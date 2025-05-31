@@ -3,3 +3,4 @@ android/build/
 *.apk
 *.so
 /node_modules
+/android/app/build/
