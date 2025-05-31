@@ -1,0 +1,1 @@
+C:\native-Project\AwesomeProject\android\app\build\intermediates\cxx\RelWithDebInfo\675p5092\obj\x86
