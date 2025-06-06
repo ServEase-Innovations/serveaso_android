@@ -18,6 +18,9 @@ import HeaderSearch from './HeaderSearch';
 import { keys } from './env';
 import Geolocation from '@react-native-community/geolocation';
 import CookServicesDialog from './CookServiceDialog';
+import MaidServiceDialog from './MaidServiceDialog';
+import NannyServiceDialog from './NannyServiceDialog';
+import DemoCook from './demoCook';
 
 interface ServiceProvider {
   serviceproviderId: number;
@@ -59,7 +62,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   const [serviceProviderData, setServiceProviderData] = useState<ServiceProvider[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Record<number, boolean>>({});
-const [dialogOpen, setDialogOpen] = useState(false);
+// const [dialogOpen, setDialogOpen] = useState(false);
 const [selectedCook, setSelectedCook] = useState<ServiceProvider | null>(null);
 
   const dispatch = useDispatch();
@@ -107,15 +110,65 @@ const [selectedCook, setSelectedCook] = useState<ServiceProvider | null>(null);
   //   }
   //   sendDataToParent(CONFIRMATION);
   // };
-  const handleSelectedProvider = (provider: any) => {
-  if (provider.housekeepingRole === 'COOK') {
-    setSelectedCook(provider);
-    setDialogOpen(true);
-  } else {
-    if (selectedProvider) {
-      selectedProvider(provider);
-    }
-    sendDataToParent(CONFIRMATION);
+//   const handleSelectedProvider = (provider: any) => {
+//   if (provider.housekeepingRole === 'COOK') {
+//     setSelectedCook(provider);
+//     setDialogOpen(true);
+//   } else {
+//     if (selectedProvider) {
+//       selectedProvider(provider);
+//     }
+//     sendDataToParent(CONFIRMATION);
+//   }
+// };
+  const [dialogOpen, setDialogOpen] = useState(false);
+const [selectedProviderData, setSelectedProviderData] = useState<ServiceProvider | null>(null);
+const handleSelectedProvider = (provider: any) => {
+  setSelectedProviderData(provider);
+  setDialogOpen(true);
+};
+
+const renderRoleSpecificDialog = () => {
+  if (!selectedProviderData) return null;
+  
+  switch (selectedProviderData.housekeepingRole) {
+    case 'COOK':
+      return (
+        // <CookServicesDialog
+        //   visible={dialogOpen}
+        //   onClose={() => setDialogOpen(false)}
+        //   // providerDetails={selectedProviderData}
+        //   sendDataToParent={sendDataToParent} open={false}
+        //    handleClose={function (): void {
+        //     throw new Error('Function not implemented.');
+        //   } }       
+        //    />
+        <DemoCook
+          visible={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          sendDataToParent={sendDataToParent}
+        />
+      );
+    case 'MAID':
+      return (
+        <MaidServiceDialog
+          visible={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          // providerDetails={selectedProviderData}
+          sendDataToParent={sendDataToParent}
+        />
+      );
+    case 'NANNY':
+      return (
+        <NannyServiceDialog
+          visible={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          // providerDetails={selectedProviderData}
+          sendDataToParent={sendDataToParent}
+        />
+      );
+    default:
+      return null;
   }
 };
 
@@ -130,13 +183,13 @@ const [selectedCook, setSelectedCook] = useState<ServiceProvider | null>(null);
         startDate: '2025-04-01',
         endDate: '2025-04-30',
         timeslot: '06:00-20:00',
-        housekeepingRole: 'COOK',
+        housekeepingRole: 'MAID',
         latitude: 22.94739666666667,
         longitude: 88.65848666666668,
       };
   
-      const response = await axios.get(
-        'http://3.109.59.100:8080/api/serviceproviders/search',
+      const response = await axiosInstance.get(
+        '/api/serviceproviders/search',
         { params }
       );
       console.log('Response:', response.data);
@@ -255,13 +308,15 @@ const [selectedCook, setSelectedCook] = useState<ServiceProvider | null>(null);
         />
       )}
 
-       <CookServicesDialog
+       {/* <CookServicesDialog
         visible={dialogOpen}
         onClose={() => setDialogOpen(false)}
         // providerDetails={selectedCook}
         sendDataToParent={sendDataToParent} open={false} handleClose={function (): void {
           throw new Error('Function not implemented.');
-        } }    />
+        } }    /> */}
+ {renderRoleSpecificDialog()}
+        
     </View>  
   );
 };

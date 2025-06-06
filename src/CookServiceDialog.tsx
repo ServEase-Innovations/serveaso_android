@@ -11,8 +11,8 @@ import {
   Platform,
 } from 'react-native';
 import axios from 'axios';
-import { useDispatch, useSelector } from 'react-redux';
 import { EnhancedProviderDetails } from './types/ProviderDetailsType';
+import { useDispatch, useSelector } from 'react-redux';
 import { BookingDetails } from './types/engagementRequest';
 import { BOOKINGS } from './Constants/pagesConstants';
 import Login from './Login';
@@ -24,8 +24,9 @@ interface CookServicesDialogProps {
   handleClose: () => void;
   providerDetails?: EnhancedProviderDetails;
   sendDataToParent?: (data: string) => void;
-  visible: boolean;        // Changed from 'open' to 'visible'
+    visible: boolean;        // Changed from 'open' to 'visible'
   onClose: () => void;  
+
 }
 
 interface MealPackage {
@@ -47,23 +48,22 @@ interface PackagesState {
   [key: string]: MealPackage;
 }
 
-const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
-  open,
-  handleClose,
+const CookServicesDialog: React.FC<CookServicesDialogProps> = ({ 
+  open, 
+  handleClose, 
   providerDetails,
   sendDataToParent,
-  visible,       // Changed from 'open' to 'visible'
-  onClose  
+  visible,
+  onClose
 }) => {
   const bookingType = useSelector((state: any) => state.bookingType?.value);
   const user = useSelector((state: any) => state.user?.value);
   const pricing = useSelector((state: any) => state.pricing?.groupedServices);
-  const cookServices = pricing?.cook?.filter((service: any) => service.Type === 'Regular') || [];
-
+  const cookServices = pricing?.cook?.filter((service: any) => service.Type === "Regular") || [];
+  
   const [packages, setPackages] = useState<PackagesState>({});
   const [loginOpen, setLoginOpen] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
-  const [voucherCode, setVoucherCode] = useState('');
   const dispatch = useDispatch();
 
   const customerId = user?.customerDetails?.customerId || null;
@@ -75,18 +75,18 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
 
   const bookingDetails: BookingDetails = {
     serviceProviderId: 0,
-    serviceProviderName: '',
+    serviceProviderName: "",
     customerId: 0,
-    customerName: '',
+    customerName: "", 
     startDate: new Date().toISOString().split('T')[0],
-    endDate: '',
-    engagements: '',
-    address: '',
-    timeslot: '',
+    endDate: "",
+    engagements: "",
+    address: "",
+    timeslot: "",
     monthlyAmount: 0,
-    paymentMode: 'UPI',
-    bookingType: 'MEAL_PACKAGE',
-    taskStatus: 'NOT_STARTED',
+    paymentMode: "UPI",
+    bookingType: "MEAL_PACKAGE",
+    taskStatus: "NOT_STARTED", 
     responsibilities: [],
   };
 
@@ -112,28 +112,28 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
   useEffect(() => {
     if (cookServices.length > 0 && Object.keys(packages).length === 0) {
       const initialPackages: PackagesState = {};
-
+      
       cookServices.forEach((service: any) => {
         const category = service.Categories.toLowerCase();
-        const maxPersons = parseInt(service['Numbers/Size'].replace('<=', '')) || 3;
-        const basePrice = service['Price /Month (INR)'];
-
+        const maxPersons = parseInt(service["Numbers/Size"].replace('<=', '')) || 3;
+        const basePrice = service["Price /Month (INR)"];
+        
         initialPackages[category] = {
           selected: false,
           persons: 1,
           basePrice,
           calculatedPrice: calculatePriceForPersons(basePrice, 1),
           maxPersons,
-          description: service['Job Description'].split('\n').filter((line: string) => line.trim() !== ''),
+          description: service["Job Description"].split('\n').filter((line: string) => line.trim() !== ''),
           preparationTime: getPreparationTime(category),
           rating: 4.84,
           reviews: getReviewsText(category),
           category: service.Categories,
-          jobDescription: service['Job Description'],
-          remarks: service['Remarks/Conditions'],
+          jobDescription: service["Job Description"],
+          remarks: service["Remarks/Conditions"]
         };
       });
-
+      
       setPackages(initialPackages);
     }
   }, [cookServices, packages]);
@@ -145,41 +145,29 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
   }, [user]);
 
   const getPreparationTime = (category: string): string => {
-    switch (category) {
-      case 'breakfast':
-        return '30 mins preparation';
-      case 'lunch':
-        return '45 mins preparation';
-      case 'dinner':
-        return '1.5 hrs preparation';
-      default:
-        return '30 mins preparation';
+    switch(category) {
+      case 'breakfast': return '30 mins preparation';
+      case 'lunch': return '45 mins preparation';
+      case 'dinner': return '1.5 hrs preparation';
+      default: return '30 mins preparation';
     }
   };
 
   const getReviewsText = (category: string): string => {
-    switch (category) {
-      case 'breakfast':
-        return '(2.9M reviews)';
-      case 'lunch':
-        return '(1.7M reviews)';
-      case 'dinner':
-        return '(2.7M reviews)';
-      default:
-        return '(1M reviews)';
+    switch(category) {
+      case 'breakfast': return '(2.9M reviews)';
+      case 'lunch': return '(1.7M reviews)';
+      case 'dinner': return '(2.7M reviews)';
+      default: return '(1M reviews)';
     }
   };
 
   const getCategoryColor = (category: string): string => {
-    switch (category.toLowerCase()) {
-      case 'breakfast':
-        return '#e17055';
-      case 'lunch':
-        return '#00b894';
-      case 'dinner':
-        return '#0984e3';
-      default:
-        return '#2d3436';
+    switch(category.toLowerCase()) {
+      case 'breakfast': return '#e17055';
+      case 'lunch': return '#00b894';
+      case 'dinner': return '#0984e3';
+      default: return '#2d3436';
     }
   };
 
@@ -196,31 +184,31 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
   };
 
   const handlePersonChange = (packageName: string, operation: 'increment' | 'decrement') => {
-    setPackages((prev) => {
+    setPackages(prev => {
       const currentPackage = prev[packageName];
       if (!currentPackage) return prev;
 
       let newValue = currentPackage.persons;
-
+      
       if (operation === 'increment') {
         newValue += 1;
       } else if (operation === 'decrement' && newValue > 1) {
         newValue -= 1;
       }
-
+      
       return {
         ...prev,
         [packageName]: {
           ...currentPackage,
           persons: newValue,
-          calculatedPrice: calculatePriceForPersons(currentPackage.basePrice, newValue),
-        },
+          calculatedPrice: calculatePriceForPersons(currentPackage.basePrice, newValue)
+        }
       };
     });
   };
 
   const togglePackageSelection = (packageName: string) => {
-    setPackages((prev) => {
+    setPackages(prev => {
       const currentPackage = prev[packageName];
       if (!currentPackage) return prev;
 
@@ -228,15 +216,14 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
         ...prev,
         [packageName]: {
           ...currentPackage,
-          selected: !currentPackage.selected,
-        },
+          selected: !currentPackage.selected
+        }
       };
     });
   };
 
   const handleApplyVoucher = () => {
     // Voucher logic here
-    Alert.alert('Voucher Applied', `Voucher code ${voucherCode} has been applied`);
   };
 
   const handleCheckout = async () => {
@@ -250,118 +237,139 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
         }));
 
       if (selectedPackages.length === 0) {
-        Alert.alert('Selection Required', 'Please select at least one package');
+        Alert.alert("Please select at least one package");
         return;
       }
 
-      const totalAmount = selectedPackages.reduce((sum, pkg) => sum + pkg.price, 0);
+      const totalAmount = selectedPackages.reduce(
+        (sum, pkg) => sum + pkg.price,
+        0
+      );
 
       const response = await axios.post(
-        'http://13.201.229.41:3000/create-order',
+        "https://utils-dmua.onrender.com/create-order",
         { amount: totalAmount * 100 },
-        { headers: { 'Content-Type': 'application/json' } }
+        { headers: { "Content-Type": "application/json" } }
       );
 
       if (response.status === 200 && response.data.success) {
         const orderId = response.data.orderId;
         const amount = totalAmount * 100;
-        const currency = 'INR';
+        const currency = "INR";
 
-        // In React Native, you would typically use a Razorpay React Native SDK
-        // This is a simplified implementation
-        Alert.alert(
-          'Payment Initiated',
-          'Redirecting to payment gateway...',
-          [
-            {
-              text: 'OK',
-              onPress: async () => {
-                // Simulate payment success
-                Alert.alert('Payment Successful', 'Your payment was successful!');
+        if (typeof window.Razorpay === "undefined") {
+          Alert.alert("Razorpay SDK not loaded.");
+          return;
+        }
 
-                bookingDetails.serviceProviderId = providerDetails?.serviceproviderId
-                  ? Number(providerDetails.serviceproviderId)
-                  : null;
-                bookingDetails.serviceProviderName = providerFullName;
-                bookingDetails.customerId = customerId;
-                bookingDetails.customerName = customerName;
-                bookingDetails.address = currentLocation;
-                bookingDetails.startDate = bookingType?.startDate || new Date().toISOString().split('T')[0];
-                bookingDetails.endDate = bookingType?.endDate || '';
+        bookingDetails.serviceProviderId = providerDetails?.serviceproviderId
+          ? Number(providerDetails.serviceproviderId)
+          : null;
+        bookingDetails.serviceProviderName = providerFullName;
+        bookingDetails.customerId = customerId;
+        bookingDetails.customerName = customerName;
+        bookingDetails.address = currentLocation;
+        bookingDetails.startDate =
+          bookingType?.startDate || new Date().toISOString().split("T")[0];
+        bookingDetails.endDate = bookingType?.endDate || "";
 
-                bookingDetails.engagements = selectedPackages
-                  .map((pkg) => `${pkg.mealType} for ${pkg.persons} persons`)
-                  .join(', ');
-                bookingDetails.monthlyAmount = totalAmount;
-                bookingDetails.timeslot = bookingType.timeRange;
+        bookingDetails.engagements = selectedPackages
+          .map((pkg) => `${pkg.mealType} for ${pkg.persons} persons`)
+          .join(", ");
+        bookingDetails.monthlyAmount = totalAmount;
+        bookingDetails.timeslot = bookingType.timeRange;
 
+        const options = {
+          key: "rzp_test_lTdgjtSRlEwreA",
+          amount,
+          currency,
+          name: "Serveaso",
+          description: "Meal Package Booking",
+          order_id: orderId,
+          handler: async function (razorpayResponse: any) {
+            Alert.alert(`Payment successful! Payment ID: ${razorpayResponse.razorpay_payment_id}`);
+
+            try {
+              const bookingResponse = await axiosInstance.post(
+                "/api/serviceproviders/engagement/add",
+                bookingDetails,
+                {
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                }
+              );
+
+              if (bookingResponse.status === 201) {
+                // Notification logic inserted here
                 try {
-                  const bookingResponse = await axiosInstance.post(
-                    '/api/serviceproviders/engagement/add',
-                    bookingDetails,
+                  const notifyResponse = await fetch(
+                    "http://localhost:4000/send-notification",
                     {
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
+                      method: "POST",
+                      body: JSON.stringify({
+                        title: "Hello from ServEaso!",
+                        body: `Your booking for ${bookingDetails.engagements} has been successfully confirmed!`,
+                        url: "http://localhost:3000",
+                      }),
+                      headers: { "Content-Type": "application/json" },
                     }
                   );
 
-                  if (bookingResponse.status === 201) {
-                    try {
-                      const notifyResponse = await fetch('http://localhost:4000/send-notification', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                          title: 'Hello from ServEaso!',
-                          body: `Your booking for ${bookingDetails.engagements} has been successfully confirmed!`,
-                          url: 'http://localhost:3000',
-                        }),
-                        headers: { 'Content-Type': 'application/json' },
-                      });
-
-                      if (notifyResponse.ok) {
-                        console.log('Notification triggered!');
-                        Alert.alert('Notification', 'Booking confirmation sent!');
-                      } else {
-                        console.error('Notification failed');
-                      }
-                    } catch (error) {
-                      console.error('Error sending notification:', error);
-                    }
-
-                    if (sendDataToParent) {
-                      sendDataToParent(BOOKINGS);
-                    }
-                    handleClose();
+                  if (notifyResponse.ok) {
+                    console.log("Notification triggered!");
+                    Alert.alert("Notification sent!");
+                  } else {
+                    console.error("Notification failed");
+                    Alert.alert("Failed to send notification");
                   }
                 } catch (error) {
-                  console.error('Error saving booking:', error);
-                  Alert.alert('Error', 'Failed to save booking details');
+                  console.error("Error sending notification:", error);
+                  Alert.alert("Error sending notification");
                 }
-              },
-            },
-          ]
-        );
+
+                if (sendDataToParent) {
+                  sendDataToParent(BOOKINGS);
+                }
+                handleClose();
+              }
+            } catch (error) {
+              console.error("Error saving booking:", error);
+            }
+          },
+          prefill: {
+            name: customerName || "",
+            email: user?.email || "",
+            contact: user?.mobileNo || "",
+          },
+          theme: {
+            color: "#3399cc",
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
       }
     } catch (error) {
-      console.log('error => ', error);
-      Alert.alert('Payment Failed', 'Failed to initiate payment. Please try again.');
+      console.log("error => ", error);
+      Alert.alert("Failed to initiate payment. Please try again.");
     }
   };
 
   const renderPackageSections = () => {
     return Object.entries(packages).map(([packageName, pkg]) => {
       const categoryColor = getCategoryColor(packageName);
-
+      
       return (
-        <View
+        <View 
           key={packageName}
           style={[
             styles.packageContainer,
             {
               backgroundColor: pkg.selected ? `${categoryColor}10` : '#fff',
               borderLeftWidth: pkg.selected ? 3 : 1,
-              borderLeftColor: pkg.selected ? categoryColor : '#dfe6e9',
-            },
+              borderLeftColor: pkg.selected ? categoryColor : '#dfe6e9'
+            }
           ]}
         >
           <View style={styles.packageHeader}>
@@ -378,24 +386,32 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
               <Text style={[styles.priceText, { color: categoryColor }]}>
                 ₹{pkg.calculatedPrice.toFixed(2)}
               </Text>
-              <Text style={styles.preparationTimeText}>{pkg.preparationTime}</Text>
+              <Text style={styles.timeText}>{pkg.preparationTime}</Text>
             </View>
           </View>
-
-          <View style={styles.personsContainer}>
-            <Text style={styles.personsLabel}>Persons:</Text>
+          
+          <View style={styles.personSelectorContainer}>
+            <Text style={styles.personLabel}>Persons:</Text>
             <View style={styles.personSelector}>
-              <TouchableOpacity
+              <TouchableOpacity 
                 onPress={() => handlePersonChange(packageName, 'decrement')}
-                style={[styles.personButton, styles.leftButton]}
+                style={[
+                  styles.personButton, 
+                  styles.leftPersonButton,
+                  pkg.persons <= 1 && styles.disabledButton
+                ]}
                 disabled={pkg.persons <= 1}
               >
                 <Text style={styles.personButtonText}>-</Text>
               </TouchableOpacity>
               <Text style={styles.personCount}>{pkg.persons}</Text>
-              <TouchableOpacity
+              <TouchableOpacity 
                 onPress={() => handlePersonChange(packageName, 'increment')}
-                style={[styles.personButton, styles.rightButton]}
+                style={[
+                  styles.personButton, 
+                  styles.rightPersonButton,
+                  pkg.persons >= 15 && styles.disabledButton
+                ]}
                 disabled={pkg.persons >= 15}
               >
                 <Text style={styles.personButtonText}>+</Text>
@@ -405,35 +421,29 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
               <Text style={styles.extraChargeText}>*Additional charges applied</Text>
             )}
           </View>
-
+          
           <View style={styles.descriptionContainer}>
-            {pkg.description.map(
-              (item, index) =>
-                item.trim() && (
-                  <View key={index} style={styles.descriptionItem}>
-                    <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.descriptionText}>{item.trim()}</Text>
-                  </View>
-                )
-            )}
+            {pkg.description.map((item, index) => (
+              item.trim() && (
+                <View key={index} style={styles.descriptionItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.descriptionText}>{item.trim()}</Text>
+                </View>
+              )
+            ))}
           </View>
-
-          <TouchableOpacity
+          
+          <TouchableOpacity 
             onPress={() => togglePackageSelection(packageName)}
             style={[
               styles.selectButton,
               {
                 backgroundColor: pkg.selected ? categoryColor : '#fff',
-                borderColor: pkg.selected ? categoryColor : '#dfe6e9',
-              },
+                borderColor: pkg.selected ? categoryColor : '#dfe6e9'
+              }
             ]}
           >
-            <Text
-              style={[
-                styles.selectButtonText,
-                { color: pkg.selected ? '#fff' : categoryColor },
-              ]}
-            >
+            <Text style={[styles.selectButtonText, { color: pkg.selected ? '#fff' : categoryColor }]}>
               {pkg.selected ? 'SELECTED' : 'SELECT PACKAGE'}
             </Text>
           </TouchableOpacity>
@@ -450,32 +460,30 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
   return (
     <>
       <Modal
-       visible={visible}    // Changed from open
+      visible={visible}    // Changed from open
         onRequestClose={onClose} 
         // visible={open}
-        // onRequestClose={handleClose}
         animationType="slide"
         transparent={false}
+        // onRequestClose={handleClose}
       >
         <View style={styles.modalContainer}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>MEAL PACKAGES</Text>
+            <Text style={styles.headerText}>MEAL PACKAGES</Text>
           </View>
-
-          <ScrollView style={styles.content}>
+          
+          <ScrollView style={styles.contentContainer}>
             {renderPackageSections()}
           </ScrollView>
-
+          
           <View style={styles.voucherContainer}>
             <Text style={styles.voucherTitle}>Apply Voucher</Text>
             <View style={styles.voucherInputContainer}>
               <TextInput
                 placeholder="Enter voucher code"
                 style={styles.voucherInput}
-                value={voucherCode}
-                onChangeText={setVoucherCode}
               />
-              <TouchableOpacity
+              <TouchableOpacity 
                 onPress={handleApplyVoucher}
                 style={styles.applyButton}
               >
@@ -483,22 +491,24 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
               </TouchableOpacity>
             </View>
           </View>
-
+          
           <View style={styles.footer}>
             <View>
               <Text style={styles.totalItemsText}>
-                Total for {totalItems} item{totalItems !== 1 ? 's' : ''} ({totalPersons} person
-                {totalPersons !== 1 ? 's' : ''})
+                Total for {totalItems} item{totalItems !== 1 ? 's' : ''} ({totalPersons} person{totalPersons !== 1 ? 's' : ''})
               </Text>
               <Text style={styles.totalPriceText}>₹{totalPrice.toFixed(2)}</Text>
             </View>
-
+            
             <View style={styles.checkoutContainer}>
               {!loggedInUser && (
                 <>
-                  <TouchableOpacity style={styles.infoButton}>
-                    <Icon name="info-outline" size={20} color="#636e72" />
-                  </TouchableOpacity>
+                  <Icon 
+                    name="info-outline" 
+                    size={20} 
+                    color="#666" 
+                    style={styles.infoIcon}
+                  />
                   <TouchableOpacity
                     style={styles.loginButton}
                     onPress={handleLogin}
@@ -507,12 +517,12 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
                   </TouchableOpacity>
                 </>
               )}
-
+              
               {loggedInUser && (
                 <TouchableOpacity
                   style={[
                     styles.checkoutButton,
-                    { backgroundColor: totalItems > 0 ? '#e17055' : '#bdc3c7' },
+                    totalItems === 0 && styles.disabledCheckoutButton
                   ]}
                   onPress={handleCheckout}
                   disabled={totalItems === 0}
@@ -527,18 +537,11 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
 
       <Modal
         visible={loginOpen}
-       
-        onRequestClose={handleLoginClose}
         animationType="slide"
         transparent={false}
+        onRequestClose={handleLoginClose}
       >
-        <Login onClose={function (): void {
-          throw new Error('Function not implemented.');
-        } } onLoginSuccess={function (role: string): void {
-          throw new Error('Function not implemented.');
-        } }       
-         //  bookingPage={handleBookingPage}
-         />
+        <Login bookingPage={handleBookingPage} />
       </Modal>
     </>
   );
@@ -554,14 +557,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  headerTitle: {
+  headerText: {
     color: '#2d3436',
     fontSize: 24,
     fontWeight: 'bold',
   },
-  content: {
+  contentContainer: {
     padding: 20,
-    flex: 1,
   },
   packageContainer: {
     borderWidth: 1,
@@ -601,16 +603,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 18,
   },
-  preparationTimeText: {
+  timeText: {
     color: '#636e72',
     fontSize: 14,
   },
-  personsContainer: {
+  personSelectorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 15,
   },
-  personsLabel: {
+  personLabel: {
     marginRight: 15,
     color: '#2d3436',
   },
@@ -626,17 +628,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     backgroundColor: '#f5f5f5',
   },
-  leftButton: {
-    borderRightWidth: 1,
-    borderRightColor: '#dfe6e9',
+  leftPersonButton: {
     borderTopLeftRadius: 20,
     borderBottomLeftRadius: 20,
+    borderRightWidth: 1,
+    borderRightColor: '#dfe6e9',
   },
-  rightButton: {
-    borderLeftWidth: 1,
-    borderLeftColor: '#dfe6e9',
+  rightPersonButton: {
     borderTopRightRadius: 20,
     borderBottomRightRadius: 20,
+    borderLeftWidth: 1,
+    borderLeftColor: '#dfe6e9',
   },
   personButtonText: {
     fontSize: 16,
@@ -646,6 +648,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     minWidth: 20,
     textAlign: 'center',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   extraChargeText: {
     color: '#e17055',
@@ -672,11 +677,10 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderRadius: 6,
-    fontWeight: 'bold',
+    alignItems: 'center',
     marginTop: 10,
   },
   selectButtonText: {
-    textAlign: 'center',
     fontWeight: 'bold',
   },
   voucherContainer: {
@@ -706,11 +710,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   applyButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    padding: 10,
     backgroundColor: '#27ae60',
     borderRadius: 6,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   applyButtonText: {
     color: 'white',
@@ -749,12 +753,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  infoButton: {
+  infoIcon: {
     marginRight: 8,
   },
   loginButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    padding: 8,
     backgroundColor: '#1976d2',
     borderRadius: 6,
   },
@@ -766,7 +769,11 @@ const styles = StyleSheet.create({
   checkoutButton: {
     paddingVertical: 12,
     paddingHorizontal: 25,
+    backgroundColor: '#e17055',
     borderRadius: 6,
+  },
+  disabledCheckoutButton: {
+    backgroundColor: '#bdc3c7',
   },
   checkoutButtonText: {
     color: 'white',

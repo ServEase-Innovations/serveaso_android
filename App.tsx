@@ -7,12 +7,7 @@ import Login from './src/Login';
 import DetailsView from './src/DetailsView';
 import ServiceProviderDashboard from './src/ServiceProviderDashboard';
 import Booking from './src/Bookings';
-import { CONFIRMATION, DETAILS } from './src/Constants/pagesConstants';
-import ProviderDetails from './src/ProviderDetails';
-import ServiceProvidersList from './src/ServiceProvidersList';
-import BookingDialog from './src/newServiceProvider';
-import ServiceProviderSearch from './src/ApiSearch';
-
+import { CONFIRMATION, DETAILS, PROFILE } from './src/Constants/pagesConstants';
 
 const App = () => {
   const [showLogin, setShowLogin] = useState(false);
@@ -30,7 +25,13 @@ const App = () => {
     setShowLogin(false);
   };
 
-  const handleLoginSuccess = (role: string) => {
+  const handleLoginSuccess = () => {
+    setIsLoggedIn(true);
+    setShowLogin(false);
+    setCurrentView('landing');
+  };
+
+  const handleServiceProviderLogin = (role: string) => {
     setSelectedRole(role);
     setShowLogin(false);
     setIsLoggedIn(true);
@@ -70,6 +71,8 @@ const App = () => {
     setSelection(page);
     if (page === DETAILS) {
       setCurrentView('details');
+    } else if (page === PROFILE) {
+      setCurrentView('dashboard');
     }
   };
 
@@ -88,15 +91,20 @@ const App = () => {
       case 'details':
         return (
           <DetailsView
-          sendDataToParent={() => {}}
-            // role={selectedRole || ''}
-            // goBack={() => setCurrentView('landing')}    
-                />
+            sendDataToParent={() => {}}
+          />
         );
       case 'landing':
       default:
         if (showLogin) {
-          return <Login onClose={handleCloseLogin} onLoginSuccess={handleLoginSuccess} />;
+          return (
+            <Login 
+              onClose={handleCloseLogin}
+              onLoginSuccess={handleLoginSuccess}
+              // bookingPage={handleServiceProviderLogin}
+              sendDataToParent={handleDataFromChild}
+            />
+          );
         }
         return (
           <LandingPage 
@@ -126,10 +134,6 @@ const App = () => {
           {renderCurrentView()}
         </SafeAreaView>
       </View> 
-     
-     {/* <ServiceProviderSearch/> */}
-{/* <ServiceProvidersList/> */}
-{/* // <BookingDialog/> */}
 
       <View style={styles.footer}>
         <Footer />

@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+   KeyboardAvoidingView,
 } from 'react-native';
 import moment from 'moment';
 import { Picker } from '@react-native-picker/picker';
@@ -19,6 +20,7 @@ import { RadioButton } from 'react-native-paper';
 import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'react-native-image-picker';
 import axios from 'axios';
+import axiosInstance from './axiosInstance';
 
 // Define interfaces
 interface FormData {
@@ -292,8 +294,8 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
     return age >= 18;
   };
 
-  const handleDOBChange = (dob: string) => {
-    setFormData({ ...formData, dob });
+ const handleDOBChange = (dob: string) => {
+  setFormData({ ...formData, dob });
 
     const isValidAge = validateAge(dob);
 
@@ -413,26 +415,99 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
   };
 
   const handleSubmit = async () => {
-    setIsLoading(true);
-    
-    try {
-      // Filter out empty values
-      const payload = Object.fromEntries(
-        Object.entries(formData).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
-      );
+  setIsLoading(true);
+  
+  try {
+    // Filter out empty values
+    const filteredPayload = Object.fromEntries(
+      Object.entries(formData).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
+    );
 
-      // In a real app, you would upload the image first and then submit the form
-      // This is a simplified version
-      
-      Alert.alert('Success', 'Registration successful!');
-      onRegistrationSuccess();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to register. Please try again.');
-      console.error('Error submitting form:', error);
-    } finally {
-      setIsLoading(false);
+    if (validateForm()) {
+      try {
+        // Upload profile image if selected
+        if (image) {
+          const formDataToUpload = new FormData();
+          formDataToUpload.append('image', {
+            uri: image.uri,
+            type: 'image/jpeg',
+            name: 'profile.jpg',
+          });
+
+          const imageResponse = await axios.post(
+            'http://your-api-endpoint/upload',
+            formDataToUpload,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            }
+          );
+
+          if (imageResponse.status === 200) {
+            filteredPayload.profilePic = imageResponse.data.imageUrl;
+          } else {
+            Alert.alert('Warning', 'Image upload failed. Proceeding without profile picture.');
+          }
+        }
+
+        // Upload document image if selected
+        if (documentImage) {
+          const docFormData = new FormData();
+          docFormData.append('document', {
+            uri: documentImage.uri,
+            type: 'image/jpeg',
+            name: 'document.jpg',
+          });
+
+          const docResponse = await axios.post(
+            'http://your-api-endpoint/upload-document',
+            docFormData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            }
+          );
+
+          if (docResponse.status === 200) {
+            filteredPayload.documentImageUrl = docResponse.data.documentUrl;
+          } else {
+            Alert.alert('Warning', 'Document upload failed. Proceeding without document.');
+          }
+        }
+
+        // Submit the form data
+        const response = await axiosInstance.post(
+          "/api/serviceproviders/serviceprovider/add",
+          filteredPayload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        Alert.alert('Success', 'Service provider added successfully!');
+        console.log("Success:", response.data);
+
+        setTimeout(() => {
+          onRegistrationSuccess();
+        }, 3000);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to add service provider. Please try again.');
+        console.error("Error submitting form:", error);
+      }
+    } else {
+      Alert.alert('Warning', 'Please fill out all required fields.');
     }
-  };
+  } catch (error) {
+    Alert.alert('Error', 'Failed to register. Please try again.');
+    console.error('Error submitting form:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const updateFormTimeSlot = (morningRange: number[], eveningRange: number[]) => {
     const startMorning = formatDisplayTime(morningRange[0]);
@@ -467,39 +542,102 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
               </TouchableOpacity>
             </View>
 
+            <Text style={styles.inputLabel}>First Name *</Text>
             <TextInput
               style={[styles.input, errors.firstName && styles.inputError]}
-              placeholder="First Name *"
+              placeholder="Enter your first name"
+              placeholderTextColor="#999"
               value={formData.firstName}
               onChangeText={(text) => handleRealTimeValidation('firstName', text)}
               editable={!isFieldsDisabled}
             />
             {errors.firstName && <Text style={styles.errorText}>{errors.firstName}</Text>}
 
+            <Text style={styles.inputLabel}>Middle Name</Text>
             <TextInput
               style={styles.input}
-              placeholder="Middle Name"
+              placeholder="Enter your middle name"
+              placeholderTextColor="#999"
               value={formData.middleName}
               onChangeText={(text) => handleChange('middleName', text)}
               editable={!isFieldsDisabled}
             />
 
+            <Text style={styles.inputLabel}>Last Name *</Text>
             <TextInput
               style={[styles.input, errors.lastName && styles.inputError]}
-              placeholder="Last Name *"
+              placeholder="Enter your last name"
+              placeholderTextColor="#999"
               value={formData.lastName}
               onChangeText={(text) => handleRealTimeValidation('lastName', text)}
               editable={!isFieldsDisabled}
             />
             {errors.lastName && <Text style={styles.errorText}>{errors.lastName}</Text>}
 
-            {/* Date Picker - Using TextInput for simplicity */}
+            {/* <Text style={styles.inputLabel}>Date of Birth *</Text>
             <TextInput
               style={styles.input}
-              placeholder="Date of Birth (YYYY-MM-DD) *"
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#999"
               value={formData.dob}
               onChangeText={(text) => handleDOBChange(text)}
-            />
+            /> */}
+            <Text style={styles.inputLabel}>Date of Birth *</Text>
+<View style={styles.dateInputContainer}>
+  <TextInput
+    style={[styles.dateInput, styles.dateInputPart, !validateAge(formData.dob) && formData.dob ? styles.inputError : null]}
+    placeholder="YYYY"
+    placeholderTextColor="#999"
+    value={formData.dob.split('-')[0] || ''}
+    onChangeText={(text) => {
+      if (text.length <= 4) {
+        const parts = formData.dob.split('-');
+        parts[0] = text;
+        const newDob = parts.join('-');
+        handleDOBChange(newDob);
+      }
+    }}
+    keyboardType="number-pad"
+    maxLength={4}
+  />
+  <Text style={styles.dateSeparator}>/</Text>
+  <TextInput
+    style={[styles.dateInput, styles.dateInputPart]}
+    placeholder="MM"
+    placeholderTextColor="#999"
+    value={formData.dob.split('-')[1] || ''}
+    onChangeText={(text) => {
+      if (text.length <= 2 && (Number(text) <= 12 || text === '')) {
+        const parts = formData.dob.split('-');
+        parts[1] = text;
+        const newDob = parts.join('-');
+        handleDOBChange(newDob);
+      }
+    }}
+    keyboardType="number-pad"
+    maxLength={2}
+  />
+  <Text style={styles.dateSeparator}>/</Text>
+  <TextInput
+    style={[styles.dateInput, styles.dateInputPart]}
+    placeholder="DD"
+    placeholderTextColor="#999"
+    value={formData.dob.split('-')[2] || ''}
+    onChangeText={(text) => {
+      if (text.length <= 2 && (Number(text) <= 31 || text === '')) {
+        const parts = formData.dob.split('-');
+        parts[2] = text;
+        const newDob = parts.join('-');
+        handleDOBChange(newDob);
+      }
+    }}
+    keyboardType="number-pad"
+    maxLength={2}
+  />
+</View>
+{!validateAge(formData.dob) && formData.dob ? (
+  <Text style={styles.errorText}>You must be at least 18 years old to proceed.</Text>
+) : null}
 
             <Text style={styles.label}>Gender *</Text>
             <RadioButton.Group
@@ -523,9 +661,11 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
             </RadioButton.Group>
             {errors.gender && <Text style={styles.errorText}>{errors.gender}</Text>}
 
+            <Text style={styles.inputLabel}>Email *</Text>
             <TextInput
               style={[styles.input, errors.emailId && styles.inputError]}
-              placeholder="Email *"
+              placeholder="Enter your email address"
+              placeholderTextColor="#999"
               value={formData.emailId}
               onChangeText={(text) => handleRealTimeValidation('emailId', text)}
               keyboardType="email-address"
@@ -533,10 +673,12 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
             />
             {errors.emailId && <Text style={styles.errorText}>{errors.emailId}</Text>}
 
+            <Text style={styles.inputLabel}>Password *</Text>
             <View style={styles.passwordContainer}>
               <TextInput
                 style={[styles.input, errors.password && styles.inputError]}
-                placeholder="Password *"
+                placeholder="Create a password"
+                placeholderTextColor="#999"
                 secureTextEntry={!showPassword}
                 value={formData.password}
                 onChangeText={(text) => handleRealTimeValidation('password', text)}
@@ -551,10 +693,12 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
             </View>
             {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
+            <Text style={styles.inputLabel}>Confirm Password *</Text>
             <View style={styles.passwordContainer}>
               <TextInput
                 style={[styles.input, errors.confirmPassword && styles.inputError]}
-                placeholder="Confirm Password *"
+                placeholder="Confirm your password"
+                placeholderTextColor="#999"
                 secureTextEntry={!showConfirmPassword}
                 value={formData.confirmPassword}
                 onChangeText={(text) => handleRealTimeValidation('confirmPassword', text)}
@@ -569,9 +713,11 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
             </View>
             {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
 
+            <Text style={styles.inputLabel}>Mobile Number *</Text>
             <TextInput
               style={[styles.input, errors.mobileNo && styles.inputError]}
-              placeholder="Mobile Number *"
+              placeholder="Enter your 10-digit mobile number"
+              placeholderTextColor="#999"
               value={formData.mobileNo}
               onChangeText={(text) => handleRealTimeValidation('mobileNo', text)}
               keyboardType="phone-pad"
@@ -579,9 +725,11 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
             />
             {errors.mobileNo && <Text style={styles.errorText}>{errors.mobileNo}</Text>}
 
+            <Text style={styles.inputLabel}>Alternate Number</Text>
             <TextInput
               style={styles.input}
-              placeholder="Alternate Number"
+              placeholder="Enter alternate contact number"
+              placeholderTextColor="#999"
               value={formData.AlternateNumber}
               onChangeText={(text) => handleChange('AlternateNumber', text)}
               keyboardType="phone-pad"
@@ -593,59 +741,73 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
       case 1:
         return (
           <ScrollView style={styles.stepContainer}>
+            <Text style={styles.inputLabel}>Address *</Text>
             <TextInput
               style={[styles.input, errors.address && styles.inputError]}
-              placeholder="Address *"
+              placeholder="Enter your complete address"
+              placeholderTextColor="#999"
               value={formData.address}
               onChangeText={(text) => handleChange('address', text)}
               multiline
             />
             {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
 
+            <Text style={styles.inputLabel}>Building Name *</Text>
             <TextInput
               style={[styles.input, errors.buildingName && styles.inputError]}
-              placeholder="Building Name *"
+              placeholder="Enter building name"
+              placeholderTextColor="#999"
               value={formData.buildingName}
               onChangeText={(text) => handleChange('buildingName', text)}
             />
             {errors.buildingName && <Text style={styles.errorText}>{errors.buildingName}</Text>}
 
+            <Text style={styles.inputLabel}>Locality *</Text>
             <TextInput
               style={[styles.input, errors.locality && styles.inputError]}
-              placeholder="Locality *"
+              placeholder="Enter your locality"
+              placeholderTextColor="#999"
               value={formData.locality}
               onChangeText={(text) => handleChange('locality', text)}
             />
             {errors.locality && <Text style={styles.errorText}>{errors.locality}</Text>}
 
+            <Text style={styles.inputLabel}>Street *</Text>
             <TextInput
               style={[styles.input, errors.street && styles.inputError]}
-              placeholder="Street *"
+              placeholder="Enter street name"
+              placeholderTextColor="#999"
               value={formData.street}
               onChangeText={(text) => handleChange('street', text)}
             />
             {errors.street && <Text style={styles.errorText}>{errors.street}</Text>}
 
+            <Text style={styles.inputLabel}>Pincode *</Text>
             <TextInput
               style={[styles.input, errors.pincode && styles.inputError]}
-              placeholder="Pincode *"
+              placeholder="Enter 6-digit pincode"
+              placeholderTextColor="#999"
               value={formData.pincode}
               onChangeText={(text) => handleRealTimeValidation('pincode', text)}
               keyboardType="number-pad"
             />
             {errors.pincode && <Text style={styles.errorText}>{errors.pincode}</Text>}
 
+            <Text style={styles.inputLabel}>Current Location *</Text>
             <TextInput
               style={[styles.input, errors.currentLocation && styles.inputError]}
-              placeholder="Current Location *"
+              placeholder="Enter your current location"
+              placeholderTextColor="#999"
               value={formData.currentLocation}
               onChangeText={(text) => handleChange('currentLocation', text)}
             />
             {errors.currentLocation && <Text style={styles.errorText}>{errors.currentLocation}</Text>}
 
+            <Text style={styles.inputLabel}>Nearby Location</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nearby Location"
+              placeholder="Enter nearby landmark"
+              placeholderTextColor="#999"
               value={formData.nearbyLocation}
               onChangeText={(text) => handleChange('nearbyLocation', text)}
             />
@@ -735,27 +897,33 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
             <Text style={styles.label}>Languages</Text>
             <Text style={styles.note}>Note: Languages selection UI would be implemented here</Text>
 
+            <Text style={styles.inputLabel}>Description</Text>
             <TextInput
               style={styles.input}
-              placeholder="Description"
+              placeholder="Describe your services and experience"
+              placeholderTextColor="#999"
               value={formData.description}
               onChangeText={(text) => handleChange('description', text)}
               multiline
               numberOfLines={4}
             />
 
+            <Text style={styles.inputLabel}>Experience (years) *</Text>
             <TextInput
               style={[styles.input, errors.experience && styles.inputError]}
-              placeholder="Experience *"
+              placeholder="Enter your years of experience"
+              placeholderTextColor="#999"
               value={formData.experience}
               onChangeText={(text) => handleChange('experience', text)}
               keyboardType="numeric"
             />
             {errors.experience && <Text style={styles.errorText}>{errors.experience}</Text>}
 
+            <Text style={styles.inputLabel}>Referral Code (Optional)</Text>
             <TextInput
               style={styles.input}
-              placeholder="Referral Code (Optional)"
+              placeholder="Enter referral code if any"
+              placeholderTextColor="#999"
               value={formData.referralCode}
               onChangeText={(text) => handleChange('referralCode', text)}
             />
@@ -827,9 +995,11 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
       case 3:
         return (
           <ScrollView style={styles.stepContainer}>
+            <Text style={styles.inputLabel}>Aadhaar Number *</Text>
             <TextInput
               style={[styles.input, errors.kyc && styles.inputError]}
-              placeholder="Aadhaar Number *"
+              placeholder="Enter 12-digit Aadhaar number"
+              placeholderTextColor="#999"
               value={formData.AADHAR}
               onChangeText={(text) => handleRealTimeValidation('AADHAR', text)}
               keyboardType="numeric"
@@ -864,7 +1034,16 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
   };
 
   return (
-    <View style={styles.container}>
+     <KeyboardAvoidingView
+    style={styles.container}
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+  >
+    <ScrollView 
+      contentContainerStyle={styles.scrollContainer}
+      keyboardShouldPersistTaps="handled"
+    >
+    // <View style={styles.container}>
       <Text style={styles.title}>Service Provider Registration</Text>
       
       {/* Stepper */}
@@ -916,11 +1095,21 @@ const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = 
 
       <View style={styles.loginLinkContainer}>
         <Text style={styles.loginText}>Already have an account? </Text>
-        <TouchableOpacity onPress={handleBackLogin}>
+        <TouchableOpacity onPress={() => {
+          console.log('Sign in button pressed');
+          if (onBackToLogin) {
+            onBackToLogin();
+          } else {
+            console.error('onBackToLogin function not provided');
+          }
+        }}>
           <Text style={styles.loginLink}>Sign in</Text>
         </TouchableOpacity>
       </View>
-    </View>
+ </View>
+    </ScrollView>
+  </KeyboardAvoidingView>
+   
   );
 };
 
@@ -929,6 +1118,10 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#fff',
+  },
+   scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 20, // Add some padding at the bottom
   },
   title: {
     fontSize: 24,
@@ -941,12 +1134,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 20,
-    flexWrap: 'wrap',
   },
   stepIndicatorContainer: {
     alignItems: 'center',
-    width: '20%',
-    marginBottom: 10,
+    flex: 1,
   },
   stepIndicator: {
     width: 30,
@@ -975,32 +1166,41 @@ const styles = StyleSheet.create({
     flex: 1,
     marginBottom: 20,
   },
+  inputLabel: {
+    fontSize: 14,
+    marginBottom: 5,
+    color: '#333',
+    fontWeight: '500',
+  },
+  label: {
+    fontSize: 14,
+    marginBottom: 5,
+    marginTop: 10,
+    color: '#333',
+    fontWeight: '500',
+  },
   input: {
-    borderWidth: 1,
+    height: 40,
     borderColor: '#ddd',
+    borderWidth: 1,
     borderRadius: 5,
-    padding: 10,
+    paddingHorizontal: 10,
     marginBottom: 10,
-    fontSize: 16,
+    backgroundColor: '#fff',
+     color: '#000',
   },
   inputError: {
     borderColor: 'red',
   },
   errorText: {
     color: 'red',
+    fontSize: 12,
     marginBottom: 10,
-    fontSize: 14,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
   },
   radioGroup: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
+    justifyContent: 'space-around',
+    marginBottom: 10,
   },
   radioOption: {
     flexDirection: 'row',
@@ -1009,7 +1209,6 @@ const styles = StyleSheet.create({
   radioLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 5,
   },
   icon: {
     width: 20,
@@ -1017,32 +1216,36 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   picker: {
+    height: 50,
+    width: '100%',
+    marginBottom: 10,
     borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    position: 'relative',
   },
   showPasswordButton: {
     position: 'absolute',
     right: 10,
-    padding: 10,
   },
   button: {
     backgroundColor: '#1fb28a',
-    padding: 15,
+    padding: 12,
     borderRadius: 5,
     alignItems: 'center',
-    marginBottom: 15,
+    marginVertical: 10,
   },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
   },
   backButton: {
-    backgroundColor: '#ccc',
-    padding: 15,
+    backgroundColor: '#666',
+    padding: 12,
     borderRadius: 5,
     alignItems: 'center',
     flex: 1,
@@ -1050,14 +1253,14 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     backgroundColor: '#1fb28a',
-    padding: 15,
+    padding: 12,
     borderRadius: 5,
     alignItems: 'center',
     flex: 1,
   },
   submitButton: {
     backgroundColor: '#1fb28a',
-    padding: 15,
+    padding: 12,
     borderRadius: 5,
     alignItems: 'center',
     flex: 1,
@@ -1072,28 +1275,27 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   imageUploadButton: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  profileImage: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-  },
   imageUploadText: {
     color: '#666',
     textAlign: 'center',
   },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
   documentPreview: {
     alignItems: 'center',
     marginTop: 10,
-    marginBottom: 20,
   },
   documentImage: {
     width: 200,
@@ -1106,17 +1308,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
     color: '#666',
   },
-  sliderLabel: {
-    fontSize: 14,
-    marginTop: 15,
-    marginBottom: 5,
-    color: '#333',
-  },
-  sliderValue: {
-    textAlign: 'center',
-    marginBottom: 15,
-    color: '#666',
-  },
   confirmationContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1126,7 +1317,7 @@ const styles = StyleSheet.create({
   confirmationText: {
     fontSize: 18,
     textAlign: 'center',
-    color: '#333',
+    color: '#1fb28a',
   },
   loginLinkContainer: {
     flexDirection: 'row',
@@ -1141,32 +1332,41 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   note: {
-    fontStyle: 'italic',
+    fontSize: 12,
     color: '#666',
-    marginBottom: 15,
+    marginBottom: 10,
   },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 15,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 8,
-    backgroundColor: '#e0e0e0',
-  },
-  selectedChip: {
-    backgroundColor: '#1fb28a',
-  },
-  chipText: {
+  sliderLabel: {
+    fontSize: 14,
+    marginTop: 10,
     color: '#333',
   },
-  selectedChipText: {
-    color: '#fff',
+  sliderValue: {
+    textAlign: 'center',
+    marginBottom: 10,
+    color: '#666',
   },
+  dateInputContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 10,
+},
+dateInput: {
+  height: 40,
+  borderColor: '#ddd',
+  borderWidth: 1,
+  borderRadius: 5,
+  paddingHorizontal: 10,
+  backgroundColor: '#fff',
+},
+dateInputPart: {
+  flex: 1,
+  textAlign: 'center',
+},
+dateSeparator: {
+  paddingHorizontal: 5,
+  fontSize: 16,
+},
 });
 
 export default ServiceProviderRegistration;

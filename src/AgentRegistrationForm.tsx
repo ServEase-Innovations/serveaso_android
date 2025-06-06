@@ -3,14 +3,14 @@ import {
   View,
   TextInput,
   Text,
-  Button,
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Clipboard,
   Platform,
+  ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
-import ClipboardLib from '@react-native-clipboard/clipboard';
+import Clipboard from '@react-native-clipboard/clipboard';
 import axios from 'axios';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
@@ -19,29 +19,29 @@ interface AgentRegistrationFormProps {
   onRegistrationSuccess: () => void;
 }
 
-const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({ 
-  onBackToLogin, 
-  onRegistrationSuccess 
+const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
+  onBackToLogin,
+  onRegistrationSuccess,
 }) => {
   const [formData, setFormData] = useState({
-    companyName: "",
-    mobileNumber: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    address: "",
+    companyName: '',
+    mobileNumber: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    address: '',
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
 
   const [validationErrors, setValidationErrors] = useState({
-    mobileNumber: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
+    mobileNumber: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
   });
-  const [referralCode, setReferralCode] = useState('');
 
   const mobileRegex = /^[0-9]{10}$/;
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -55,24 +55,49 @@ const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
   const validateForm = (field: string, value: string) => {
     let errors = { ...validationErrors };
 
-    if (field === 'mobileNumber' && !mobileRegex.test(value)) {
-      errors.mobileNumber = 'Enter a valid 10-digit mobile number';
-    } else if (field === 'email' && !emailRegex.test(value)) {
-      errors.email = 'Enter a valid email address';
-    } else if (field === 'password' && !passwordRegex.test(value)) {
-      errors.password =
-        'Password must be at least 8 characters with 1 letter, 1 number, and 1 special character';
-    } else if (field === 'confirmPassword' && value !== formData.password) {
-      errors.confirmPassword = 'Passwords do not match';
-    } 
-    // else {
-    //   delete errors[field];
-    // }
+    switch (field) {
+      case 'mobileNumber':
+        errors.mobileNumber = mobileRegex.test(value) ? '' : 'Enter a valid 10-digit mobile number';
+        break;
+      case 'email':
+        errors.email = emailRegex.test(value) ? '' : 'Enter a valid email address';
+        break;
+      case 'password':
+        errors.password = passwordRegex.test(value)
+          ? ''
+          : 'Password must be at least 8 characters with 1 letter, 1 number, and 1 special character';
+        break;
+      case 'confirmPassword':
+        errors.confirmPassword =
+          value === formData.password ? '' : 'Passwords do not match';
+        break;
+    }
 
     setValidationErrors(errors);
   };
 
+  const isFormValid = () => {
+    const requiredFields = ['companyName', 'mobileNumber', 'email', 'password', 'confirmPassword', 'address'];
+    for (const field of requiredFields) {
+      if (!formData[field as keyof typeof formData]) {
+        Alert.alert('Validation Error', 'Please fill all required fields.');
+        return false;
+      }
+    }
+
+    for (const error in validationErrors) {
+      if (validationErrors[error as keyof typeof validationErrors]) {
+        Alert.alert('Validation Error', 'Please fix the form errors before submitting.');
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const handleSubmit = async () => {
+    if (!isFormValid()) return;
+
     const requestData = {
       companyName: formData.companyName,
       emailId: formData.email,
@@ -91,8 +116,9 @@ const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
       if (response.status === 200) {
         const generatedCode = response.data.referralCode || 'REF1234567';
         setReferralCode(generatedCode);
-        ClipboardLib.setString(generatedCode);
+        Clipboard.setString(generatedCode);
         Alert.alert('Success', 'Vendor added successfully!\nReferral code copied to clipboard!');
+        onRegistrationSuccess();
       } else {
         Alert.alert('Error', response.data.error || 'Failed to add vendor');
       }
@@ -104,92 +130,107 @@ const AgentRegistrationForm: React.FC<AgentRegistrationFormProps> = ({
 
   const handleCopyReferralCode = () => {
     if (referralCode) {
-      ClipboardLib.setString(referralCode);
+      Clipboard.setString(referralCode);
       Alert.alert('Copied', 'Referral code copied to clipboard!');
     }
   };
 
   return (
-    <View style={styles.container}>
-<TouchableOpacity 
-        style={styles.backButton} 
-        onPress={onBackToLogin}
-        activeOpacity={0.7}
-      >
-        <MaterialIcons name="arrow-back" size={20} color="#fff" />
-        <Text style={styles.backButtonText}>Back to Login</Text>
-      </TouchableOpacity>       
-      <Text style={styles.title}>Agent Registration</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.container}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <TouchableOpacity style={styles.backButton} onPress={onBackToLogin}>
+          <MaterialIcons name="arrow-back" size={20} color="#fff" />
+          <Text style={styles.backButtonText}>Back to Login</Text>
+        </TouchableOpacity>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Name of the Company *"
-        value={formData.companyName}
-        onChangeText={(text) => handleChange('companyName', text)}
-      />
+        <Text style={styles.title}>Agent Registration</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Mobile Number *"
-        keyboardType="numeric"
-        value={formData.mobileNumber}
-        onChangeText={(text) => handleChange('mobileNumber', text)}
-      />
-      {validationErrors.mobileNumber && <Text style={styles.error}>{validationErrors.mobileNumber}</Text>}
+        <Text style={styles.label}>Company Name *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter company name"
+          value={formData.companyName}
+          onChangeText={(text) => handleChange('companyName', text)}
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email ID *"
-        keyboardType="email-address"
-        value={formData.email}
-        onChangeText={(text) => handleChange('email', text)}
-      />
-      {validationErrors.email && <Text style={styles.error}>{validationErrors.email}</Text>}
+        <Text style={styles.label}>Mobile Number *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter 10-digit mobile number"
+          keyboardType="numeric"
+          value={formData.mobileNumber}
+          onChangeText={(text) => handleChange('mobileNumber', text)}
+        />
+        {validationErrors.mobileNumber && <Text style={styles.error}>{validationErrors.mobileNumber}</Text>}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password *"
-        secureTextEntry={!showPassword}
-        value={formData.password}
-        onChangeText={(text) => handleChange('password', text)}
-      />
-      <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-        <Text style={styles.toggleText}>{showPassword ? 'Hide' : 'Show'} Password</Text>
-      </TouchableOpacity>
-      {validationErrors.password && <Text style={styles.error}>{validationErrors.password}</Text>}
+        <Text style={styles.label}>Email ID *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter email address"
+          keyboardType="email-address"
+          value={formData.email}
+          onChangeText={(text) => handleChange('email', text)}
+        />
+        {validationErrors.email && <Text style={styles.error}>{validationErrors.email}</Text>}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Confirm Password *"
-        secureTextEntry={!showConfirmPassword}
-        value={formData.confirmPassword}
-        onChangeText={(text) => handleChange('confirmPassword', text)}
-      />
-      <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-        <Text style={styles.toggleText}>{showConfirmPassword ? 'Hide' : 'Show'} Confirm Password</Text>
-      </TouchableOpacity>
-      {validationErrors.confirmPassword && <Text style={styles.error}>{validationErrors.confirmPassword}</Text>}
+        <Text style={styles.label}>Password *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Create password"
+          secureTextEntry={!showPassword}
+          value={formData.password}
+          onChangeText={(text) => handleChange('password', text)}
+        />
+        <TouchableOpacity
+          style={styles.toggleButton}
+          onPress={() => setShowPassword(!showPassword)}
+        >
+          <Text style={styles.toggleText}>{showPassword ? 'Hide' : 'Show'} Password</Text>
+        </TouchableOpacity>
+        {validationErrors.password && <Text style={styles.error}>{validationErrors.password}</Text>}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Company Address *"
-        value={formData.address}
-        onChangeText={(text) => handleChange('address', text)}
-      />
+        <Text style={styles.label}>Confirm Password *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Re-enter password"
+          secureTextEntry={!showConfirmPassword}
+          value={formData.confirmPassword}
+          onChangeText={(text) => handleChange('confirmPassword', text)}
+        />
+        <TouchableOpacity
+          style={styles.toggleButton}
+          onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+        >
+          <Text style={styles.toggleText}>{showConfirmPassword ? 'Hide' : 'Show'} Password</Text>
+        </TouchableOpacity>
+        {validationErrors.confirmPassword && <Text style={styles.error}>{validationErrors.confirmPassword}</Text>}
 
-      <View style={{ marginTop: 20 }}>
-        <Button title="Submit" onPress={handleSubmit} />
-      </View>
+        <Text style={styles.label}>Company Address *</Text>
+        <TextInput
+          style={[styles.input, styles.addressInput]}
+          placeholder="Enter full address"
+          value={formData.address}
+          onChangeText={(text) => handleChange('address', text)}
+          multiline
+        />
 
-      {referralCode !== '' && (
-        <View style={styles.referralBox}>
-          <Text style={styles.referralText}>Referral Code: {referralCode}</Text>
-          <TouchableOpacity onPress={handleCopyReferralCode}>
-            <Text style={styles.copyLink}>Copy</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>Submit Registration</Text>
+        </TouchableOpacity>
+
+        {referralCode !== '' && (
+          <View style={styles.referralBox}>
+            <Text style={styles.referralText}>Your Referral Code: {referralCode}</Text>
+            <TouchableOpacity style={styles.copyButton} onPress={handleCopyReferralCode}>
+              <Text style={styles.copyLink}>Copy to Clipboard</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -198,69 +239,90 @@ export default AgentRegistrationForm;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContainer: {
     padding: 20,
     paddingTop: 60,
-    backgroundColor: '#fff',
   },
   title: {
     fontSize: 22,
     fontWeight: '600',
-    marginBottom: 20,
+    marginBottom: 25,
     textAlign: 'center',
+    color: '#333',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
+    color: '#444',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#999',
-    borderRadius: 6,
-    padding: 10,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+  },
+  addressInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  toggleButton: {
+    alignSelf: 'flex-end',
     marginBottom: 10,
   },
   toggleText: {
-    color: '#007BFF',
-    textAlign: 'right',
-    marginBottom: 10,
+    color: '#4f8ad5',
+    fontSize: 14,
   },
   error: {
     color: 'red',
-    marginBottom: 8,
+    marginBottom: 10,
+    fontSize: 14,
+  },
+  submitButton: {
+    backgroundColor: '#4f8ad5',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   referralBox: {
     marginTop: 30,
     padding: 15,
     backgroundColor: '#f2f2f2',
     borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   referralText: {
     fontSize: 16,
+    marginBottom: 10,
+  },
+  copyButton: {
+    alignSelf: 'flex-start',
   },
   copyLink: {
-    color: '#007BFF',
-    fontWeight: 'bold',
+    color: '#4f8ad5',
+    fontSize: 14,
   },
-   backButton: {
+  backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4f8ad5',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    marginTop: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    marginBottom: 20,
   },
   backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#4f8ad5',
     marginLeft: 8,
+    fontSize: 16,
   },
 });
