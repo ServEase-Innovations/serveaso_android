@@ -6,6 +6,7 @@
     "C:\\native-Project\\AwesomeProject\\node_modules\\@react-native-community\\geolocation\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\@react-native-community\\slider\\android\\src\\main\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\@react-native-picker\\picker\\android\\src\\main\\jni\\CMakeLists.txt",
+    "C:\\native-Project\\AwesomeProject\\node_modules\\react-native-date-picker\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\react-native-image-picker\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\react-native-maps\\android\\src\\main\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\react-native-permissions\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
@@ -96,6 +97,11 @@
     },
     "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba": {
       "artifactName": "react_codegen_RNCGeolocationSpec",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "react_codegen_RNDatePickerSpecs::@c00f981c6e74346c63d4": {
+      "artifactName": "react_codegen_RNDatePickerSpecs",
       "abi": "x86",
       "runtimeFiles": []
     }

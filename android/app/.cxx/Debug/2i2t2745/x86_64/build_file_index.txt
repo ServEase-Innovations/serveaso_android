@@ -4,6 +4,7 @@ C:\native-Project\AwesomeProject\node_modules\@react-native-community\datetimepi
 C:\native-Project\AwesomeProject\node_modules\@react-native-community\geolocation\android\build\generated\source\codegen\jni\CMakeLists.txt
 C:\native-Project\AwesomeProject\node_modules\@react-native-community\slider\android\src\main\jni\CMakeLists.txt
 C:\native-Project\AwesomeProject\node_modules\@react-native-picker\picker\android\src\main\jni\CMakeLists.txt
+C:\native-Project\AwesomeProject\node_modules\react-native-date-picker\android\build\generated\source\codegen\jni\CMakeLists.txt
 C:\native-Project\AwesomeProject\node_modules\react-native-image-picker\android\build\generated\source\codegen\jni\CMakeLists.txt
 C:\native-Project\AwesomeProject\node_modules\react-native-maps\android\src\main\jni\CMakeLists.txt
 C:\native-Project\AwesomeProject\node_modules\react-native-permissions\android\build\generated\source\codegen\jni\CMakeLists.txt

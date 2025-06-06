@@ -121,6 +121,16 @@ rule CXX_SHARED_LIBRARY_LINKER__react_codegen_rnpicker_Debug
 #############################################
 # Rule for compiling CXX files.
 
+rule CXX_COMPILER__react_codegen_RNDatePickerSpecs_Debug
+  depfile = $DEP_FILE
+  deps = gcc
+  command = C:\Users\91909\AppData\Local\Android\Sdk\ndk\27.1.12297006\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=x86_64-none-linux-android24 --sysroot=C:/Users/91909/AppData/Local/Android/Sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/windows-x86_64/sysroot $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -o $out -c $in
+  description = Building CXX object $out
+
+
+#############################################
+# Rule for compiling CXX files.
+
 rule CXX_COMPILER__react_codegen_RNImagePickerSpec_Debug
   depfile = $DEP_FILE
   deps = gcc

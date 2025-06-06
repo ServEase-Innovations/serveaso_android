@@ -1,6 +1,6 @@
 # ninja log v5
-92925	162622	7696880137303702	CMakeFiles/appmodules.dir/C_/native-Project/AwesomeProject/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	bb5e327b951882f5
-23	144	0	C:/native-Project/AwesomeProject/android/app/.cxx/RelWithDebInfo/675p5092/armeabi-v7a/CMakeFiles/cmake.verify_globs	68346e4b04c49dc6
+40	28819	7702214340184368	CMakeFiles/appmodules.dir/C_/native-Project/AwesomeProject/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	bb5e327b951882f5
+12	93	0	C:/native-Project/AwesomeProject/android/app/.cxx/RelWithDebInfo/675p5092/armeabi-v7a/CMakeFiles/cmake.verify_globs	68346e4b04c49dc6
 103488	116703	7696879676911245	RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/RNMapsSpecsJSI-generated.cpp.o	904e8ba853c6c023
 86979	115224	7696879663214934	rnpicker_autolinked_build/CMakeFiles/react_codegen_rnpicker.dir/4028a48ec966c635c21887a771a4e939/source/codegen/jni/react/renderer/components/rnpicker/Props.cpp.o	81610193ba22afe4
 98458	107673	7696879585352953	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/States.cpp.o	63e417124a9c150d
@@ -20,7 +20,7 @@
 47846	61422	7696879123288250	RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/f3ee4c34af00dbdcf11b60ec1cbc8a99/RNCGeolocationSpecJSI-generated.cpp.o	e5cf9460432764ae
 59	30267	7696878812527099	rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/rnasyncstorage-generated.cpp.o	c382b0afb792747f
 37	32073	7696878831666197	rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/ComponentDescriptors.cpp.o	eb9566ebe4ad2bf3
-23	33635	7696878839991522	CMakeFiles/appmodules.dir/OnLoad.cpp.o	6bf0ad596d2e9446
+48	13884	7702214191027888	CMakeFiles/appmodules.dir/OnLoad.cpp.o	6bf0ad596d2e9446
 24108	43651	7696878941628306	rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/rnclipboardJSI-generated.cpp.o	cded871424bec987
 71845	83644	7696879346337141	RNCSlider_autolinked_build/CMakeFiles/react_codegen_RNCSlider.dir/951f4266edd5695a625d26a4d49e6bdf/codegen/jni/react/renderer/components/RNCSlider/States.cpp.o	25947ce59537ffb
 29516	45753	7696878969483979	rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/ShadowNodes.cpp.o	55779c5987a53d47
@@ -66,7 +66,7 @@
 74812	98457	7696879496327578	rnpicker_autolinked_build/CMakeFiles/react_codegen_rnpicker.dir/RNCAndroidDialogPickerMeasurementsManager.cpp.o	26170e6ea57386d5
 81640	98707	7696879497020709	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ComponentDescriptors.cpp.o	8bddff128a79c712
 95437	108947	7696879600762182	RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/RNImagePickerSpecJSI-generated.cpp.o	59077a1efb5f6d0a
-162624	162987	7696880141830801	C:/native-Project/AwesomeProject/android/app/build/intermediates/cxx/RelWithDebInfo/675p5092/obj/armeabi-v7a/libappmodules.so	77dc3b64d2cd888e
+28820	30096	7702214352876921	C:/native-Project/AwesomeProject/android/app/build/intermediates/cxx/RelWithDebInfo/675p5092/obj/armeabi-v7a/libappmodules.so	77dc3b64d2cd888e
 83646	112522	7696879636032937	rnpicker_autolinked_build/CMakeFiles/react_codegen_rnpicker.dir/148c00bad2a5d15c1055855d206b13c2/jni/react/renderer/components/rnpicker/ComponentDescriptors.cpp.o	c7a8a8d759541f9f
 108850	128150	7696879793034806	RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/ShadowNodes.cpp.o	84036c7e42b29f76
 111562	128960	7696879797755269	RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/RNMapsSpecs-generated.cpp.o	d902fc60c9c6e6eb
@@ -83,8 +83,16 @@
 137767	151097	7696880023045188	RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/ShadowNodes.cpp.o	5d9fb7dcafb65a1f
 142277	151691	7696880029074862	RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/Props.cpp.o	79192e21879e2828
 107702	158658	7696880097855472	RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/ComponentDescriptors.cpp.o	11803e8c6c783fd0
-146	2132	7702214046685264	build.ninja	9b1b06c8fd5acb4c
-6	67	0	C:/native-Project/AwesomeProject/android/app/.cxx/RelWithDebInfo/675p5092/armeabi-v7a/CMakeFiles/cmake.verify_globs	68346e4b04c49dc6
-48	13884	7702214191027888	CMakeFiles/appmodules.dir/OnLoad.cpp.o	6bf0ad596d2e9446
-40	28819	7702214340184368	CMakeFiles/appmodules.dir/C_/native-Project/AwesomeProject/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	bb5e327b951882f5
-28820	30096	7702214352876921	C:/native-Project/AwesomeProject/android/app/build/intermediates/cxx/RelWithDebInfo/675p5092/obj/armeabi-v7a/libappmodules.so	77dc3b64d2cd888e
+146	2132	7703241091933732	build.ninja	9b1b06c8fd5acb4c
+94	1476	7703241091933732	build.ninja	9b1b06c8fd5acb4c
+3	65	0	C:/native-Project/AwesomeProject/android/app/.cxx/RelWithDebInfo/675p5092/armeabi-v7a/CMakeFiles/cmake.verify_globs	68346e4b04c49dc6
+79	15880	7703241240982056	RNDatePickerSpecs_autolinked_build/CMakeFiles/react_codegen_RNDatePickerSpecs.dir/react/renderer/components/RNDatePickerSpecs/States.cpp.o	d86a0fea606db3b7
+126	17953	7703241276659866	RNDatePickerSpecs_autolinked_build/CMakeFiles/react_codegen_RNDatePickerSpecs.dir/react/renderer/components/RNDatePickerSpecs/EventEmitters.cpp.o	1553c08ef55d4aa2
+87	18526	7703241282165134	RNDatePickerSpecs_autolinked_build/CMakeFiles/react_codegen_RNDatePickerSpecs.dir/react/renderer/components/RNDatePickerSpecs/ShadowNodes.cpp.o	c8f5c5af97a122a0
+106	18835	7703241284912840	RNDatePickerSpecs_autolinked_build/CMakeFiles/react_codegen_RNDatePickerSpecs.dir/react/renderer/components/RNDatePickerSpecs/RNDatePickerSpecsJSI-generated.cpp.o	f9330fcef8b9756c
+72	19337	7703241290459372	RNDatePickerSpecs_autolinked_build/CMakeFiles/react_codegen_RNDatePickerSpecs.dir/RNDatePickerSpecs-generated.cpp.o	82db4dd669d62ae9
+64	21014	7703241307334380	CMakeFiles/appmodules.dir/OnLoad.cpp.o	b8a3f0971abfd10d
+137	21593	7703241313005995	RNDatePickerSpecs_autolinked_build/CMakeFiles/react_codegen_RNDatePickerSpecs.dir/react/renderer/components/RNDatePickerSpecs/Props.cpp.o	46e79c0a6592fe64
+95	22431	7703241321558154	RNDatePickerSpecs_autolinked_build/CMakeFiles/react_codegen_RNDatePickerSpecs.dir/react/renderer/components/RNDatePickerSpecs/ComponentDescriptors.cpp.o	eca332bc983a210f
+55	53524	7703241631546657	CMakeFiles/appmodules.dir/C_/native-Project/AwesomeProject/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	a26840b363ce304f
+53526	55273	7703241649858579	C:/native-Project/AwesomeProject/android/app/build/intermediates/cxx/RelWithDebInfo/675p5092/obj/armeabi-v7a/libappmodules.so	d9a1267580beca25

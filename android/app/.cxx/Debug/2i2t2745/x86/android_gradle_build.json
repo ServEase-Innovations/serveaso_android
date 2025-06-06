@@ -6,6 +6,7 @@
     "C:\\native-Project\\AwesomeProject\\node_modules\\@react-native-community\\geolocation\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\@react-native-community\\slider\\android\\src\\main\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\@react-native-picker\\picker\\android\\src\\main\\jni\\CMakeLists.txt",
+    "C:\\native-Project\\AwesomeProject\\node_modules\\react-native-date-picker\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\react-native-image-picker\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\react-native-maps\\android\\src\\main\\jni\\CMakeLists.txt",
     "C:\\native-Project\\AwesomeProject\\node_modules\\react-native-permissions\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
@@ -55,6 +56,11 @@
         "C:\\Users\\91909\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\jsi\\libs\\android.x86\\libjsi.so",
         "C:\\Users\\91909\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\reactnative\\libs\\android.x86\\libreactnative.so"
       ]
+    },
+    "react_codegen_RNDatePickerSpecs::@c00f981c6e74346c63d4": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_RNDatePickerSpecs"
     },
     "react_codegen_RNDateTimePickerCGen::@59b70ddc31ba2f8ef1d2": {
       "toolchain": "toolchain",

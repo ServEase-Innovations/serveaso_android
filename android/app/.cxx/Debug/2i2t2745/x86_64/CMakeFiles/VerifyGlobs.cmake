@@ -188,6 +188,31 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "C:/native-Project/AwesomeProject/android/app/.cxx/Debug/2i2t2745/x86_64/CMakeFiles/cmake.verify_globs")
 endif()
 
+# react_codegen_SRCS at C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/RNDatePickerSpecs-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/native-Project/AwesomeProject/android/app/.cxx/Debug/2i2t2745/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/react/renderer/components/RNDatePickerSpecs/*.cpp")
+set(OLD_GLOB
+  "C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/react/renderer/components/RNDatePickerSpecs/ComponentDescriptors.cpp"
+  "C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/react/renderer/components/RNDatePickerSpecs/EventEmitters.cpp"
+  "C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/react/renderer/components/RNDatePickerSpecs/Props.cpp"
+  "C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/react/renderer/components/RNDatePickerSpecs/RNDatePickerSpecsJSI-generated.cpp"
+  "C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/react/renderer/components/RNDatePickerSpecs/ShadowNodes.cpp"
+  "C:/native-Project/AwesomeProject/node_modules/react-native-date-picker/android/build/generated/source/codegen/jni/react/renderer/components/RNDatePickerSpecs/States.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/native-Project/AwesomeProject/android/app/.cxx/Debug/2i2t2745/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
 # react_codegen_SRCS at C:/native-Project/AwesomeProject/node_modules/react-native-image-picker/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/native-Project/AwesomeProject/node_modules/react-native-image-picker/android/build/generated/source/codegen/jni/*.cpp")
 set(OLD_GLOB
