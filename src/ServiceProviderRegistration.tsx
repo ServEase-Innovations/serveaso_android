@@ -726,6 +726,13 @@ const ServiceProviderRegistration: React.FC<
     setActiveStep(Math.max(activeStep - 1, 0));
   };
 
+  const [showServicePicker, setShowServicePicker] = useState(false);
+const serviceTypes = [
+  { label: 'Cook', value: 'COOK' },
+  { label: 'Nanny', value: 'NANNY' },
+  { label: 'Maid', value: 'MAID' },
+];
+
   const handleSubmit = async () => {
     setIsLoading(true);
 
@@ -1206,16 +1213,47 @@ const ServiceProviderRegistration: React.FC<
         return (
           <ScrollView style={styles.stepContainer}>
             <Text style={styles.label}>Select Service Type *</Text>
-            <Picker
-              selectedValue={formData.housekeepingRole}
-              onValueChange={handleServiceTypeChange}
-              style={styles.picker}
-            >
-              <Picker.Item label="Select Service Type" value="" />
-              <Picker.Item label="Cook" value="COOK" />
-              <Picker.Item label="Nanny" value="NANNY" />
-              <Picker.Item label="Maid" value="MAID" />
-            </Picker>
+            <TouchableOpacity 
+  style={[styles.input, errors.housekeepingRole && styles.inputError]}
+  onPress={() => setShowServicePicker(true)}
+>
+  <Text style={{ color: formData.housekeepingRole ? '#000' : '#999' }}>
+    {formData.housekeepingRole ? 
+      (formData.housekeepingRole === 'COOK' ? 'Cook' : 
+       formData.housekeepingRole === 'NANNY' ? 'Nanny' : 
+       formData.housekeepingRole === 'MAID' ? 'Maid' : '') : 
+      'Select Service Type'}
+  </Text>
+</TouchableOpacity>
+
+<Modal
+  visible={showServicePicker}
+  transparent={true}
+  animationType="slide"
+>
+  <View style={styles.modalPickerContainer}>
+    <View style={styles.modalPickerContent}>
+      {serviceTypes.map((service) => (
+        <TouchableOpacity
+          key={service.value}
+          style={styles.serviceOption}
+          onPress={() => {
+            handleServiceTypeChange(service.value);
+            setShowServicePicker(false);
+          }}
+        >
+          <Text style={styles.serviceOptionText}>{service.label}</Text>
+        </TouchableOpacity>
+      ))}
+      <TouchableOpacity
+        style={styles.cancelButton}
+        onPress={() => setShowServicePicker(false)}
+      >
+        <Text style={styles.cancelButtonText}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
             {errors.housekeepingRole && (
               <Text style={styles.errorText}>{errors.housekeepingRole}</Text>
             )}
@@ -1826,6 +1864,37 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 5,
   },
+  modalPickerContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0,0,0,0.5)',
+},
+modalPickerContent: {
+  backgroundColor: '#fff',
+  width: '80%',
+  borderRadius: 10,
+  padding: 20,
+},
+serviceOption: {
+  padding: 15,
+  borderBottomWidth: 1,
+  borderBottomColor: '#eee',
+},
+serviceOptionText: {
+  fontSize: 16,
+},
+cancelButton: {
+  padding: 15,
+  marginTop: 10,
+  backgroundColor: '#f0f0f0',
+  borderRadius: 5,
+  alignItems: 'center',
+},
+cancelButtonText: {
+  color: '#ff0000',
+  fontSize: 16,
+},
 });
 
 export default ServiceProviderRegistration;

@@ -1,47 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  ActivityIndicator, 
-  Alert, 
-  TouchableOpacity 
-} from 'react-native';
-import axios from 'axios';
-import axiosInstance from './axiosInstance';
-import LoadingIndicator from './LoadingIndicator';
-import { CONFIRMATION } from './Constants/pagesConstants';
-import { useDispatch } from 'react-redux';
-import { add } from './features/detailsDataSlice';
-import HeaderSearch from './HeaderSearch';
-import { keys } from './env';
-import Geolocation from '@react-native-community/geolocation';
-import CookServicesDialog from './CookServiceDialog';
-import MaidServiceDialog from './MaidServiceDialog';
-import NannyServiceDialog from './NannyServiceDialog';
-import DemoCook from './demoCook';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable */
 
-interface ServiceProvider {
-  serviceproviderId: number;
-  firstName: string;
-  middleName: string | null;
-  lastName: string;
-  gender: string;
-  housekeepingRole: string;
-  diet: string;
-  cookingSpeciality: string;
-  rating: number;
-  age: number;
-  experience: number;
-  timeslot: string;
-  distance?: number;
-  mobileNo: number;
-  locality: string;
-  currentLocation: string;
-  dob: string;
-  kyc: string;
-}
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Alert } from "react-native";
+import axiosInstance from "./axiosInstance";
+import LoadingIndicator from "./LoadingIndicator";
+import { CONFIRMATION } from "./Constants/pagesConstants";
+import ProviderDetails from "./ProviderDetails";
+import { useDispatch } from "react-redux";
+import { add } from "./features/detailsDataSlice";
+import HeaderSearch from "./HeaderSearch";
+import PreferenceSelection from "./PreferenceSelection";
+import axios from "axios";
+import { keys } from "./env";
+import Geolocation from '@react-native-community/geolocation';
 
 interface DetailsViewProps {
   sendDataToParent: (data: string) => void;
@@ -57,23 +29,21 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   selectedProvider,
 }) => {
   const [ServiceProvidersData, setServiceProvidersData] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedProviderType, setSelectedProviderType] = useState("");
-  const [serviceProviderData, setServiceProviderData] = useState<ServiceProvider[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [expandedCards, setExpandedCards] = useState<Record<number, boolean>>({});
-// const [dialogOpen, setDialogOpen] = useState(false);
-const [selectedCook, setSelectedCook] = useState<ServiceProvider | null>(null);
+  const [searchData, setSearchData] = useState<any>();
+  const [serviceProviderData, setServiceProviderData] = useState<any>();
 
   const dispatch = useDispatch();
 
+  const handleCheckoutData = (data: any) => {
+    console.log("Received checkout data:", data);
 
-  
-  const toggleCardExpansion = (providerId: number) => {
-    setExpandedCards(prev => ({
-      ...prev,
-      [providerId]: !prev[providerId]
-    }));
+    if (checkoutItem) {
+      checkoutItem(data);
+    }
   };
 
   useEffect(() => {
@@ -97,6 +67,7 @@ const [selectedCook, setSelectedCook] = useState<ServiceProvider | null>(null);
         dispatch(add(response?.data));
       } catch (err) {
         console.error("There was a problem with the fetch operation:", err);
+        Alert.alert("Error", "There was a problem fetching data");
       } finally {
         setLoading(false);
       }
@@ -104,220 +75,99 @@ const [selectedCook, setSelectedCook] = useState<ServiceProvider | null>(null);
     fetchData();
   }, [selected]);
 
-  // const handleSelectedProvider = (provider: any) => {
-  //   if (selectedProvider) {
-  //     selectedProvider(provider);
-  //   }
-  //   sendDataToParent(CONFIRMATION);
-  // };
-//   const handleSelectedProvider = (provider: any) => {
-//   if (provider.housekeepingRole === 'COOK') {
-//     setSelectedCook(provider);
-//     setDialogOpen(true);
-//   } else {
-//     if (selectedProvider) {
-//       selectedProvider(provider);
-//     }
-//     sendDataToParent(CONFIRMATION);
-//   }
-// };
-  const [dialogOpen, setDialogOpen] = useState(false);
-const [selectedProviderData, setSelectedProviderData] = useState<ServiceProvider | null>(null);
-const handleSelectedProvider = (provider: any) => {
-  setSelectedProviderData(provider);
-  setDialogOpen(true);
-};
-
-const renderRoleSpecificDialog = () => {
-  if (!selectedProviderData) return null;
-  
-  switch (selectedProviderData.housekeepingRole) {
-    case 'COOK':
-      return (
-        // <CookServicesDialog
-        //   visible={dialogOpen}
-        //   onClose={() => setDialogOpen(false)}
-        //   // providerDetails={selectedProviderData}
-        //   sendDataToParent={sendDataToParent} open={false}
-        //    handleClose={function (): void {
-        //     throw new Error('Function not implemented.');
-        //   } }       
-        //    />
-        <DemoCook
-          visible={dialogOpen}
-          onClose={() => setDialogOpen(false)}
-          sendDataToParent={sendDataToParent}
-        />
-      );
-    case 'MAID':
-      return (
-        <MaidServiceDialog
-          visible={dialogOpen}
-          onClose={() => setDialogOpen(false)}
-          // providerDetails={selectedProviderData}
-          sendDataToParent={sendDataToParent}
-        />
-      );
-    case 'NANNY':
-      return (
-        <NannyServiceDialog
-          visible={dialogOpen}
-          onClose={() => setDialogOpen(false)}
-          // providerDetails={selectedProviderData}
-          sendDataToParent={sendDataToParent}
-        />
-      );
-    default:
-      return null;
-  }
-};
-
-  const handleSearch = () => {
-    performSearch();
+  const handleBackClick = () => {
+    sendDataToParent("");
   };
 
-  const performSearch = async () => {
-    try {
-      setSearchLoading(true);
-      const params = {
-        startDate: '2025-04-01',
-        endDate: '2025-04-30',
-        timeslot: '06:00-20:00',
-        housekeepingRole: 'MAID',
-        latitude: 22.94739666666667,
-        longitude: 88.65848666666668,
-      };
+  const toggleDrawer = (open: boolean) => {
+    setDrawerOpen(open);
+  };
+
+  const handleSearchResults = (data: any[]) => {
+    setSearchResults(data);
+    toggleDrawer(false);
+  };
+
+  const handleSelectedProvider = (provider: any) => {
+    if (selectedProvider) {
+      selectedProvider(provider);
+    }
+    sendDataToParent(CONFIRMATION);
+  };
+
+  const handleSearch = (formData: { serviceType: string; startTime: string; endTime: string }) => {
+    console.log("Search data received in MainComponent:", formData);
+    setSearchData(formData);
+    performSearch(formData);
+  };
+
+  const performSearch = async (formData: any) => {
+    const timeSlotFormatted = `${formData.startTime}-${formData.endTime}`;
+    const housekeepingRole = selected?.toUpperCase() || "";
   
-      const response = await axiosInstance.get(
-        '/api/serviceproviders/search',
-        { params }
-      );
+    const getCoordinates = (): Promise<{ latitude: number; longitude: number }> =>
+      new Promise((resolve, reject) => {
+        Geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+          (error) => {
+            console.error("Geolocation error:", error);
+            reject(error);
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        );
+      });
+    
+    try {
+      const { latitude, longitude } = await getCoordinates();
+      console.log("Latitude:", latitude, "Longitude:", longitude);
+
+      const params = {
+        startDate: "2025-04-01",
+        endDate: "2025-04-30",
+        timeslot: timeSlotFormatted,
+        housekeepingRole,
+        latitude,
+        longitude,
+      };
+
+      const response = await axiosInstance.get('/api/serviceproviders/search', { params });
       console.log('Response:', response.data);
       setServiceProviderData(response.data);
-      // Initialize all cards as collapsed by default
-      const initialExpandedState = response.data.reduce((acc: Record<number, boolean>, provider: ServiceProvider) => {
-        acc[provider.serviceproviderId] = false;
-        return acc;
-      }, {});
-      setExpandedCards(initialExpandedState);
     } catch (error: any) {
-      console.error('API Error:', error?.response?.data || error.message);
-      Alert.alert('Error', 'Something went wrong while fetching data.');
-    } finally {
-      setSearchLoading(false);
+      console.error('Geolocation or API error:', error.message || error);
+      Alert.alert("Error", "Failed to get location or fetch service providers");
     }
   };
 
-  const renderItem = ({ item }: { item: ServiceProvider }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        
-        <View style={styles.headerContent}>
-          <Text style={styles.cardTitle}>{item.firstName} {item.lastName}</Text>
-          <Text style={styles.roleText}>{item.housekeepingRole}</Text>
-           <Text style={styles.detailLabel}>Experience:{item.experience} year(s)</Text>
-        </View>
-        {/* <View style={styles.ratingContainer}>
-          <Text style={styles.rating}>⭐ {item.rating || 'New'}</Text>
-        </View> */}
-        <TouchableOpacity 
-          style={styles.expandButton}
-          onPress={() => toggleCardExpansion(item.serviceproviderId)}
-        >
-          <Text style={styles.expandButtonText}>
-            {expandedCards[item.serviceproviderId] ? '-' : '+'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      
-      {expandedCards[item.serviceproviderId] && (
-        <View style={styles.cardBody}>
-          <View style={styles.detailSection}>
-            <Text style={styles.sectionTitle}>Personal Details</Text>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Age:</Text>
-              <Text style={styles.detailValue}>{item.age}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Gender:</Text>
-              <Text style={styles.detailValue}>{item.gender}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>KYC:</Text>
-              <Text style={styles.detailValue}>{item.kyc}</Text>
-            </View>
-          </View>
-
-          <View style={styles.detailSection}>
-            <Text style={styles.sectionTitle}>Service Details</Text>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Diet Speciality:</Text>
-              <Text style={styles.detailValue}>{item.diet}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Cooking Speciality:</Text>
-              <Text style={styles.detailValue}>{item.cookingSpeciality}</Text>
-            </View>
-           
-            {item.distance && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Distance:</Text>
-                <Text style={styles.detailValue}>{item.distance.toFixed(1)} km</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      )}
-      
-      <TouchableOpacity 
-        style={styles.bookButton}
-        onPress={() => handleSelectedProvider(item)}
-      >
-        <Text style={styles.bookButtonText}>Book Now</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  console.log("Service Providers Data:", ServiceProvidersData);
+  console.log("Service Providers Data:", serviceProviderData);
 
   return (
     <View style={styles.mainContainer}>
-      <View style={styles.search}>
-        <HeaderSearch onSearch={handleSearch} />
+      <View style={styles.searchContainer}>
+        <HeaderSearch onSearch={handleSearch}/>
+        {/* <PreferenceSelection /> */}
       </View>
       
-      {searchLoading ? (
-        <ActivityIndicator size="large" color="#4CAF50" style={styles.loader} />
+      {loading ? (
+        <LoadingIndicator />
+      ) : Array.isArray(serviceProviderData) && serviceProviderData.length > 0 ? (
+        <ScrollView>
+          {serviceProviderData.map((provider, index) => (
+            <ProviderDetails key={index} {...provider} />
+          ))}
+        </ScrollView>
       ) : (
-        <FlatList
-          data={serviceProviderData}
-          keyExtractor={(item) => item.serviceproviderId.toString()}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            !searchLoading ? (
-              <View style={styles.noDataContainer}>
-                <Text style={styles.noDataText}>No service providers found. Try a search to find available providers.</Text>
-                <TouchableOpacity 
-                  style={styles.searchButton}
-                  onPress={handleSearch}
-                >
-                  <Text style={styles.searchButtonText}>Search Providers</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null
-          }
-        />
+        <View style={styles.noDataContainer}>
+          <Text style={styles.noDataText}>No Data</Text>
+        </View>
       )}
-
-       {/* <CookServicesDialog
-        visible={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        // providerDetails={selectedCook}
-        sendDataToParent={sendDataToParent} open={false} handleClose={function (): void {
-          throw new Error('Function not implemented.');
-        } }    /> */}
- {renderRoleSpecificDialog()}
-        
-    </View>  
+    </View>
   );
 };
 
@@ -327,139 +177,17 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#f5f5f5',
   },
-  search: {
+  searchContainer: {
     marginBottom: 16,
-  },
-  loader: {
-    marginVertical: 20,
-  },
-  listContainer: {
-    paddingBottom: 20,
   },
   noDataContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   noDataText: {
-    textAlign: 'center',
-    marginBottom: 20,
-    color: '#666',
-    fontSize: 16,
-  },
-  searchButton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 8,
-    minWidth: 200,
-    alignItems: 'center',
-  },
-  searchButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  expandButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  expandButtonText: {
-    color: 'white',
-    fontSize: 25,
-    fontWeight: 'bold',
-  },
-  headerContent: {
-    flex: 1,
-  },
-  cardTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  roleText: {
-    fontSize: 14,
     color: '#666',
-    marginTop: 4,
-  },
-  // ratingContainer: {
-  //   backgroundColor: '#f8f8f8',
-  //   padding: 6,
-  //   borderRadius: 12,
-  //   minWidth: 60,
-  //   alignItems: 'center',
-  // },
-  // rating: {
-  //   fontSize: 14,
-  //   color: '#ffb400',
-  //   fontWeight: 'bold',
-  // },
-  cardBody: {
-    marginBottom: 16,
-  },
-  detailSection: {
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#444',
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    paddingBottom: 4,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-    flex: 1,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  bookButton: {
-    backgroundColor: '#4CAF50',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  bookButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
 });
 
