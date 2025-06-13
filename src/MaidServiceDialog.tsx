@@ -17,6 +17,7 @@ import { BOOKINGS } from './Constants/pagesConstants';
 import { EnhancedProviderDetails } from './types/ProviderDetailsType';
 import axiosInstance from './axiosInstance';
 import Icon from 'react-native-vector-icons/MaterialIcons'; 
+import Login from './Login';
 
 interface MaidServiceDialogProps {
   visible: boolean;
@@ -864,21 +865,19 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
 
       {/* Login Modal */}
       <Modal
-        visible={loginVisible}
-        onRequestClose={handleLoginClose}
-        animationType="slide"
-        transparent={false}
-      >
-        <View style={styles.loginContainer}>
-          <Text style={styles.loginTitle}>Login Screen</Text>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={handleLoginClose}
-          >
-            <Icon name="close" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
+  visible={loginVisible}
+  onRequestClose={handleLoginClose}
+  animationType="slide"
+  transparent={false}
+>
+  <Login 
+    onClose={handleLoginClose}
+    onLoginSuccess={() => {
+      handleLoginClose();
+      setLoggedInUser(user); // This will update the UI to show checkout button
+    }}
+  />
+  </Modal>
     </>
   );
 };
