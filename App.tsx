@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, SafeAreaView } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from './src/Header';
 import Footer from './src/Footer';
 import LandingPage from './src/Landingpage';
@@ -101,7 +102,6 @@ const App = () => {
             <Login 
               onClose={handleCloseLogin}
               onLoginSuccess={handleLoginSuccess}
-              // bookingPage={handleServiceProviderLogin}
               sendDataToParent={handleDataFromChild}
             />
           );
@@ -116,46 +116,50 @@ const App = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Header
-          onLoginRequest={handleLoginRequest}
-          onProfileClick={handleProfileClick}
-          goToLandingPage={goToLandingPage}
-          isLoggedIn={isLoggedIn}
-          onSignOut={handleSignOut}
-          onDashboardClick={handleDashboardClick}
-          onBookingHistoryClick={handleBookingHistoryClick}
-        />
-      </View>
+    <SafeAreaProvider>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Header
+            onLoginRequest={handleLoginRequest}
+            onProfileClick={handleProfileClick}
+            goToLandingPage={goToLandingPage}
+            isLoggedIn={isLoggedIn}
+            onSignOut={handleSignOut}
+            onDashboardClick={handleDashboardClick}
+            onBookingHistoryClick={handleBookingHistoryClick}
+          />
+        </View>
 
-      <View style={styles.body}>
-        <SafeAreaView style={styles.safeArea}>
-          {renderCurrentView()}
-        </SafeAreaView>
-      </View> 
+        <View style={styles.body}>
+          <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+            {renderCurrentView()}
+          </SafeAreaView>
+        </View> 
 
-      <View style={styles.footer}>
-        <Footer />
+        <View style={styles.footer}>
+          <Footer />
+        </View>
       </View>
-    </View>
+    </SafeAreaProvider>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-  },
+ container: {
+  flex: 1,
+  backgroundColor: '#fff',
+},
+body: {
+  flex: 1,
+  backgroundColor: '#fff',
+},
+
   header: {
     width: '100%',
     backgroundColor: '#fff',
     zIndex: 10,
   },
-  body: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-  },
+ 
   safeArea: {
     flex: 1,
   },

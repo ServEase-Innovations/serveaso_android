@@ -28,6 +28,9 @@ C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNMapsSpecs_autoli
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/edit_cache.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
+C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir
+C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/safeareacontext_autolinked_build/CMakeFiles/edit_cache.dir
+C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/safeareacontext_autolinked_build/CMakeFiles/rebuild_cache.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/edit_cache.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/rebuild_cache.dir

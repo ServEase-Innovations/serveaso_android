@@ -53,6 +53,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/RNImagePickerSpec_autolinked_build/cmake_install.cmake")
   include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/RNMapsSpecs_autolinked_build/cmake_install.cmake")
   include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/RNPermissionsSpec_autolinked_build/cmake_install.cmake")
+  include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/safeareacontext_autolinked_build/cmake_install.cmake")
   include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/RNVectorIconsSpec_autolinked_build/cmake_install.cmake")
 
 endif()

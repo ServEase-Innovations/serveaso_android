@@ -263,6 +263,51 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/CMakeFiles/cmake.verify_globs")
 endif()
 
+# LIB_CUSTOM_SRCS at C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt:22 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/*.cpp")
+set(OLD_GLOB
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# LIB_CUSTOM_SRCS at C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt:22 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../../common/cpp/react/renderer/components/safeareacontext/*.cpp")
+set(OLD_GLOB
+  "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../../common/cpp/react/renderer/components/safeareacontext/RNCSafeAreaViewShadowNode.cpp"
+  "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../../common/cpp/react/renderer/components/safeareacontext/RNCSafeAreaViewState.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# LIB_CODEGEN_SRCS at C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt:23 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../build/generated/source/codegen/jni/safeareacontext-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# LIB_CODEGEN_SRCS at C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt:23 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/safeareacontext/*.cpp")
+set(OLD_GLOB
+  "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/safeareacontext/ComponentDescriptors.cpp"
+  "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/safeareacontext/EventEmitters.cpp"
+  "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/safeareacontext/Props.cpp"
+  "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/safeareacontext/ShadowNodes.cpp"
+  "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/safeareacontext/States.cpp"
+  "C:/serveaso_android/node_modules/react-native-safe-area-context/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/safeareacontext/safeareacontextJSI-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
 # react_codegen_SRCS at C:/serveaso_android/node_modules/react-native-vector-icons/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/serveaso_android/node_modules/react-native-vector-icons/android/build/generated/source/codegen/jni/*.cpp")
 set(OLD_GLOB
