@@ -7,5 +7,6 @@ C:\serveaso_android\node_modules\@react-native-picker\picker\android\src\main\jn
 C:\serveaso_android\node_modules\react-native-image-picker\android\build\generated\source\codegen\jni\CMakeLists.txt
 C:\serveaso_android\node_modules\react-native-maps\android\src\main\jni\CMakeLists.txt
 C:\serveaso_android\node_modules\react-native-permissions\android\build\generated\source\codegen\jni\CMakeLists.txt
+C:\serveaso_android\node_modules\react-native-safe-area-context\android\src\main\jni\CMakeLists.txt
 C:\serveaso_android\node_modules\react-native-vector-icons\android\build\generated\source\codegen\jni\CMakeLists.txt
 C:\serveaso_android\node_modules\react-native\ReactAndroid\cmake-utils\default-app-setup\CMakeLists.txt
