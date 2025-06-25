@@ -1,0 +1,659 @@
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+  Button,
+  Platform,
+  TextStyle,
+  ViewStyle,
+  ImageStyle,
+} from "react-native";
+import { useDispatch } from "react-redux";
+import { add } from "./features/bookingTypeSlice";
+import { DETAILS } from "./Constants/pagesConstants";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import RadioButton from './RadioButton';
+
+// Import local images
+const cookImage = require("../assets/images/newCook.png");
+const maidImage = require("../assets/images/newMaid.png");
+const nannyImage = require("../assets/images/newNanny.png");
+const heroImage = require("../assets/images/maid-hero.png");
+
+interface ChildComponentProps {
+  sendDataToParent: (data: string) => void;
+  bookingType: (data: string) => void;
+}
+
+const HomePage: React.FC<ChildComponentProps> = ({
+  sendDataToParent,
+  bookingType,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [selectedType, setSelectedtype] = useState("");
+  const [selectedRadioButtonValue, setSelectedRadioButtonValue] = useState("");
+  const [openServiceDialog, setOpenServiceDialog] = useState(false);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [endTime, setEndTime] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [currentPicker, setCurrentPicker] = useState<"start" | "end">("start");
+
+  const dispatch = useDispatch();
+
+  const handleClick = (data: string) => {
+    setOpen(true);
+    setSelectedtype(data);
+  };
+
+  const getSelectedValue = (value: string) => {
+    setSelectedRadioButtonValue(value);
+    setStartDate(null);
+    setEndDate(null);
+    setStartTime(null);
+    setEndTime(null);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+  };
+
+  const calculateDuration = (start: Date, end: Date) => {
+    const diffInMs = end.getTime() - start.getTime();
+    return diffInMs / (1000 * 60 * 60);
+  };
+
+  const handleSave = () => {
+    let duration = 0;
+    const booking = {
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+      startTime: startTime?.toISOString(),
+      endTime: endTime?.toISOString(),
+      bookingPreference: selectedRadioButtonValue,
+      serviceType: selectedType,
+    };
+
+    if (selectedRadioButtonValue === "Date") {
+      setOpenServiceDialog(true);
+    }
+
+    if (selectedRadioButtonValue !== "Date") {
+      sendDataToParent(DETAILS);
+    }
+
+    dispatch(add(booking));
+  };
+
+  const isConfirmDisabled = () => {
+    if (!startDate) return true;
+    if (selectedRadioButtonValue !== "Monthly" && !endDate) return true;
+    if (!startTime) return true;
+    if (selectedRadioButtonValue !== "Monthly" && !endTime) return true;
+    return false;
+  };
+
+  const showDatepicker = (type: "start" | "end") => {
+    setCurrentPicker(type);
+    setShowDatePicker(true);
+  };
+
+  const showTimepicker = (type: "start" | "end") => {
+    setCurrentPicker(type);
+    setShowTimePicker(true);
+  };
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      if (currentPicker === "start") {
+        setStartDate(selectedDate);
+        if (selectedRadioButtonValue === "Date") {
+          setEndDate(selectedDate);
+        }
+      } else {
+        setEndDate(selectedDate);
+      }
+    }
+  };
+
+  const onTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(false);
+    if (selectedTime) {
+      if (currentPicker === "start") {
+        setStartTime(selectedTime);
+      } else {
+        setEndTime(selectedTime);
+      }
+    }
+  };
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return "";
+    return date.toLocaleDateString();
+  };
+
+  const formatTime = (time: Date | null) => {
+    if (!time) return "";
+    return time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <ScrollView style={styles.container}>
+      {/* Hero Section */}
+      <View style={styles.heroSection}>
+        <View style={styles.heroTextContainer}>
+          <Text style={styles.heroTitle}>
+            Book trusted household help in minutes
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            ServEase connects you to trained maids, cooks, and caregivers on
+            demand. Safe, affordable and instant.
+          </Text>
+          <View style={styles.serviceIconsContainer}>
+            <TouchableOpacity
+              style={styles.serviceIconContainer}
+              onPress={() => handleClick("COOK")}
+            >
+              <Image source={cookImage} style={styles.serviceImage} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.serviceIconContainer}
+              onPress={() => handleClick("MAID")}
+            >
+              <Image source={maidImage} style={styles.serviceImage} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.serviceIconContainer}
+              onPress={() => handleClick("NANNY")}
+            >
+              <Image source={nannyImage} style={styles.serviceImage} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.outlineButton}>
+              <Text style={styles.outlineButtonText}>I need help</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.outlineButton}>
+              <Text style={styles.outlineButtonText}>I want to work</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.heroImageContainer}>
+          <Image source={heroImage} style={styles.heroImage} />
+        </View>
+      </View>
+
+      {/* Services Section */}
+      <View style={styles.servicesSection}>
+        <Text style={styles.sectionTitle}>Popular Services</Text>
+        <View style={styles.servicesGrid}>
+          {[
+            {
+              title: "Home Cook",
+              desc: "Skilled and hygienic cooks who specialize in home-style meals.",
+              icon: "👩‍🍳",
+            },
+            {
+              title: "Cleaning Help",
+              desc: "Reliable maids for daily, deep, or special occasion cleaning.",
+              icon: "🧼",
+            },
+            {
+              title: "Caregiver",
+              desc: "Trained support for children, seniors, or patients at home.",
+              icon: "❤️",
+            },
+          ].map((service, index) => (
+            <View key={index} style={styles.serviceCard}>
+              <View style={styles.serviceCardContent}>
+                <Text style={styles.serviceIcon}>{service.icon}</Text>
+                <Text style={styles.serviceTitle}>{service.title}</Text>
+                <Text style={styles.serviceDesc}>{service.desc}</Text>
+                <TouchableOpacity>
+                  <Text style={styles.learnMoreLink}>Learn More</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* How it works */}
+      <View style={styles.howItWorksSection}>
+        <Text style={styles.sectionTitle}>How It Works</Text>
+        <View style={styles.stepsContainer}>
+          <View style={styles.step}>
+            <Text style={styles.stepIcon}>✋</Text>
+            <Text style={styles.stepTitle}>Choose your service</Text>
+            <Text style={styles.stepDesc}>
+              Select from a variety of tasks that suit your needs.
+            </Text>
+          </View>
+          <View style={styles.step}>
+            <Text style={styles.stepIcon}>📅</Text>
+            <Text style={styles.stepTitle}>Schedule in minutes</Text>
+            <Text style={styles.stepDesc}>
+              Book a time that works for you, quickly and easily.
+            </Text>
+          </View>
+          <View style={styles.step}>
+            <Text style={styles.stepIcon}>🏠</Text>
+            <Text style={styles.stepTitle}>Relax, we'll handle the rest</Text>
+            <Text style={styles.stepDesc}>
+              Our verified professionals ensure your peace of mind.
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Booking Dialog */}
+      <Modal visible={open} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Book a {selectedType.toLowerCase()}</Text>
+
+            <View style={styles.radioGroup}>
+              <Text style={styles.radioLabel}>Book by</Text>
+              <View style={styles.radioOptions}>
+                <View style={styles.radioOption}>
+                  <RadioButton
+                    selected={selectedRadioButtonValue === "Date"}
+                    onPress={() => getSelectedValue("Date")}
+                  />
+                  <Text>Date</Text>
+                </View>
+                <View style={styles.radioOption}>
+                  <RadioButton
+                    selected={selectedRadioButtonValue === "Short term"}
+                    onPress={() => getSelectedValue("Short term")}
+                  />
+                  <Text>Short term</Text>
+                </View>
+                <View style={styles.radioOption}>
+                  <RadioButton
+                    selected={selectedRadioButtonValue === "Monthly"}
+                    onPress={() => getSelectedValue("Monthly")}
+                  />
+                  <Text>Monthly</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Date/Time Selection Section */}
+            {selectedRadioButtonValue && (
+              <View style={styles.dateTimeContainer}>
+                {/* Date Selection - Show for all booking types */}
+                <View style={styles.dateContainer}>
+                  <Text style={styles.label}>
+                    {selectedRadioButtonValue === "Monthly" ? "Select Month" : "Select Date"}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.dateInput}
+                    onPress={() => showDatepicker("start")}
+                  >
+                    <Text style={styles.dateInputText}>
+                      {formatDate(startDate) || "Select date"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Only show end date for non-monthly bookings */}
+                {(selectedRadioButtonValue === "Date" || selectedRadioButtonValue === "Short term") && (
+                  <View style={styles.dateContainer}>
+                    <Text style={styles.label}>End Date</Text>
+                    <TouchableOpacity
+                      style={[styles.dateInput, !startDate && styles.disabledInput]}
+                      onPress={() => showDatepicker("end")}
+                      disabled={!startDate}
+                    >
+                      <Text style={styles.dateInputText}>
+                        {formatDate(endDate) || "Select date"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Time Selection - Show for all booking types */}
+                <View style={styles.timeInputContainer}>
+                  <View style={styles.timeInputWrapper}>
+                    <Text style={styles.label}>Start Time</Text>
+                    <TouchableOpacity
+                      style={styles.timeInput}
+                      onPress={() => showTimepicker("start")}
+                    >
+                      <Text style={styles.timeInputText}>
+                        {formatTime(startTime) || "Select time"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {/* Only show end time for non-monthly bookings */}
+                  {(selectedRadioButtonValue === "Date" || selectedRadioButtonValue === "Short term") && (
+                    <View style={styles.timeInputWrapper}>
+                      <Text style={styles.label}>End Time</Text>
+                      <TouchableOpacity
+                        style={[styles.timeInput, !startTime && styles.disabledInput]}
+                        onPress={() => showTimepicker("end")}
+                        disabled={!startTime}
+                      >
+                        <Text style={styles.timeInputText}>
+                          {formatTime(endTime) || "Select time"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
+            <View style={styles.modalButtons}>
+              <Button title="Cancel" onPress={handleClose} />
+              <Button
+                title="Confirm"
+                onPress={handleSave}
+                disabled={isConfirmDisabled()}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {(showDatePicker || showTimePicker) && (
+        <DateTimePicker
+          value={
+            currentPicker === "start"
+              ? startDate || new Date()
+              : endDate || new Date()
+          }
+          mode={showDatePicker ? "date" : "time"}
+          display="default"
+          onChange={showDatePicker ? onDateChange : onTimeChange}
+          minimumDate={new Date()}
+        />
+      )}
+    </ScrollView>
+  );
+};
+
+// ... (keep the existing Styles interface and StyleSheet declaration)
+
+interface Styles {
+  container: ViewStyle;
+  heroSection: ViewStyle;
+  heroTextContainer: ViewStyle;
+  heroTitle: TextStyle;
+  heroSubtitle: TextStyle;
+  serviceIconsContainer: ViewStyle;
+  serviceIconContainer: ViewStyle;
+  serviceImage: ImageStyle;
+  buttonContainer: ViewStyle;
+  outlineButton: ViewStyle;
+  outlineButtonText: TextStyle;
+  heroImageContainer: ViewStyle;
+  heroImage: ImageStyle;
+  servicesSection: ViewStyle;
+  sectionTitle: TextStyle;
+  servicesGrid: ViewStyle;
+  serviceCard: ViewStyle;
+  serviceCardContent: ViewStyle;
+  serviceIcon: TextStyle;
+  serviceTitle: TextStyle;
+  serviceDesc: TextStyle;
+  learnMoreLink: TextStyle;
+  howItWorksSection: ViewStyle;
+  stepsContainer: ViewStyle;
+  step: ViewStyle;
+  stepIcon: TextStyle;
+  stepTitle: TextStyle;
+  stepDesc: TextStyle;
+  modalContainer: ViewStyle;
+  modalContent: ViewStyle;
+  modalTitle: TextStyle;
+  radioGroup: ViewStyle;
+  radioLabel: TextStyle;
+  radioOptions: ViewStyle;
+  radioOption: ViewStyle;
+  dateTimeContainer: ViewStyle;
+  dateContainer: ViewStyle;
+  monthlyContainer: ViewStyle;
+  label: TextStyle;
+  dateInput: ViewStyle;
+  timeInputContainer: ViewStyle;
+  timeInputWrapper: ViewStyle;
+  timeInput: ViewStyle;
+  dateBlock: ViewStyle;
+  modalButtons: ViewStyle;
+}
+
+const styles = StyleSheet.create<Styles>({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingTop: 16,
+  },
+  heroSection: {
+    backgroundColor: "#fff",
+    padding: 16,
+    flexDirection: "column",
+  },
+  heroTextContainer: {
+    flex: 1,
+    paddingRight: 0,
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 16,
+  },
+  serviceIconsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 16,
+  },
+  serviceIconContainer: {
+    alignItems: "center",
+  },
+  serviceImage: {
+    width: 100,
+    height: 100,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
+    paddingTop: 8,
+  },
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  outlineButtonText: {
+    fontSize: 14,
+  },
+  heroImageContainer: {
+    alignItems: "center",
+    marginTop: 16,
+  },
+  heroImage: {
+    width: "100%",
+    maxWidth: 400,
+    height: 280,
+    borderRadius: 12,
+  },
+  servicesSection: {
+    padding: 16,
+    paddingTop: 40,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  servicesGrid: {
+    flexDirection: "column",
+    gap: 16,
+  },
+  serviceCard: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    padding: 20,
+  },
+  serviceCardContent: {
+    alignItems: "center",
+    gap: 8,
+  },
+  serviceIcon: {
+    fontSize: 36,
+  },
+  serviceTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  serviceDesc: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+  },
+  learnMoreLink: {
+    fontSize: 14,
+    color: "#1976d2",
+    marginTop: 8,
+  },
+  howItWorksSection: {
+    backgroundColor: "#e6f2ff",
+    padding: 40,
+    paddingVertical: 20,
+  },
+  stepsContainer: {
+    flexDirection: "column",
+    gap: 24,
+  },
+  step: {
+    alignItems: "center",
+  },
+  stepIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  stepTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  stepDesc: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 8,
+    width: "90%",
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  radioGroup: {
+    marginBottom: 16,
+  },
+  radioLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  radioOptions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  radioOption: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dateTimeContainer: {
+    gap: 16,
+  },
+  dateContainer: {
+    gap: 16,
+  },
+  monthlyContainer: {
+    gap: 16,
+  },
+  label: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 4,
+    padding: 12,
+  },
+  timeInputContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  timeInputWrapper: {
+    flex: 1,
+  },
+  timeInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 4,
+    padding: 12,
+  },
+  dateBlock: {
+    flex: 1,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 16,
+    gap: 8,
+  },
+  dateInputText: {
+  color: '#000', // or any color you prefer
+},
+timeInputText: {
+  color: '#000', // or any color you prefer
+},
+disabledInput: {
+  backgroundColor: '#f0f0f0',
+},
+
+});
+
+export default HomePage;

@@ -9,117 +9,131 @@ import DetailsView from './src/DetailsView';
 import ServiceProviderDashboard from './src/ServiceProviderDashboard';
 import Booking from './src/Bookings';
 import { CONFIRMATION, DETAILS, PROFILE } from './src/Constants/pagesConstants';
+import HomePage from './src/HomePage';
+import Head from './src/Head';
 
 const App = () => {
-  const [showLogin, setShowLogin] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'bookingHistory' | 'details'>('landing');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [selection, setSelection] = useState<string | undefined>(); 
-  const [selectedBookingType, setSelectedBookingType] = useState<string | undefined>();
+  // const [showLogin, setShowLogin] = useState(false);
+  // const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  // const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'bookingHistory' | 'details'>('landing');
+  // const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // const [selection, setSelection] = useState<string | undefined>(); 
+  // const [selectedBookingType, setSelectedBookingType] = useState<string | undefined>();
   
-  const handleLoginRequest = () => {
-    setShowLogin(true);
+    const [currentView, setCurrentView] = useState('HOME');
+  const [selectedBookingType, setSelectedBookingType] = useState('');
+
+  const handleViewChange = (view: string) => {
+    setCurrentView(view);
   };
 
-  const handleCloseLogin = () => {
-    setShowLogin(false);
+  const handleBookingType = (type: string) => {
+    setSelectedBookingType(type);
   };
 
-  const handleLoginSuccess = () => {
-    setIsLoggedIn(true);
-    setShowLogin(false);
-    setCurrentView('landing');
-  };
+  // const handleLoginRequest = () => {
+  //   setShowLogin(true);
+  // };
 
-  const handleServiceProviderLogin = (role: string) => {
-    setSelectedRole(role);
-    setShowLogin(false);
-    setIsLoggedIn(true);
-    setCurrentView('dashboard');
-  };
+  // const handleCloseLogin = () => {
+  //   setShowLogin(false);
+  // };
 
-  const goToLandingPage = () => {
-    setSelectedRole(null);
-    setCurrentView('landing');
-    setIsLoggedIn(false);
-  };
+  // const handleLoginSuccess = () => {
+  //   setIsLoggedIn(true);
+  //   setShowLogin(false);
+  //   setCurrentView('landing');
+  // };
 
-  const handleBackToLanding = () => {
-    setSelectedRole(null);
-    setCurrentView('landing');
-  };
+  // const handleServiceProviderLogin = (role: string) => {
+  //   setSelectedRole(role);
+  //   setShowLogin(false);
+  //   setIsLoggedIn(true);
+  //   setCurrentView('dashboard');
+  // };
 
-  const handleProfileClick = () => {
-    // Logic to handle profile click
-  };
+  // const goToLandingPage = () => {
+  //   setSelectedRole(null);
+  //   setCurrentView('landing');
+  //   setIsLoggedIn(false);
+  // };
 
-  const handleSignOut = () => {
-    setIsLoggedIn(false);
-    setCurrentView('landing');
-  };
+  // const handleBackToLanding = () => {
+  //   setSelectedRole(null);
+  //   setCurrentView('landing');
+  // };
 
-  const handleDashboardClick = () => {
-    setCurrentView('dashboard');
-  };
+  // const handleProfileClick = () => {
+  //   // Logic to handle profile click
+  // };
 
-  const handleBookingHistoryClick = () => {
-    setCurrentView('bookingHistory');
-  };
+  // const handleSignOut = () => {
+  //   setIsLoggedIn(false);
+  //   setCurrentView('landing');
+  // };
 
-  const handleDataFromChild = (page: string) => {
-    console.log("data from child ==> ", page);
-    setSelection(page);
-    if (page === DETAILS) {
-      setCurrentView('details');
-    } else if (page === PROFILE) {
-      setCurrentView('dashboard');
-    }
-  };
+  // const handleDashboardClick = () => {
+  //   setCurrentView('dashboard');
+  // };
 
-  const handleSelectedBookingType = (role: string) => {
-    console.log("Selected booking type:", role);
-    setSelectedRole(role);
-    setSelectedBookingType(role);
-  };
+  // const handleBookingHistoryClick = () => {
+  //   setCurrentView('bookingHistory');
+  // };
 
-  const renderCurrentView = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return <ServiceProviderDashboard />;
-      case 'bookingHistory':
-        return <Booking goBack={() => setCurrentView('dashboard')} />;
-      case 'details':
-        return (
-          <DetailsView
-            sendDataToParent={() => {}}
-          />
-        );
-      case 'landing':
-      default:
-        if (showLogin) {
-          return (
-            <Login 
-              onClose={handleCloseLogin}
-              onLoginSuccess={handleLoginSuccess}
-              sendDataToParent={handleDataFromChild}
-            />
-          );
-        }
-        return (
-          <LandingPage 
-            sendDataToParent={handleDataFromChild} 
-            bookingType={handleSelectedBookingType} 
-          />
-        );
-    }
-  };
+  // const handleDataFromChild = (page: string) => {
+  //   console.log("data from child ==> ", page);
+  //   setSelection(page);
+  //   if (page === DETAILS) {
+  //     setCurrentView('details');
+  //   } else if (page === PROFILE) {
+  //     setCurrentView('dashboard');
+  //   }
+  // };
+
+  // const handleSelectedBookingType = (role: string) => {
+  //   console.log("Selected booking type:", role);
+  //   setSelectedRole(role);
+  //   setSelectedBookingType(role);
+  // };
+
+  // const renderCurrentView = () => {
+  //   switch (currentView) {
+  //     case 'dashboard':
+  //       return <ServiceProviderDashboard />;
+  //     case 'bookingHistory':
+  //       return <Booking goBack={() => setCurrentView('dashboard')} />;
+  //     case 'details':
+  //       return (
+  //         <DetailsView
+  //           sendDataToParent={() => {}}
+  //         />
+  //       );
+  //     case 'landing':
+  //     default:
+  //       if (showLogin) {
+  //         return (
+  //           <Login 
+  //             onClose={handleCloseLogin}
+  //             onLoginSuccess={handleLoginSuccess}
+  //             sendDataToParent={handleDataFromChild}
+  //           />
+  //         );
+  //       }
+  //       return (
+  //         <LandingPage 
+  //           sendDataToParent={handleDataFromChild} 
+  //           bookingType={handleSelectedBookingType} 
+  //         />
+  //       );
+  //   }
+  // };
 
   return (
     <SafeAreaProvider>
       <View style={styles.container}>
+      
         <View style={styles.header}>
-          <Header
+          {/* <Header
             onLoginRequest={handleLoginRequest}
             onProfileClick={handleProfileClick}
             goToLandingPage={goToLandingPage}
@@ -127,14 +141,37 @@ const App = () => {
             onSignOut={handleSignOut}
             onDashboardClick={handleDashboardClick}
             onBookingHistoryClick={handleBookingHistoryClick}
-          />
+          /> */}
+          <Head sendDataToParent={function (data: string): void {
+          throw new Error('Function not implemented.');
+        } }/>
         </View>
 
-        <View style={styles.body}>
+        {/* <View style={styles.body}>
           <SafeAreaView style={styles.safeArea} edges={['bottom']}>
             {renderCurrentView()}
           </SafeAreaView>
-        </View> 
+        </View>  */}
+        {/* <HomePage sendDataToParent={function (data: string): void {
+          throw new Error('Function not implemented.');
+        } } bookingType={function (data: string): void {
+          throw new Error('Function not implemented.');
+        } }/> */}
+         
+        <SafeAreaView style={styles.body} edges={['bottom']}>
+          {currentView === 'HOME' ? (
+            <HomePage 
+              sendDataToParent={handleViewChange} 
+              bookingType={handleBookingType} 
+            />
+          ) : (
+            <DetailsView 
+              sendDataToParent={handleViewChange} 
+              selected={selectedBookingType} 
+            />
+          )}
+        </SafeAreaView>
+
 
         <View style={styles.footer}>
           <Footer />
@@ -145,28 +182,45 @@ const App = () => {
 };
 
 const styles = StyleSheet.create({
- container: {
-  flex: 1,
-  backgroundColor: '#fff',
-},
-body: {
-  flex: 1,
-  backgroundColor: '#fff',
-},
-
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   header: {
     width: '100%',
     backgroundColor: '#fff',
     zIndex: 10,
   },
- 
-  safeArea: {
+  body: {
     flex: 1,
+    backgroundColor: '#fff',
   },
   footer: {
     width: '100%',
     backgroundColor: '#fff',
   },
+//  container: {
+//   flex: 1,
+//   backgroundColor: '#fff',
+// },
+// body: {
+//   flex: 1,
+//   backgroundColor: '#fff',
+// },
+
+//   header: {
+//     width: '100%',
+//     backgroundColor: '#fff',
+//     zIndex: 10,
+//   },
+ 
+//   safeArea: {
+//     flex: 1,
+//   },
+//   footer: {
+//     width: '100%',
+//     backgroundColor: '#fff',
+//   },
 });
 
 export default App;
