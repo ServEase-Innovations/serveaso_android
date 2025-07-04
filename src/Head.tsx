@@ -29,6 +29,8 @@ import Geocoder from 'react-native-geocoding';
 import MapView, { Marker } from 'react-native-maps';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { NativeModules } from 'react-native';
+import {useAuth0} from 'react-native-auth0';
+import config from '../auth0-configuration';
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
@@ -37,10 +39,20 @@ interface ChildComponentProps {
 Geocoder.init(keys.api_key);
 
 const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
-  const handleClick = (e: any) => {
+  // const handleClick = (e: any) => {
+  //   if (e === 'sign_out') {
+  //     dispatch(remove());
+  //     sendDataToParent("");
+  //   } else {
+  //     sendDataToParent(e);
+  //   }
+  // };
+ const handleClick = (e: any) => {
     if (e === 'sign_out') {
       dispatch(remove());
       sendDataToParent("");
+    } else if (e === 'HOME') {
+      sendDataToParent("HOME"); // This will trigger the view change in App.tsx
     } else {
       sendDataToParent(e);
     }
@@ -64,6 +76,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [showGPSButton, setShowGPSButton] = useState(false);
   const [isCheckingLocation, setIsCheckingLocation] = useState(false);
+const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Error, isLoading: auth0Loading} = useAuth0();
 
   useEffect(() => {
     setLoggedInUser(user);
@@ -251,15 +264,40 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     handleClick(BOOKINGS);
   };
 
-  const handleSignOut = () => {
+  // const handleSignOut = () => {
+  //   setMenuVisible(false);
+  //   handleClick('sign_out');
+  // };
+  const handleSignOut = async () => {
+  try {
+    await clearSession({}, {});
+    dispatch(remove());
     setMenuVisible(false);
     handleClick('sign_out');
-  };
+  } catch (e) {
+    console.log('Log out error:', e);
+  }
+};
 
-  const handleLoginClick = () => {
-    setMenuVisible(false);
-    handleClick(LOGIN);
-  };
+  // const handleLoginClick = () => {
+  //   setMenuVisible(false);
+  //   handleClick(LOGIN);
+  // };
+  // Modify the handleLoginClick function to use Auth0
+const handleLoginClick = async () => {
+  setMenuVisible(false);
+  try {
+    await authorize({}, {});
+    const credentials = await getCredentials();
+    if (credentials?.accessToken) {
+      Alert.alert('Login Successful');
+      // Here you would typically handle the user data and store it in your app state
+      // For example: dispatch(setUser(auth0User));
+    }
+  } catch (e) {
+    console.log('Login error:', e);
+  }
+};
 
   return (
     <View style={{ position: 'relative' }}>
@@ -270,13 +308,16 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
       )}
 
       <View style={styles.headerContainer}>
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('../assets/images/logo.png')}
-            style={styles.logo}
-          />
-          <Text style={styles.logoText}>ServEaso</Text>
-        </View>
+        <TouchableOpacity 
+  style={styles.logoContainer} 
+  onPress={() => handleClick('HOME')}
+>
+  <Image
+    source={require('../assets/images/logo.png')}
+    style={styles.logo}
+  />
+  <Text style={styles.logoText}>ServEaso</Text>
+</TouchableOpacity>
 
         <View style={styles.actionsContainer}>
           <TouchableOpacity 
@@ -395,7 +436,72 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
           </View>
         </Modal>
 
-        {menuVisible && (
+
+{menuVisible && (
+  <View style={styles.menuDropdown}>
+    {!auth0User && !loggedInUser ? (
+      <>
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={handleLoginClick}
+        >
+          <Text style={styles.menuItemText}>Login / Signup</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={() => {
+            setMenuVisible(false);
+            Alert.alert('Terms & Conditions clicked');
+          }}
+        >
+          <Text style={styles.menuItemText}>Terms & Conditions</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={() => {
+            setMenuVisible(false);
+            Alert.alert('Contact Us clicked');
+          }}
+        >
+          <Text style={styles.menuItemText}>Contact Us</Text>
+        </TouchableOpacity>
+      </>
+    ) : (
+      <>
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={handleProfileClick}
+        >
+          <Text style={styles.menuItemText}>Profile</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={handleBookingHistoryClick}
+        >
+          <Text style={styles.menuItemText}>Booking History</Text>
+        </TouchableOpacity>
+        
+        {loggedInUser?.role === 'admin' && (
+          <TouchableOpacity 
+            style={styles.menuItem} 
+            onPress={handleDashboardClick}
+          >
+            <Text style={styles.menuItemText}>Dashboard</Text>
+          </TouchableOpacity>
+        )}
+        
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={handleSignOut}
+        >
+          <Text style={styles.menuItemText}>Sign Out</Text>
+        </TouchableOpacity>
+      </>
+    )}
+  </View>
+)}
+        {/* {menuVisible && (
           <View style={styles.menuDropdown}>
             {!loggedInUser ? (
               <>
@@ -458,7 +564,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
               </>
             )}
           </View>
-        )}
+        )} */}
       </View>
     </View>
   );
@@ -532,10 +638,11 @@ const styles = StyleSheet.create<Styles>({
     height: 70,
     elevation: 3,
   },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+ logoContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 8, // Add some padding to make it easier to tap
+},
   logo: {
     height: 40,
     width: 40,

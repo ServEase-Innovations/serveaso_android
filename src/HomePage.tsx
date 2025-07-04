@@ -18,6 +18,7 @@ import { add } from "./features/bookingTypeSlice";
 import { DETAILS } from "./Constants/pagesConstants";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import RadioButton from './RadioButton';
+import ServiceProviderRegistration from './ServiceProviderRegistration';
 
 // Import local images
 const cookImage = require("../assets/images/newCook.png");
@@ -45,6 +46,11 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [currentPicker, setCurrentPicker] = useState<"start" | "end">("start");
+  const [showRegistration, setShowRegistration] = useState(false);
+
+    const handleWorkButtonClick = () => {
+    setShowRegistration(true);
+  };
 
   const dispatch = useDispatch();
 
@@ -183,9 +189,21 @@ const HomePage: React.FC<ChildComponentProps> = ({
             <TouchableOpacity style={styles.outlineButton}>
               <Text style={styles.outlineButtonText}>I need help</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.outlineButton}>
-              <Text style={styles.outlineButtonText}>I want to work</Text>
-            </TouchableOpacity>
+              <TouchableOpacity 
+        style={styles.outlineButton}
+        onPress={handleWorkButtonClick}
+      >
+        <Text style={styles.outlineButtonText}>I want to work</Text>
+      </TouchableOpacity>
+
+        {/* Add the registration modal */}
+      <Modal visible={showRegistration} animationType="slide">
+        <ServiceProviderRegistration
+          onBackToLogin={() => setShowRegistration(false)}
+          onRegistrationSuccess={() => setShowRegistration(false)}
+        />
+      </Modal>
+      
           </View>
         </View>
         <View style={styles.heroImageContainer}>

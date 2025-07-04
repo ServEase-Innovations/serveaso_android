@@ -11,6 +11,8 @@ import Booking from './src/Bookings';
 import { CONFIRMATION, DETAILS, PROFILE } from './src/Constants/pagesConstants';
 import HomePage from './src/HomePage';
 import Head from './src/Head';
+import { Auth0Provider } from 'react-native-auth0';
+import config from './auth0-configuration';
 
 const App = () => {
   // const [showLogin, setShowLogin] = useState(false);
@@ -23,6 +25,13 @@ const App = () => {
     const [currentView, setCurrentView] = useState('HOME');
   const [selectedBookingType, setSelectedBookingType] = useState('');
 
+ const handleDataFromChild = (data: string) => {
+  if (data === 'HOME') {
+    setCurrentView('HOME');
+  } else {
+    // Handle other cases as needed
+  }
+};
   const handleViewChange = (view: string) => {
     setCurrentView(view);
   };
@@ -129,55 +138,86 @@ const App = () => {
   // };
 
   return (
-    <SafeAreaProvider>
-      <View style={styles.container}>
+    //     <Auth0Provider domain={config.domain} clientId={config.clientId}>
+    // <SafeAreaProvider>
+    //   <View style={styles.container}>
       
-        <View style={styles.header}>
-          {/* <Header
-            onLoginRequest={handleLoginRequest}
-            onProfileClick={handleProfileClick}
-            goToLandingPage={goToLandingPage}
-            isLoggedIn={isLoggedIn}
-            onSignOut={handleSignOut}
-            onDashboardClick={handleDashboardClick}
-            onBookingHistoryClick={handleBookingHistoryClick}
-          /> */}
-          <Head sendDataToParent={function (data: string): void {
-          throw new Error('Function not implemented.');
-        } }/>
-        </View>
+    //     <View style={styles.header}>
+    //       {/* <Header
+    //         onLoginRequest={handleLoginRequest}
+    //         onProfileClick={handleProfileClick}
+    //         goToLandingPage={goToLandingPage}
+    //         isLoggedIn={isLoggedIn}
+    //         onSignOut={handleSignOut}
+    //         onDashboardClick={handleDashboardClick}
+    //         onBookingHistoryClick={handleBookingHistoryClick}
+    //       /> */}
+    //       <Head sendDataToParent={function (data: string): void {
+    //       throw new Error('Function not implemented.');
+    //     } }/>
+    //     </View>
 
-        {/* <View style={styles.body}>
-          <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-            {renderCurrentView()}
-          </SafeAreaView>
-        </View>  */}
-        {/* <HomePage sendDataToParent={function (data: string): void {
-          throw new Error('Function not implemented.');
-        } } bookingType={function (data: string): void {
-          throw new Error('Function not implemented.');
-        } }/> */}
+    //     {/* <View style={styles.body}>
+    //       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    //         {renderCurrentView()}
+    //       </SafeAreaView>
+    //     </View>  */}
+    //     {/* <HomePage sendDataToParent={function (data: string): void {
+    //       throw new Error('Function not implemented.');
+    //     } } bookingType={function (data: string): void {
+    //       throw new Error('Function not implemented.');
+    //     } }/> */}
          
-        <SafeAreaView style={styles.body} edges={['bottom']}>
-          {currentView === 'HOME' ? (
-            <HomePage 
-              sendDataToParent={handleViewChange} 
-              bookingType={handleBookingType} 
-            />
-          ) : (
-            <DetailsView 
-              sendDataToParent={handleViewChange} 
-              selected={selectedBookingType} 
-            />
-          )}
-        </SafeAreaView>
+    //     <SafeAreaView style={styles.body} edges={['bottom']}>
+    //       {currentView === 'HOME' ? (
+    //         <HomePage 
+    //           sendDataToParent={handleViewChange} 
+    //           bookingType={handleBookingType} 
+             
+    //         />
+    //       ) : (
+    //         <DetailsView 
+    //           sendDataToParent={handleViewChange} 
+    //           selected={selectedBookingType} 
+    //         />
+    //       )}
+    //     </SafeAreaView>
 
 
-        <View style={styles.footer}>
-          <Footer />
+    //     <View style={styles.footer}>
+    //       <Footer />
+    //     </View>
+    //   </View>
+    // </SafeAreaProvider>
+    // </Auth0Provider>
+      <Auth0Provider domain={config.domain} clientId={config.clientId}>
+      <SafeAreaProvider>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            {/* Pass the actual handler function */}
+            <Head sendDataToParent={handleDataFromChild} />
+          </View>
+
+          <SafeAreaView style={styles.body} edges={['bottom']}>
+            {currentView === 'HOME' ? (
+              <HomePage 
+                sendDataToParent={handleViewChange} 
+                bookingType={handleBookingType} 
+              />
+            ) : (
+              <DetailsView 
+                sendDataToParent={handleViewChange} 
+                selected={selectedBookingType} 
+              />
+            )}
+          </SafeAreaView>
+
+          <View style={styles.footer}>
+            <Footer />
+          </View>
         </View>
-      </View>
-    </SafeAreaProvider>
+      </SafeAreaProvider>
+    </Auth0Provider>
   );
 };
 

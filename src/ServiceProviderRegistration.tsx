@@ -27,7 +27,7 @@ import Geolocation from "@react-native-community/geolocation";
 import Geocoder from "react-native-geocoding";
 import { PERMISSIONS, request, RESULTS } from "react-native-permissions";
 import { NativeModules, Linking } from "react-native";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // Define interfaces
 interface FormData {
@@ -1492,6 +1492,14 @@ const serviceTypes = [
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
     >
+       <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={onBackToLogin}
+        >
+          <Icon name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
@@ -1525,7 +1533,7 @@ const serviceTypes = [
           {/* Navigation Buttons */}
           <View style={styles.navigationButtons}>
             {activeStep > 0 && (
-              <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              <TouchableOpacity style={styles.backButtons} onPress={handleBack}>
                 <Text style={styles.buttonText}>Back</Text>
               </TouchableOpacity>
             )}
@@ -1575,6 +1583,21 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: "#fff",
+  },
+   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  backButton: {
+    marginRight: 15,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -1700,7 +1723,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
-  backButton: {
+  backButtons: {
     backgroundColor: "#666",
     padding: 12,
     borderRadius: 5,
