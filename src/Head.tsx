@@ -31,6 +31,8 @@ import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { NativeModules } from 'react-native';
 import {useAuth0} from 'react-native-auth0';
 import config from '../auth0-configuration';
+import { selectCartItems } from './features/addToSlice';
+import {CartDialog} from './CartDialog';
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
@@ -76,6 +78,9 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [showGPSButton, setShowGPSButton] = useState(false);
   const [isCheckingLocation, setIsCheckingLocation] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+   const cartItems = useSelector(selectCartItems);
+
 const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Error, isLoading: auth0Loading} = useAuth0();
 
   useEffect(() => {
@@ -331,12 +336,15 @@ const handleLoginClick = async () => {
           </TouchableOpacity>
 
           <View style={styles.iconsContainer}>
-            <TouchableOpacity style={styles.iconButton} onPress={() => handleClick(CHECKOUT)}>
-              <View style={styles.cartBadge}>
-                <Text style={styles.badgeText}>{cart?.length || 0}</Text>
-              </View>
-              <FeatherIcon name="shopping-cart" size={20} color="#000" />
-            </TouchableOpacity>
+          <TouchableOpacity 
+  style={styles.iconButton} 
+  onPress={() => setIsCartOpen(true)}
+>
+  <View style={styles.cartBadge}>
+    <Text style={styles.badgeText}>{cartItems?.length || 0}</Text>
+  </View>
+  <FeatherIcon name="shopping-cart" size={20} color="#000" />
+</TouchableOpacity>
 
             <TouchableOpacity style={styles.iconButton} onPress={handleMenuPress}>
               {loggedInUser ? (
@@ -566,6 +574,15 @@ const handleLoginClick = async () => {
           </View>
         )} */}
       </View>
+          <CartDialog 
+      open={isCartOpen}
+      handleClose={() => setIsCartOpen(false)}
+      handleCheckout={() => {
+        setIsCartOpen(false);
+        handleClick(CHECKOUT);
+      }}
+    />
+
     </View>
   );
 };
