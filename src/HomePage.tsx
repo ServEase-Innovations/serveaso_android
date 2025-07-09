@@ -19,6 +19,8 @@ import { DETAILS } from "./Constants/pagesConstants";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import RadioButton from './RadioButton';
 import ServiceProviderRegistration from './ServiceProviderRegistration';
+import ServiceDetailsDialog from './ServiceDetailsDialog'; // Import the dialog component
+
 
 // Import local images
 const cookImage = require("../assets/images/newCook.png");
@@ -47,6 +49,8 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [currentPicker, setCurrentPicker] = useState<"start" | "end">("start");
   const [showRegistration, setShowRegistration] = useState(false);
+  const [serviceDetailsOpen, setServiceDetailsOpen] = useState(false);
+  const [selectedServiceType, setSelectedServiceType] = useState<"cook" | "maid" | "babycare" | null>(null);
 
     const handleWorkButtonClick = () => {
     setShowRegistration(true);
@@ -150,6 +154,23 @@ const HomePage: React.FC<ChildComponentProps> = ({
     if (!time) return "";
     return time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
+  
+  const handleLearnMore = (service: string) => {
+    switch (service) {
+      case "Home Cook":
+        setSelectedServiceType("cook");
+        break;
+      case "Cleaning Help":
+        setSelectedServiceType("maid");
+        break;
+      case "Caregiver":
+        setSelectedServiceType("babycare");
+        break;
+      default:
+        setSelectedServiceType(null);
+    }
+    setServiceDetailsOpen(true);
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -237,7 +258,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
                 <Text style={styles.serviceIcon}>{service.icon}</Text>
                 <Text style={styles.serviceTitle}>{service.title}</Text>
                 <Text style={styles.serviceDesc}>{service.desc}</Text>
-                <TouchableOpacity>
+                <TouchableOpacity  onPress={() => handleLearnMore(service.title)}>
                   <Text style={styles.learnMoreLink}>Learn More</Text>
                 </TouchableOpacity>
               </View>
@@ -399,11 +420,14 @@ const HomePage: React.FC<ChildComponentProps> = ({
           minimumDate={new Date()}
         />
       )}
+      <ServiceDetailsDialog
+  open={serviceDetailsOpen}
+  onClose={() => setServiceDetailsOpen(false)}
+  serviceType={selectedServiceType}
+/>
     </ScrollView>
   );
 };
-
-// ... (keep the existing Styles interface and StyleSheet declaration)
 
 interface Styles {
   container: ViewStyle;

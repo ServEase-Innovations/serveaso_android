@@ -13,6 +13,7 @@ import HomePage from './src/HomePage';
 import Head from './src/Head';
 import { Auth0Provider } from 'react-native-auth0';
 import config from './auth0-configuration';
+import NewDetails from './src/newDetails';
 
 const App = () => {
   // const [showLogin, setShowLogin] = useState(false);
@@ -199,6 +200,7 @@ const App = () => {
           </View>
 
           <SafeAreaView style={styles.body} edges={['bottom']}>
+            
             {currentView === 'HOME' ? (
               <HomePage 
                 sendDataToParent={handleViewChange} 
@@ -210,6 +212,9 @@ const App = () => {
                 selected={selectedBookingType} 
               />
             )}
+           {/* <NewDetails sendDataToParent={function (data: string): void {
+            throw new Error('Function not implemented.');
+          } }/> */}
           </SafeAreaView>
 
           <View style={styles.footer}>

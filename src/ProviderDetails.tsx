@@ -20,6 +20,7 @@ import MaidServiceDialog from "./MaidServiceDialog";
 import CookServicesDialog from "./CookServiceDialog";
 import CookServiceDialog from "./CookServiceDialog";
 import NannyServiceDialog from "./NannyServiceDialog";
+import DemoCook from "./demoCook";
 
 interface ProviderDetailsProps {
   housekeepingRole: string;
@@ -339,12 +340,13 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
             )}
             
             {props.housekeepingRole === "MAID" && (
-              <MaidServiceDialog 
-                // open={open} 
-                // handleClose={handleClose} 
-                providerDetails={providerDetailsData} visible={false} onClose={function (): void {
-                  throw new Error("Function not implemented.");
-                } }              />
+              // <MaidServiceDialog 
+              //   // open={open} 
+              //   // handleClose={handleClose} 
+              //   providerDetails={providerDetailsData} visible={false} onClose={function (): void {
+              //     throw new Error("Function not implemented.");
+              //   } }              />
+              <DemoCook/>
             )}
             
             {props.housekeepingRole === "NANNY" && (
