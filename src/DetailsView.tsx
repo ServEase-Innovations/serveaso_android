@@ -93,7 +93,7 @@ export const NewDetails: React.FC<DetailsProps> = ({
       console.log("Latitude:", latitude, "Longitude:", longitude);
 
       const response = await axiosInstance.get(
-        "/api/serviceproviders/search?startDate=2025-04-01&endDate=2025-04-30&timeslot=16:37-16:37&housekeepingRole=COOK&latitude=22.94739666666667&longitude=88.65848666666668"
+        "/api/serviceproviders/search?startDate=2025-04-01&endDate=2025-04-30&timeslot=16:37-16:37&housekeepingRole=MAID&latitude=22.94739666666667&longitude=88.65848666666668"
       );
       
       console.log("Response:", response.data);

@@ -3,24 +3,56 @@ import React, { useEffect, useRef, useState } from "react";
 import { 
   View, 
   Text, 
-  StyleSheet, 
   TouchableOpacity, 
+  StyleSheet, 
   Image, 
-  Modal, 
+  Modal,
   ScrollView,
   Alert
 } from "react-native";
 import moment from "moment";
+import AddIcon from 'react-native-vector-icons/MaterialIcons';
+import RemoveIcon from 'react-native-vector-icons/MaterialIcons';
+import InfoIcon from 'react-native-vector-icons/MaterialIcons';
+import CloseIcon from 'react-native-vector-icons/FontAwesome';
 import { useDispatch, useSelector } from "react-redux";
-import { add, update } from "./features/bookingTypeSlice";
 import axiosInstance from "./axiosInstance";
-import { Bookingtype } from "./types/bookingTypeData";
-import { EnhancedProviderDetails } from "./types/ProviderDetailsType";
-import MaidServiceDialog from "./MaidServiceDialog";
-import CookServicesDialog from "./CookServiceDialog";
-import CookServiceDialog from "./CookServiceDialog";
+import PlusIcon from 'react-native-vector-icons/Feather';
+import { add, update } from "./features/bookingTypeSlice";
 import NannyServiceDialog from "./NannyServiceDialog";
+import MaidServiceDialog from "./MaidServiceDialog";
 import DemoCook from "./demoCook";
+
+
+// Types
+interface BookingType {
+  serviceproviderId: string;
+  eveningSelection: string | null;
+  morningSelection: string | null;
+  timeRange?: string;
+  duration?: number;
+}
+
+interface EnhancedProviderDetails {
+  serviceproviderId: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  gender: string;
+  dob: string;
+  diet: string;
+  housekeepingRole: string;
+  selectedMorningTime: number | null;
+  selectedEveningTime: number | null;
+  matchedMorningSelection: string | null;
+  matchedEveningSelection: string | null;
+  startTime: string;
+  endTime: string;
+  language?: string;
+  experience?: string;
+  otherServices?: string;
+  availableTimeSlots?: string[];
+}
 
 interface ProviderDetailsProps {
   housekeepingRole: string;
@@ -44,9 +76,9 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const [morningSelection, setMorningSelection] = useState<number | null>(null);
   const [eveningSelectionTime, setEveningSelectionTime] = useState<string | null>(null);
   const [morningSelectionTime, setMorningSelectionTime] = useState<string | null>(null);
-  const [loggedInUser, setLoggedInUser] = useState();
+  const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [open, setOpen] = useState(false);
-  const [engagementData, setEngagementData] = useState(null);
+  const [engagementData, setEngagementData] = useState<any>(null);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [missingTimeSlots, setMissingTimeSlots] = useState<string[]>([]);
   const [startTime, setStartTime] = useState("08:00");
@@ -167,7 +199,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   };
 
   const handleBookNow = () => {
-    let booking: Bookingtype;
+    let booking: BookingType;
 
     if (props.housekeepingRole !== "NANNY") {
       booking = {
@@ -268,150 +300,141 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     endTime
   };
 
+  const renderServiceDialog = () => {
+    switch (props.housekeepingRole) {
+      case "COOK":
+        return <DemoCook 
+            open={open}
+            handleClose={handleClose}
+            providerDetails={providerDetailsData} />;
+      case "MAID":
+        return <MaidServiceDialog 
+            //   open={open} 
+            //   handleClose={handleClose} 
+            providerDetails={providerDetailsData} visible={false} onClose={function (): void {
+                throw new Error("Function not implemented.");
+            } }        />;
+      case "NANNY":
+        return <NannyServiceDialog 
+            //   open={open} 
+            //   handleClose={handleClose} 
+            providerDetails={providerDetailsData} visible={false} onClose={function (): void {
+                throw new Error("Function not implemented.");
+            } } />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.card}>
           <TouchableOpacity
             style={styles.expandButton}
             onPress={toggleExpand}
           >
-            <Text style={styles.expandButtonText}>
-              {isExpanded ? "-" : "+"}
-            </Text>
+            {isExpanded ? (
+              <RemoveIcon name="remove" size={24} color="#1976d2" />
+            ) : (
+              <AddIcon name="add" size={24} color="#1976d2" />
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.bookNowButton}
             onPress={handleLogin}
           >
-            <Text style={styles.bookNowButtonText}>Book Now</Text>
+            <Text style={styles.bookNowText}>Book Now</Text>
           </TouchableOpacity>
-        </View>
 
-        <View style={styles.content}>
-          <View style={styles.essentials}>
-            <Text style={styles.nameText}>
-              {props.firstName} {props.middleName} {props.lastName}
-              <Text style={styles.genderAgeText}>
-                ({props.gender === "FEMALE" ? "F " : props.gender === "MALE" ? "M " : "O"}
-                {calculateAge(props.dob)})
+          <View style={styles.content}>
+            <View style={styles.essentials}>
+              <Text style={styles.nameText}>
+                {props.firstName} {props.middleName} {props.lastName}
+                <Text style={styles.genderAgeText}>
+                  ({props.gender === "FEMALE" ? "F " : props.gender === "MALE" ? "M " : "O"}
+                  {calculateAge(props.dob)})
+                </Text>
+                <Image
+                  source={dietImage}
+                  style={styles.dietImage}
+                />
               </Text>
-              <Image
-                source={dietImage}
-                style={styles.dietImage}
-              />
-            </Text>
-          </View>
-
-          {isExpanded && (
-            <View style={styles.expandedContent}>
-              <Text style={styles.detailText}>
-                Language: {props.language || "English"}
-              </Text>
-
-              <Text style={styles.detailText}>
-                Experience: {props.experience || "1 year"}, 
-                Other Services: {props.otherServices || "N/A"}
-              </Text>
-              
-              {warning && <Text style={styles.warningText}>{warning}</Text>}
             </View>
-          )}
+
+            {isExpanded && (
+              <View>
+                <Text style={styles.detailText}>
+                  Language: {props.language || "English"}
+                </Text>
+
+                <Text style={styles.detailText}>
+                  Experience: {props.experience || "1 year"}, 
+                  Other Services: {props.otherServices || "N/A"}
+                </Text>
+                
+                {warning && <Text style={styles.warningText}>{warning}</Text>}
+              </View>
+            )}
+          </View>
         </View>
       </View>
 
-      {/* Dialogs would be implemented as Modals in React Native */}
-      <Modal
-        visible={open}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={handleClose}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            {props.housekeepingRole === "COOK" && (
-              <CookServiceDialog 
-                open={open}
-                handleClose={handleClose}
-                providerDetails={providerDetailsData} visible={false} onClose={function (): void {
-                  throw new Error("Function not implemented.");
-                } }              />
-            )}
-            
-            {props.housekeepingRole === "MAID" && (
-              // <MaidServiceDialog 
-              //   // open={open} 
-              //   // handleClose={handleClose} 
-              //   providerDetails={providerDetailsData} visible={false} onClose={function (): void {
-              //     throw new Error("Function not implemented.");
-              //   } }              />
-              <DemoCook/>
-            )}
-            
-            {props.housekeepingRole === "NANNY" && (
-              <NannyServiceDialog 
-                // open={open} 
-                // handleClose={handleClose} 
-                providerDetails={providerDetailsData} visible={false} onClose={function (): void {
-                  throw new Error("Function not implemented.");
-                } }              />
-            )}
-          </View>
-        </View>
-      </Modal>
+      {renderServiceDialog()}
     </>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    padding: 10,
+  },
+  card: {
+    backgroundColor: 'white',
     borderRadius: 8,
-    padding: 16,
-    margin: 8,
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
     marginBottom: 10,
   },
   expandButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
     borderWidth: 1,
     borderColor: '#1976d2',
-    borderRadius: 4,
     padding: 8,
-    marginRight: 8,
-  },
-  expandButtonText: {
-    color: '#1976d2',
-    fontSize: 16,
+    borderRadius: 4,
   },
   bookNowButton: {
+    position: 'absolute',
+    top: 10,
+    right: 80,
     borderWidth: 1,
     borderColor: '#1976d2',
-    borderRadius: 4,
     padding: 8,
+    borderRadius: 4,
   },
-  bookNowButtonText: {
+  bookNowText: {
     color: '#1976d2',
     fontSize: 14,
   },
   content: {
-    marginTop: 10,
+    marginTop: 20,
   },
   essentials: {
-    marginBottom: 8,
+    marginBottom: 10,
   },
   nameText: {
     fontWeight: 'bold',
     fontSize: 18,
-    marginBottom: 4,
+    marginBottom: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   genderAgeText: {
     fontWeight: 'bold',
@@ -423,29 +446,13 @@ const styles = StyleSheet.create({
     height: 20,
     marginLeft: 8,
   },
-  expandedContent: {
-    marginTop: 8,
-  },
   detailText: {
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   warningText: {
     color: 'red',
-    marginTop: 8,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    width: '80%',
-    maxHeight: '80%',
+    textAlign: 'right',
   },
 });
 

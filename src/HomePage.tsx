@@ -19,8 +19,8 @@ import { DETAILS } from "./Constants/pagesConstants";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import RadioButton from './RadioButton';
 import ServiceProviderRegistration from './ServiceProviderRegistration';
-import ServiceDetailsDialog from './ServiceDetailsDialog'; // Import the dialog component
-
+import ServiceDetailsDialog from './ServiceDetailsDialog'; 
+import Chatbot from './Chatbot'; 
 
 // Import local images
 const cookImage = require("../assets/images/newCook.png");
@@ -51,6 +51,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [showRegistration, setShowRegistration] = useState(false);
   const [serviceDetailsOpen, setServiceDetailsOpen] = useState(false);
   const [selectedServiceType, setSelectedServiceType] = useState<"cook" | "maid" | "babycare" | null>(null);
+  const [chatbotOpen, setChatbotOpen] = useState(false);
 
     const handleWorkButtonClick = () => {
     setShowRegistration(true);
@@ -207,7 +208,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
             </TouchableOpacity>
           </View>
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.outlineButton}>
+            <TouchableOpacity style={styles.outlineButton}  onPress={() => setChatbotOpen(true)}>
               <Text style={styles.outlineButtonText}>I need help</Text>
             </TouchableOpacity>
               <TouchableOpacity 
@@ -226,6 +227,10 @@ const HomePage: React.FC<ChildComponentProps> = ({
       </Modal>
       
           </View>
+          <Chatbot 
+  open={chatbotOpen} 
+  onClose={() => setChatbotOpen(false)} 
+/>
         </View>
         <View style={styles.heroImageContainer}>
           <Image source={heroImage} style={styles.heroImage} />

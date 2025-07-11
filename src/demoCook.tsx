@@ -247,9 +247,9 @@ const DemoCook = ({
             <TouchableOpacity style={styles.continueButton} onPress={handleCheckout}>
               <Text style={styles.continueButtonText}>CONFIRM BOOKING</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>CLOSE</Text>
-            </TouchableOpacity>
+           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+  <Text style={styles.closeButtonText}>CLOSE</Text>
+</TouchableOpacity>
           </ScrollView>
         </View>
       </View>

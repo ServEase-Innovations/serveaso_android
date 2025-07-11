@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Button, ScrollView } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from './src/Header';
 import Footer from './src/Footer';
@@ -14,6 +14,7 @@ import Head from './src/Head';
 import { Auth0Provider } from 'react-native-auth0';
 import config from './auth0-configuration';
 import NewDetails from './src/newDetails';
+import Chatbot from './src/Chatbot';
 
 const App = () => {
   // const [showLogin, setShowLogin] = useState(false);
@@ -22,7 +23,7 @@ const App = () => {
   // const [isLoggedIn, setIsLoggedIn] = useState(false);
   // const [selection, setSelection] = useState<string | undefined>(); 
   // const [selectedBookingType, setSelectedBookingType] = useState<string | undefined>();
-  
+  const [chatbotOpen, setChatbotOpen] = useState(false);
     const [currentView, setCurrentView] = useState('HOME');
   const [selectedBookingType, setSelectedBookingType] = useState('');
 
@@ -139,90 +140,65 @@ const App = () => {
   // };
 
   return (
-    //     <Auth0Provider domain={config.domain} clientId={config.clientId}>
-    // <SafeAreaProvider>
-    //   <View style={styles.container}>
-      
-    //     <View style={styles.header}>
-    //       {/* <Header
-    //         onLoginRequest={handleLoginRequest}
-    //         onProfileClick={handleProfileClick}
-    //         goToLandingPage={goToLandingPage}
-    //         isLoggedIn={isLoggedIn}
-    //         onSignOut={handleSignOut}
-    //         onDashboardClick={handleDashboardClick}
-    //         onBookingHistoryClick={handleBookingHistoryClick}
-    //       /> */}
-    //       <Head sendDataToParent={function (data: string): void {
-    //       throw new Error('Function not implemented.');
-    //     } }/>
-    //     </View>
+ <Auth0Provider domain={config.domain} clientId={config.clientId}>
+  <SafeAreaProvider>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Head sendDataToParent={handleDataFromChild} />
+      </View>
 
-    //     {/* <View style={styles.body}>
-    //       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-    //         {renderCurrentView()}
+      <SafeAreaView style={styles.body} edges={['bottom']}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {currentView === 'HOME' ? (
+            <HomePage 
+              sendDataToParent={handleViewChange} 
+              bookingType={handleBookingType} 
+            />
+          ) : (
+            <DetailsView 
+              sendDataToParent={handleViewChange} 
+              selected={selectedBookingType} 
+            />
+          )}
+
+          {/* Footer will appear after scrollable content */}
+          <Footer />
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  </SafeAreaProvider>
+</Auth0Provider>
+
+    //   <Auth0Provider domain={config.domain} clientId={config.clientId}>
+    //   <SafeAreaProvider>
+    //     <View style={styles.container}>
+    //       <View style={styles.header}>
+    //         {/* Pass the actual handler function */}
+    //         <Head sendDataToParent={handleDataFromChild} />
+    //       </View>
+          
+          
+
+    //       <SafeAreaView style={styles.body} edges={['bottom']}>
+    //         {currentView === 'HOME' ? (
+    //           <HomePage 
+    //             sendDataToParent={handleViewChange} 
+    //             bookingType={handleBookingType} 
+    //           />
+    //         ) : (
+    //           <DetailsView 
+    //             sendDataToParent={handleViewChange} 
+    //             selected={selectedBookingType} 
+    //           />
+    //         )}
     //       </SafeAreaView>
-    //     </View>  */}
-    //     {/* <HomePage sendDataToParent={function (data: string): void {
-    //       throw new Error('Function not implemented.');
-    //     } } bookingType={function (data: string): void {
-    //       throw new Error('Function not implemented.');
-    //     } }/> */}
-         
-    //     <SafeAreaView style={styles.body} edges={['bottom']}>
-    //       {currentView === 'HOME' ? (
-    //         <HomePage 
-    //           sendDataToParent={handleViewChange} 
-    //           bookingType={handleBookingType} 
-             
-    //         />
-    //       ) : (
-    //         <DetailsView 
-    //           sendDataToParent={handleViewChange} 
-    //           selected={selectedBookingType} 
-    //         />
-    //       )}
-    //     </SafeAreaView>
 
-
-    //     <View style={styles.footer}>
-    //       <Footer />
+    //       <View style={styles.footer}>
+    //         <Footer />
+    //       </View>
     //     </View>
-    //   </View>
-    // </SafeAreaProvider>
+    //   </SafeAreaProvider>
     // </Auth0Provider>
-      <Auth0Provider domain={config.domain} clientId={config.clientId}>
-      <SafeAreaProvider>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            {/* Pass the actual handler function */}
-            <Head sendDataToParent={handleDataFromChild} />
-          </View>
-
-          <SafeAreaView style={styles.body} edges={['bottom']}>
-            
-            {currentView === 'HOME' ? (
-              <HomePage 
-                sendDataToParent={handleViewChange} 
-                bookingType={handleBookingType} 
-              />
-            ) : (
-              <DetailsView 
-                sendDataToParent={handleViewChange} 
-                selected={selectedBookingType} 
-              />
-            )}
-           {/* <NewDetails sendDataToParent={function (data: string): void {
-            throw new Error('Function not implemented.');
-          } }/> */}
-          </SafeAreaView>
-
-          <View style={styles.footer}>
-            <Footer />
-          </View>
-        </View>
-      </SafeAreaProvider>
-    </Auth0Provider>
   );
 };
 
@@ -244,6 +220,11 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#fff',
   },
+  scrollContent: {
+  flexGrow: 1,
+  justifyContent: 'flex-start',
+}
+
 //  container: {
 //   flex: 1,
 //   backgroundColor: '#fff',
