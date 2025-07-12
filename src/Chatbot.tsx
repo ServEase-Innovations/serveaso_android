@@ -6,14 +6,14 @@ import {
   TextInput,
   ScrollView,
   StyleSheet,
-  Modal,
-  Dimensions,
-  PanResponder,
   Animated,
+  PanResponder,
+  Dimensions,
+  Easing,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-// Mock user data - in a real app, you would get this from your Redux store
+// Mock user data
 const mockUser = {
   role: 'CUSTOMER',
   customerDetails: {
@@ -44,18 +44,9 @@ interface ChatbotProps {
 }
 
 const Chatbot: React.FC<ChatbotProps> = ({ open, onClose }) => {
-  // In a real app, you would use Redux like this:
-  // const user = useSelector((state: any) => state.user?.value);
-  // For this example, we'll use mock data
   const user = mockUser;
-  
   const customerId = user?.customerDetails?.customerId || null;
-  const currentLocation = user?.customerDetails?.currentLocation;
   const role = user?.role;
-  const firstName = user?.customerDetails?.firstName;
-  const lastName = user?.customerDetails?.lastName;
-  const customerName = `${firstName} ${lastName}`;
-  
   const faqData = role === 'CUSTOMER' ? [...generalFaqData, ...customerFaqData] : generalFaqData;
 
   const [chatOpen, setChatOpen] = useState(false);
@@ -63,16 +54,22 @@ const Chatbot: React.FC<ChatbotProps> = ({ open, onClose }) => {
     { text: 'Namaste! Welcome to ServEase. How can we assist you today?', sender: 'bot' },
   ]);
   const [inputText, setInputText] = useState('');
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Draggable functionality
-  const pan = useRef(new Animated.ValueXY()).current;
+  // Animation and position values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const positionAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+  // Pan responder for dragging
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderMove: Animated.event([null, { dx: positionAnim.x, dy: positionAnim.y }], { useNativeDriver: false }),
       onPanResponderRelease: () => {
-        pan.extractOffset();
+        positionAnim.extractOffset();
       },
     })
   ).current;
@@ -81,7 +78,31 @@ const Chatbot: React.FC<ChatbotProps> = ({ open, onClose }) => {
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollToEnd({ animated: true });
     }
+    
+    if (isMinimized && messages.length > 1) {
+      setUnreadCount(prev => prev + 1);
+    }
   }, [messages]);
+
+  useEffect(() => {
+    if (open) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 3,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      setIsMinimized(false);
+      setUnreadCount(0);
+    }
+  }, [open]);
 
   const handleQuestionClick = (faq: any) => {
     setMessages((prevMessages) => [
@@ -98,110 +119,188 @@ const Chatbot: React.FC<ChatbotProps> = ({ open, onClose }) => {
     }
   };
 
+  const toggleMinimize = () => {
+    setIsMinimized(!isMinimized);
+    if (!isMinimized) {
+      setUnreadCount(0);
+    }
+  };
+
+  if (!open && !isMinimized) return null;
+
   return (
-    <Modal
-      visible={open}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <Animated.View
-        style={[
-          styles.draggableContainer,
-          {
-            transform: [{ translateX: pan.x }, { translateY: pan.y }],
-          },
-        ]}
-        {...panResponder.panHandlers}
-      >
-        <View style={styles.chatContainer}>
-          {/* Header Section */}
-          <View style={styles.header}>
-            {chatOpen && (
-              <TouchableOpacity onPress={() => setChatOpen(false)} style={styles.backButton}>
-                <Icon name="arrow-left" size={24} color="#333" />
-              </TouchableOpacity>
-            )}
-            <Text style={styles.headerText}>Chat Support</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Icon name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Messages and FAQ Section */}
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.messagesContainer}
-            contentContainerStyle={styles.messagesContent}
-          >
-            {messages.map((msg, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.messageBubble,
-                  msg.sender === 'user' ? styles.userMessage : styles.botMessage,
-                ]}
-              >
-                <Text style={msg.sender === 'user' ? styles.userMessageText : styles.botMessageText}>
-                  {msg.text}
-                </Text>
+    <>
+      {/* Minimized Chat Button */}
+      {isMinimized && (
+        <Animated.View
+          style={[
+            styles.minimizedButton,
+            {
+              transform: [
+                { translateX: positionAnim.x },
+                { translateY: positionAnim.y },
+              ],
+            },
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <TouchableOpacity onPress={toggleMinimize} style={styles.minimizedButtonContent}>
+            <Icon name="chat" size={28} color="#fff" />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount}</Text>
               </View>
-            ))}
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
-            {!chatOpen &&
-              faqData.map((faq, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.faqButton}
-                  onPress={() => handleQuestionClick(faq)}
-                >
-                  <Text style={styles.faqButtonText}>{faq.question}</Text>
+      {/* Chat Container */}
+      {open && !isMinimized && (
+        <Animated.View
+          style={[
+            styles.chatContainer,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { translateX: positionAnim.x },
+                { translateY: positionAnim.y },
+                { scale: scaleAnim },
+              ],
+            },
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.chatContent}>
+            {/* Header Section */}
+            <View style={styles.header}>
+              {chatOpen && (
+                <TouchableOpacity onPress={() => setChatOpen(false)} style={styles.backButton}>
+                  <Icon name="arrow-left" size={24} color="#333" />
                 </TouchableOpacity>
+              )}
+              <Text style={styles.headerText}>Chat Support</Text>
+              <View style={styles.headerRightButtons}>
+                <TouchableOpacity onPress={toggleMinimize} style={styles.minimizeButton}>
+                  <Icon name="chevron-down" size={24} color="#333" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                  <Icon name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Messages and FAQ Section */}
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.messagesContainer}
+              contentContainerStyle={styles.messagesContent}
+            >
+              {messages.map((msg, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.messageBubble,
+                    msg.sender === 'user' ? styles.userMessage : styles.botMessage,
+                  ]}
+                >
+                  <Text style={msg.sender === 'user' ? styles.userMessageText : styles.botMessageText}>
+                    {msg.text}
+                  </Text>
+                </View>
               ))}
 
-            {!chatOpen && (
-              <TouchableOpacity
-                style={styles.chatButton}
-                onPress={() => setChatOpen(true)}
-              >
-                <Text style={styles.chatButtonText}>Chat with Assistant</Text>
-              </TouchableOpacity>
-            )}
-          </ScrollView>
+              {!chatOpen &&
+                faqData.map((faq, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.faqButton}
+                    onPress={() => handleQuestionClick(faq)}
+                  >
+                    <Text style={styles.faqButtonText}>{faq.question}</Text>
+                  </TouchableOpacity>
+                ))}
 
-          {/* Chat Input Section - Only when chatOpen is true */}
-          {chatOpen && (
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.textInput}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Type your question..."
-                placeholderTextColor="#999"
-                onSubmitEditing={handleSendMessage}
-              />
-              <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-                <Icon name="send" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </Animated.View>
-    </Modal>
+              {!chatOpen && (
+                <TouchableOpacity
+                  style={styles.chatButton}
+                  onPress={() => setChatOpen(true)}
+                >
+                  <Text style={styles.chatButtonText}>Chat with Assistant</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+
+            {/* Chat Input Section */}
+            {chatOpen && (
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.textInput}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder="Type your question..."
+                  placeholderTextColor="#999"
+                  onSubmitEditing={handleSendMessage}
+                />
+                <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
+                  <Icon name="send" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      )}
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  draggableContainer: {
+  minimizedButton: {
+    position: 'absolute',
+    bottom: 50,
+    right: 20,
+    zIndex: 1001,
+  },
+  minimizedButtonContent: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#4285f4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: 'red',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  chatContainer: {
     position: 'absolute',
     bottom: 100,
     right: 20,
-    zIndex: 50,
-  },
-  chatContainer: {
     width: Dimensions.get('window').width * 0.85,
     maxWidth: 400,
     height: Dimensions.get('window').height * 0.7,
+    zIndex: 1000,
+  },
+  chatContent: {
+    flex: 1,
     backgroundColor: '#fff',
     borderRadius: 12,
     shadowColor: '#000',
@@ -232,8 +331,15 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
+  headerRightButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  minimizeButton: {
+    marginRight: 15,
+  },
   closeButton: {
-    marginLeft: 'auto',
+    marginLeft: 0,
   },
   messagesContainer: {
     flex: 1,

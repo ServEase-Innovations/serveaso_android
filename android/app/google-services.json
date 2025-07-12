@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "898242390178",
+    "project_id": "serveaso-ui",
+    "storage_bucket": "serveaso-ui.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:898242390178:android:e6c6099b67dbd130aa4ffb",
+        "android_client_info": {
+          "package_name": "com.awesomeproject"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0U1eLVXzY_DNPbQ7vNf8j95ryk0Tsgg4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

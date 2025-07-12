@@ -1713,7 +1713,7 @@ const styles = StyleSheet.create({
     right: 10,
   },
   button: {
-    backgroundColor: "#1fb28a",
+    backgroundColor: "#2771c1ff",
     padding: 12,
     borderRadius: 5,
     alignItems: "center",
@@ -1732,14 +1732,14 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   nextButton: {
-    backgroundColor: "#1fb28a",
+    backgroundColor: "#2771c1ff",
     padding: 12,
     borderRadius: 5,
     alignItems: "center",
     flex: 1,
   },
   submitButton: {
-    backgroundColor: "#1fb28a",
+    backgroundColor: "#2771c1ff",
     padding: 12,
     borderRadius: 5,
     alignItems: "center",
@@ -1797,7 +1797,7 @@ const styles = StyleSheet.create({
   confirmationText: {
     fontSize: 18,
     textAlign: "center",
-    color: "#1fb28a",
+    color: "#2771c1ff",
   },
   loginLinkContainer: {
     flexDirection: "row",
@@ -1808,7 +1808,7 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   loginLink: {
-    color: "#1fb28a",
+    color: "#2771c1ff",
     fontWeight: "bold",
   },
   note: {

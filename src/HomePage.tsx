@@ -174,6 +174,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
   };
 
   return (
+ 
     <ScrollView style={styles.container}>
       {/* Hero Section */}
       <View style={styles.heroSection}>
@@ -208,15 +209,21 @@ const HomePage: React.FC<ChildComponentProps> = ({
             </TouchableOpacity>
           </View>
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.outlineButton}  onPress={() => setChatbotOpen(true)}>
-              <Text style={styles.outlineButtonText}>I need help</Text>
-            </TouchableOpacity>
+           <TouchableOpacity style={styles.outlineButton} onPress={() => setChatbotOpen(true)}>
+  <Text style={styles.outlineButtonText}>I need help</Text>
+</TouchableOpacity>
+  
               <TouchableOpacity 
         style={styles.outlineButton}
         onPress={handleWorkButtonClick}
       >
         <Text style={styles.outlineButtonText}>I want to work</Text>
       </TouchableOpacity>
+
+   <Chatbot 
+  open={chatbotOpen} 
+  onClose={() => setChatbotOpen(false)} 
+/>
 
         {/* Add the registration modal */}
       <Modal visible={showRegistration} animationType="slide">
@@ -225,12 +232,9 @@ const HomePage: React.FC<ChildComponentProps> = ({
           onRegistrationSuccess={() => setShowRegistration(false)}
         />
       </Modal>
-      
+   
           </View>
-          <Chatbot 
-  open={chatbotOpen} 
-  onClose={() => setChatbotOpen(false)} 
-/>
+         
         </View>
         <View style={styles.heroImageContainer}>
           <Image source={heroImage} style={styles.heroImage} />
@@ -431,6 +435,8 @@ const HomePage: React.FC<ChildComponentProps> = ({
   serviceType={selectedServiceType}
 />
     </ScrollView>
+   
+
   );
 };
 
