@@ -8,6 +8,7 @@ import HomePage from './src/HomePage';
 import DetailsView from './src/DetailsView';
 import Footer from './src/Footer';
 import Chatbot from './src/Chatbot';
+import CookServicesDialog from './src/CookServiceDialog';
 
 const App = () => {
   const [chatbotOpen, setChatbotOpen] = useState(false);
@@ -40,6 +41,7 @@ const App = () => {
           {/* Main Content */}
           <SafeAreaView style={styles.body} edges={['bottom']}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
+          
               {currentView === 'HOME' ? (
                 <HomePage 
                   sendDataToParent={handleViewChange} 
@@ -53,12 +55,13 @@ const App = () => {
                   selected={selectedBookingType} 
                 />
               )}
+               <Footer />
             </ScrollView>
           </SafeAreaView>
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Footer />
+           
           </View>
 
           {/* Chatbot - Rendered outside the scroll view */}

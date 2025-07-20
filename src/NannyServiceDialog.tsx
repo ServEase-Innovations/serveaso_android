@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
+  Modal,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   TextInput,
   ScrollView,
   Alert,
@@ -12,37 +12,40 @@ import {
   Platform,
 } from 'react-native';
 import axios from 'axios';
-import { useSelector, useDispatch } from 'react-redux';
-import { EnhancedProviderDetails } from './types/ProviderDetailsType';
-import { BookingDetails } from './types/engagementRequest';
+import { useDispatch, useSelector } from 'react-redux';
 import { BOOKINGS } from './Constants/pagesConstants';
 import axiosInstance from './axiosInstance';
+import { addToCart, removeFromCart, selectCartItems } from './features/addToSlice';
+import { isNannyCartItem } from './types/cartSlice';
+import Login from './Login';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
-interface NannyServiceDialogProps {
-  visible: boolean;
-  onClose: () => void;
-  providerDetails?: EnhancedProviderDetails;
+interface NannyServicesDialogProps {
+  open: boolean;
+  handleClose: () => void;
+  providerDetails?: any;
   sendDataToParent?: (data: string) => void;
 }
 
-const NannyServiceDialog: React.FC<NannyServiceDialogProps> = ({
-  visible,
-  onClose,
+const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({ 
+  open, 
+  handleClose, 
   providerDetails,
-  sendDataToParent,
+  sendDataToParent
 }) => {
   const [activeTab, setActiveTab] = useState<'baby' | 'elderly'>('baby');
   const [babyPackages, setBabyPackages] = useState({
     day: { age: 3, selected: false },
     night: { age: 3, selected: false },
-    fullTime: { age: 3, selected: false },
+    fullTime: { age: 3, selected: false }
   });
   const [elderlyPackages, setElderlyPackages] = useState({
     day: { age: 65, selected: false },
     night: { age: 65, selected: false },
-    fullTime: { age: 65, selected: false },
+    fullTime: { age: 65, selected: false }
   });
-  const [loginVisible, setLoginVisible] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,6 +54,8 @@ const NannyServiceDialog: React.FC<NannyServiceDialogProps> = ({
   const bookingType = useSelector((state: any) => state.bookingType?.value);
   const user = useSelector((state: any) => state.user?.value);
   const dispatch = useDispatch();
+  const allCartItems = useSelector(selectCartItems);
+  const nannyCartItems = allCartItems.filter(isNannyCartItem);
   const customerId = user?.customerDetails?.customerId || null;
   const currentLocation = user?.customerDetails?.currentLocation;
   const firstName = user?.customerDetails?.firstName;
@@ -58,54 +63,181 @@ const NannyServiceDialog: React.FC<NannyServiceDialogProps> = ({
   const customerName = `${firstName} ${lastName}`;
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
 
+  const [cartItems, setCartItems] = useState<Record<string, boolean>>(() => {
+    const initialCartItems = {
+      babyDay: false,
+      babyNight: false,
+      babyFullTime: false,
+      elderlyDay: false,
+      elderlyNight: false,
+      elderlyFullTime: false
+    };
+    
+    nannyCartItems.forEach(item => {
+      const key = `${item.careType}${item.packageType.charAt(0).toUpperCase() + item.packageType.slice(1)}`;
+      initialCartItems[key as keyof typeof initialCartItems] = true;
+    });
+
+    return initialCartItems;
+  });
+
   useEffect(() => {
     if (user?.role === 'CUSTOMER') {
       setLoggedInUser(user);
     }
   }, [user]);
 
-  const handleLogin = () => setLoginVisible(true);
-  const handleLoginClose = () => setLoginVisible(false);
-  const handleBookingPage = () => setLoginVisible(false);
+  useEffect(() => {
+    const updatedCartItems = { ...cartItems };
+    
+    Object.keys(cartItems).forEach(key => {
+      if (key.startsWith('baby') || key.startsWith('elderly')) {
+        updatedCartItems[key] = false;
+      }
+    });
 
-  const handleBabyAgeChange = (packageType: string, value: number) => {
-    setBabyPackages((prev) => ({
+    nannyCartItems.forEach(item => {
+      const packageKey = `${item.careType}${item.packageType.charAt(0).toUpperCase() + item.packageType.slice(1)}`;
+      updatedCartItems[packageKey as keyof typeof updatedCartItems] = true;
+    });
+
+    setCartItems(updatedCartItems);
+  }, [nannyCartItems]);
+
+  const handleLogin = () => setLoginOpen(true);
+  const handleLoginClose = () => setLoginOpen(false);
+  const handleBookingPage = () => setLoginOpen(false);
+
+  const handleBabyAgeChange = (packageType: keyof typeof babyPackages, value: number) => {
+    setBabyPackages(prev => ({
       ...prev,
       [packageType]: {
-        ...prev[packageType as keyof typeof prev],
-        age: Math.max(0, prev[packageType as keyof typeof prev].age + value),
-      },
+        ...prev[packageType],
+        age: Math.max(0, prev[packageType].age + value)
+      }
     }));
   };
 
-  const handleElderlyAgeChange = (packageType: string, value: number) => {
-    setElderlyPackages((prev) => ({
+  const handleElderlyAgeChange = (packageType: keyof typeof elderlyPackages, value: number) => {
+    setElderlyPackages(prev => ({
       ...prev,
       [packageType]: {
-        ...prev[packageType as keyof typeof prev],
-        age: Math.max(0, prev[packageType as keyof typeof prev].age + value),
-      },
+        ...prev[packageType],
+        age: Math.max(0, prev[packageType].age + value)
+      }
     }));
   };
 
   const togglePackageSelection = (packageType: string, isBaby: boolean) => {
     if (isBaby) {
-      setBabyPackages((prev) => ({
+      setBabyPackages(prev => ({
         ...prev,
         [packageType]: {
           ...prev[packageType as keyof typeof prev],
-          selected: !prev[packageType as keyof typeof prev].selected,
-        },
+          selected: !prev[packageType as keyof typeof prev].selected
+        }
       }));
     } else {
-      setElderlyPackages((prev) => ({
+      setElderlyPackages(prev => ({
         ...prev,
         [packageType]: {
           ...prev[packageType as keyof typeof prev],
-          selected: !prev[packageType as keyof typeof prev].selected,
-        },
+          selected: !prev[packageType as keyof typeof prev].selected
+        }
       }));
     }
+  };
+
+  const handleAddToCart = (packageKey: string) => {
+    try {
+      let type: 'baby' | 'elderly';
+      let packageType: 'day' | 'night' | 'fullTime';
+
+      if (packageKey.startsWith('baby')) {
+        type = 'baby';
+        packageType = packageKey.replace('baby', '').charAt(0).toLowerCase() + 
+                     packageKey.replace('baby', '').slice(1) as 'day' | 'night' | 'fullTime';
+      } else if (packageKey.startsWith('elderly')) {
+        type = 'elderly';
+        packageType = packageKey.replace('elderly', '').charAt(0).toLowerCase() + 
+                     packageKey.replace('elderly', '').slice(1) as 'day' | 'night' | 'fullTime';
+      } else {
+        console.error('Invalid package key:', packageKey);
+        return;
+      }
+
+      const packages = type === 'baby' ? babyPackages : elderlyPackages;
+      const packageDetails = packages[packageType as keyof typeof packages];
+
+      if (!packageDetails) {
+        console.error('Package details not found for:', packageKey);
+        return;
+      }
+
+      const age = packageDetails.age;
+      const price = getPackagePrice(type, packageType);
+      const description = getPackageDescription(type, packageType);
+
+      const cartItem = {
+        id: `${type}_${packageType}_${providerDetails?.serviceproviderId || 'default'}`,
+        type: 'nanny' as const,
+        careType: type,
+        packageType,
+        age,
+        price,
+        description,
+        providerId: providerDetails?.serviceproviderId || '',
+        providerName: providerFullName
+      };
+
+      if (cartItems[packageKey]) {
+        dispatch(removeFromCart({ id: cartItem.id, type: 'nanny' }));
+      } else {
+        dispatch(addToCart(cartItem));
+      }
+
+      setCartItems(prev => ({
+        ...prev,
+        [packageKey]: !prev[packageKey]
+      }));
+    } catch (error) {
+      console.error('Error in handleAddToCart:', error);
+      setError('Failed to update cart. Please try again.');
+    }
+  };
+
+  const getPackagePrice = (type: 'baby' | 'elderly', packageType: string): number => {
+    const prices = {
+      baby: {
+        day: 16000,
+        night: 20000,
+        fullTime: 23000
+      },
+      elderly: {
+        day: 16000,
+        night: 20000,
+        fullTime: 23000
+      }
+    };
+
+    return prices[type]?.[packageType] || 0;
+  };
+
+  const getPackageDescription = (type: 'baby' | 'elderly', packageType: string): string => {
+    const descriptions = {
+      baby: {
+        day: 'Professional daytime baby care',
+        night: 'Professional overnight baby care',
+        fullTime: 'Round-the-clock professional baby care'
+      },
+      elderly: {
+        day: 'Professional daytime elderly care',
+        night: 'Professional overnight elderly care',
+        fullTime: 'Round-the-clock professional elderly care'
+      }
+    };
+
+    return descriptions[type]?.[packageType] || '';
   };
 
   const calculateTotal = () => {
@@ -124,15 +256,15 @@ const NannyServiceDialog: React.FC<NannyServiceDialogProps> = ({
 
   const getSelectedPackagesCount = () => {
     if (activeTab === 'baby') {
-      return Object.values(babyPackages).filter((pkg) => pkg.selected).length;
+      return Object.values(babyPackages).filter(pkg => pkg.selected).length;
     } else {
-      return Object.values(elderlyPackages).filter((pkg) => pkg.selected).length;
+      return Object.values(elderlyPackages).filter(pkg => pkg.selected).length;
     }
   };
 
   const handleApplyVoucher = () => {
     // Voucher logic here
-    Alert.alert('Voucher Applied', `Voucher code ${voucherCode} applied successfully`);
+    Alert.alert('Voucher Applied', 'Your voucher has been applied successfully');
   };
 
   const handleCheckout = async () => {
@@ -145,33 +277,31 @@ const NannyServiceDialog: React.FC<NannyServiceDialogProps> = ({
         throw new Error('Please select at least one service');
       }
 
-      const bookingData: BookingDetails = {
-        serviceProviderId: providerDetails?.serviceproviderId
-          ? Number(providerDetails.serviceproviderId)
-          : 0,
+      const bookingData = {
+        serviceProviderId: providerDetails?.serviceproviderId ? Number(providerDetails.serviceproviderId) : 0,
         serviceProviderName: providerFullName,
         customerId,
         customerName,
         address: currentLocation,
         startDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
-        endDate: bookingType?.endDate || '',
+        endDate: bookingType?.endDate || "",
         engagements: getSelectedServicesDescription(),
         monthlyAmount: totalAmount,
-        timeslot: bookingType?.timeRange || '',
-        paymentMode: 'UPI',
-        bookingType: 'NANNY_SERVICES',
-        taskStatus: 'NOT_STARTED',
-        responsibilities: [],
+        timeslot: bookingType?.timeRange || "",
+        paymentMode: "UPI",
+        bookingType: "NANNY_SERVICES",
+        taskStatus: "NOT_STARTED",
+        responsibilities: []
       };
 
-      // Try creating order through backend first
       try {
         const orderResponse = await createRazorpayOrder(totalAmount);
         await handlePaymentSuccess(orderResponse.data.orderId, bookingData);
       } catch (backendError) {
-        console.warn('Backend order creation failed, falling back to client-side', backendError);
+        console.warn("Backend order creation failed, falling back to client-side", backendError);
         await createClientSideOrder(totalAmount, bookingData);
       }
+
     } catch (err: any) {
       handlePaymentError(err);
     } finally {
@@ -181,422 +311,464 @@ const NannyServiceDialog: React.FC<NannyServiceDialogProps> = ({
 
   const createRazorpayOrder = async (amount: number) => {
     return await axios.post(
-      'http://13.201.229.41:3000/create-order',
-      {
+      "https://utils-dmua.onrender.com/create-order",
+      { 
         amount: amount * 100,
-        currency: 'INR',
+        currency: "INR",
         receipt: `receipt_${Date.now()}`,
-        payment_capture: 1,
+        payment_capture: 1
       },
-      {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 8000,
+      { 
+        headers: { "Content-Type": "application/json" },
+        timeout: 8000
       }
     );
   };
 
-  const createClientSideOrder = async (amount: number, bookingData: BookingDetails) => {
+  const createClientSideOrder = async (amount: number, bookingData: any) => {
     return new Promise((resolve, reject) => {
-      // In React Native, you would typically use a WebView or a native module for Razorpay integration
-      // This is a simplified version - you'd need to implement the actual Razorpay integration
-      Alert.alert(
-        'Payment',
-        `Proceed with payment of ₹${amount}?`,
-        [
-          {
-            text: 'Cancel',
-            onPress: () => reject(new Error('Payment cancelled by user')),
-            style: 'cancel',
-          },
-          {
-            text: 'OK',
-            onPress: async () => {
-              try {
-                await handlePaymentSuccess(`mock_order_${Date.now()}`, bookingData);
-                resolve({});
-              } catch (err) {
-                reject(err);
-              }
-            },
-          },
-        ],
-        { cancelable: false }
-      );
+      if (typeof window.Razorpay === "undefined") {
+        throw new Error("Razorpay SDK not loaded");
+      }
+
+      const options = {
+        key: "rzp_test_lTdgjtSRlEwreA",
+        amount: amount * 100,
+        currency: "INR",
+        name: "Serveaso",
+        description: "Nanny Services Booking",
+        handler: async (response: any) => {
+          try {
+            await handlePaymentSuccess(response.razorpay_order_id, bookingData);
+            resolve(response);
+          } catch (err) {
+            reject(err);
+          }
+        },
+        prefill: {
+          name: customerName || "",
+          email: user?.email || "",
+          contact: user?.mobileNo || "",
+        },
+        theme: {
+          color: "#3399cc",
+        },
+        modal: {
+          ondismiss: () => {
+            reject(new Error("Payment closed by user"));
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     });
   };
 
-  const handlePaymentSuccess = async (orderId: string, bookingData: BookingDetails) => {
+  const handlePaymentSuccess = async (orderId: string, bookingData: any) => {
     try {
       const bookingResponse = await axiosInstance.post(
-        '/api/serviceproviders/engagement/add',
+        "/api/serviceproviders/engagement/add",
         {
           ...bookingData,
-          paymentReference: orderId,
+          paymentReference: orderId
         },
-        { headers: { 'Content-Type': 'application/json' } }
+        { headers: { "Content-Type": "application/json" } }
       );
 
       if (bookingResponse.status === 201) {
+        try {
+          const notifyResponse = await fetch(
+            "http://localhost:4000/send-notification",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                title: "Hello from ServEaso!",
+                body: `Your booking for ${bookingData.engagements} has been successfully confirmed!`,
+                url: "http://localhost:3000",
+              }),
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+
+          if (notifyResponse.ok) {
+            console.log("Notification triggered!");
+          }
+        } catch (error) {
+          console.error("Error sending notification:", error);
+        }
+
         if (sendDataToParent) sendDataToParent(BOOKINGS);
-        onClose();
-        Alert.alert('Booking Successful', `Payment ID: ${orderId}`);
-      } else {
-        throw new Error('Failed to save booking');
+        handleClose();
       }
     } catch (err) {
-      console.error('Error saving booking:', err);
-      throw new Error('Payment succeeded but booking failed. Please contact support.');
+      console.error("Error saving booking:", err);
+      throw new Error("Payment succeeded but booking failed. Please contact support.");
     }
   };
 
   const handlePaymentError = (err: any) => {
-    console.error('Payment error:', err);
-    const errorMessage =
-      err.response?.data?.message || err.message || 'Payment failed. Please try again later.';
+    console.error("Payment error:", err);
+    const errorMessage = err.response?.data?.message || 
+                        err.message || 
+                        "Payment failed. Please try again later.";
     setError(errorMessage);
-    Alert.alert('Payment Error', errorMessage);
+    Alert.alert('Error', errorMessage);
   };
 
   const getSelectedServicesDescription = () => {
-    const selectedPackages =
-      activeTab === 'baby'
-        ? Object.entries(babyPackages).filter(([_, pkg]) => pkg.selected)
-        : Object.entries(elderlyPackages).filter(([_, pkg]) => pkg.selected);
-
-    return selectedPackages
-      .map(
-        ([pkgType, pkg]) =>
-          `${activeTab === 'baby' ? 'Baby' : 'Elderly'} care (${pkgType}) for age ≤${pkg.age}`
-      )
-      .join(', ');
+    const selectedPackages = activeTab === 'baby' 
+      ? Object.entries(babyPackages).filter(([_, pkg]) => pkg.selected)
+      : Object.entries(elderlyPackages).filter(([_, pkg]) => pkg.selected);
+    
+    return selectedPackages.map(([pkgType, pkg]) => 
+      `${activeTab === 'baby' ? 'Baby' : 'Elderly'} care (${pkgType}) for age ≤${pkg.age}`
+    ).join(', ');
   };
 
-  const renderPackage = (
-    type: string,
-    pkg: any,
-    isBaby: boolean,
-    title: string,
-    rating: number,
-    ratingColor: string,
-    reviews: string,
-    price: string,
-    description: string,
-    features: string[]
-  ) => {
-    const ageHandler = isBaby ? handleBabyAgeChange : handleElderlyAgeChange;
-    const selected = pkg.selected;
+  const renderBabyPackage = (packageType: 'day' | 'night' | 'fullTime') => {
+    const packageData = babyPackages[packageType];
+    const packageKey = `baby${packageType.charAt(0).toUpperCase() + packageType.slice(1)}`;
+    let color = '#e17055';
+    let price = '₹16,000 - ₹17,600';
+    let reviews = '(1.5M reviews)';
+    let rating = 4.8;
+    let descriptionItems = [
+      'Professional daytime baby care',
+      'Age-appropriate activities',
+      'Meal preparation and feeding'
+    ];
+
+    if (packageType === 'night') {
+      color = '#00b894';
+      price = '₹20,000 - ₹22,000';
+      reviews = '(1.2M reviews)';
+      rating = 4.9;
+      descriptionItems = [
+        'Professional overnight baby care',
+        'Night feeding and diaper changes',
+        'Sleep routine establishment'
+      ];
+    } else if (packageType === 'fullTime') {
+      color = '#0984e3';
+      price = '₹23,000 - ₹25,000';
+      reviews = '(980K reviews)';
+      rating = 4.9;
+      descriptionItems = [
+        'Round-the-clock professional care',
+        'All daily care activities included',
+        'Live-in nanny service'
+      ];
+    }
 
     return (
-      <View
-        style={[
-          styles.packageContainer,
-          { backgroundColor: selected ? '#fff8f6' : '#fff' },
-        ]}
-      >
+      <View key={packageType} style={[styles.packageCard, packageData.selected && styles.selectedPackageCard]}>
         <View style={styles.packageHeader}>
           <View>
-            <Text style={styles.packageTitle}>{title}</Text>
+            <Text style={styles.packageTitle}>Baby Care - {packageType.charAt(0).toUpperCase() + packageType.slice(1)}</Text>
             <View style={styles.ratingContainer}>
-              <Text style={[styles.ratingText, { color: ratingColor }]}>{rating}</Text>
-              <Text style={styles.reviewsText}>({reviews})</Text>
+              <Text style={[styles.ratingValue, {color}]}>{rating}</Text>
+              <Text style={styles.reviewsText}>{reviews}</Text>
             </View>
           </View>
           <View style={styles.priceContainer}>
-            <Text style={[styles.priceText, { color: ratingColor }]}>{price}</Text>
-            <Text style={styles.priceDescription}>{description}</Text>
+            <Text style={[styles.priceValue, {color}]}>{price}</Text>
+            <Text style={styles.careType}>
+              {packageType === 'day' ? 'Daytime care' : 
+               packageType === 'night' ? 'Overnight care' : 'Full-time care'}
+            </Text>
           </View>
         </View>
-
-        <View style={styles.ageSelectorContainer}>
-          <Text style={styles.ageLabel}>Age:</Text>
-          <View style={styles.ageControl}>
-            <TouchableOpacity
-              onPress={() => ageHandler(type, -1)}
+        
+        <View style={styles.personsControl}>
+          <Text style={styles.personsLabel}>Age:</Text>
+          <View style={styles.personsInput}>
+            <TouchableOpacity 
               style={styles.ageButton}
+              onPress={() => handleBabyAgeChange(packageType, -1)}
             >
               <Text style={styles.ageButtonText}>-</Text>
             </TouchableOpacity>
-            <Text style={styles.ageValue}>≤{pkg.age}</Text>
-            <TouchableOpacity
-              onPress={() => ageHandler(type, 1)}
+            <Text style={styles.personsValue}>≤{packageData.age}</Text>
+            <TouchableOpacity 
               style={styles.ageButton}
+              onPress={() => handleBabyAgeChange(packageType, 1)}
             >
               <Text style={styles.ageButtonText}>+</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        <View style={styles.featuresContainer}>
-          {features.map((feature, index) => (
-            <View key={index} style={styles.featureItem}>
-              <Text style={styles.featureBullet}>•</Text>
-              <Text style={styles.featureText}>{feature}</Text>
+        
+        <View style={styles.descriptionList}>
+          {descriptionItems.map((item, index) => (
+            <View key={index} style={styles.descriptionItem}>
+              <Text style={styles.descriptionBullet}>•</Text>
+              <Text style={styles.descriptionText}>{item}</Text>
             </View>
           ))}
         </View>
-
-        <TouchableOpacity
-          onPress={() => togglePackageSelection(type, isBaby)}
-          style={[
-            styles.selectButton,
-            { backgroundColor: selected ? '#e17055' : '#fff' },
-          ]}
-        >
-          <Text
-            style={[
-              styles.selectButtonText,
-              { color: selected ? 'white' : '#e17055' },
-            ]}
+        
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity 
+            style={[styles.selectButton, packageData.selected && {backgroundColor: color}]}
+            onPress={() => togglePackageSelection(packageType, true)}
           >
-            {selected ? 'SELECTED' : 'SELECT SERVICE'}
-          </Text>
-        </TouchableOpacity>
+            <Text style={[styles.selectButtonText, packageData.selected && {color: '#fff'}]}>
+              {packageData.selected ? 'SELECTED' : 'SELECT SERVICE'}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.cartButton, cartItems[packageKey] && {backgroundColor: color}]}
+            onPress={() => handleAddToCart(packageKey)}
+          >
+            {cartItems[packageKey] ? (
+              <>
+                <MaterialCommunityIcons name="cart-remove" size={16} color="#fff" />
+                <Text style={styles.cartButtonText}>ADDED TO CART</Text>
+              </>
+            ) : (
+              <>
+                <MaterialCommunityIcons name="cart-plus" size={16} color={color} />
+                <Text style={[styles.cartButtonText, {color}]}>ADD TO CART</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
 
-  return (
+  const renderElderlyPackage = (packageType: 'day' | 'night' | 'fullTime') => {
+    const packageData = elderlyPackages[packageType];
+    const packageKey = `elderly${packageType.charAt(0).toUpperCase() + packageType.slice(1)}`;
+    let color = '#e17055';
+    let price = '₹16,000 - ₹17,600';
+    let reviews = '(1.1M reviews)';
+    let rating = 4.7;
+    let descriptionItems = [
+      'Professional daytime elderly care',
+      'Medication management',
+      'Meal preparation and assistance'
+    ];
+
+    if (packageType === 'night') {
+      color = '#00b894';
+      price = '₹20,000 - ₹22,000';
+      reviews = '(950K reviews)';
+      rating = 4.8;
+      descriptionItems = [
+        'Professional overnight elderly care',
+        'Night-time assistance and monitoring',
+        'Sleep comfort and safety'
+      ];
+    } else if (packageType === 'fullTime') {
+      color = '#0984e3';
+      price = '₹23,000 - ₹25,000';
+      reviews = '(850K reviews)';
+      rating = 4.9;
+      descriptionItems = [
+        'Round-the-clock professional care',
+        'All daily care activities included',
+        'Live-in caregiver service'
+      ];
+    }
+
+    return (
+      <View key={packageType} style={[styles.packageCard, packageData.selected && styles.selectedPackageCard]}>
+        <View style={styles.packageHeader}>
+          <View>
+            <Text style={styles.packageTitle}>Elderly Care - {packageType.charAt(0).toUpperCase() + packageType.slice(1)}</Text>
+            <View style={styles.ratingContainer}>
+              <Text style={[styles.ratingValue, {color}]}>{rating}</Text>
+              <Text style={styles.reviewsText}>{reviews}</Text>
+            </View>
+          </View>
+          <View style={styles.priceContainer}>
+            <Text style={[styles.priceValue, {color}]}>{price}</Text>
+            <Text style={styles.careType}>
+              {packageType === 'day' ? 'Daytime care' : 
+               packageType === 'night' ? 'Overnight care' : 'Full-time care'}
+            </Text>
+          </View>
+        </View>
+        
+        <View style={styles.personsControl}>
+          <Text style={styles.personsLabel}>Age:</Text>
+          <View style={styles.personsInput}>
+            <TouchableOpacity 
+              style={styles.ageButton}
+              onPress={() => handleElderlyAgeChange(packageType, -1)}
+            >
+              <Text style={styles.ageButtonText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.personsValue}>≤{packageData.age}</Text>
+            <TouchableOpacity 
+              style={styles.ageButton}
+              onPress={() => handleElderlyAgeChange(packageType, 1)}
+            >
+              <Text style={styles.ageButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        <View style={styles.descriptionList}>
+          {descriptionItems.map((item, index) => (
+            <View key={index} style={styles.descriptionItem}>
+              <Text style={styles.descriptionBullet}>•</Text>
+              <Text style={styles.descriptionText}>{item}</Text>
+            </View>
+          ))}
+        </View>
+        
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity 
+            style={[styles.selectButton, packageData.selected && {backgroundColor: color}]}
+            onPress={() => togglePackageSelection(packageType, false)}
+          >
+            <Text style={[styles.selectButtonText, packageData.selected && {color: '#fff'}]}>
+              {packageData.selected ? 'SELECTED' : 'SELECT SERVICE'}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.cartButton, cartItems[packageKey] && {backgroundColor: color}]}
+            onPress={() => handleAddToCart(packageKey)}
+          >
+            {cartItems[packageKey] ? (
+              <>
+                <MaterialCommunityIcons name="cart-remove" size={16} color="#fff" />
+                <Text style={styles.cartButtonText}>ADDED TO CART</Text>
+              </>
+            ) : (
+              <>
+                <MaterialCommunityIcons name="cart-plus" size={16} color={color} />
+                <Text style={[styles.cartButtonText, {color}]}>ADD TO CART</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  return (    
     <>
       <Modal
-        visible={visible}
+        visible={open}
         animationType="slide"
         transparent={false}
-        onRequestClose={onClose}
+        onRequestClose={handleClose}
       >
-        <View style={styles.container}>
+        <View style={styles.modalContainer}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>NANNY SERVICES</Text>
-              
-              <View style={styles.tabContainer}>
-                <TouchableOpacity
-                  style={styles.tabButton}
-                  onPress={() => setActiveTab('baby')}
-                >
-                  <View
-                    style={[
-                      styles.tabUnderline,
-                      activeTab === 'baby' && styles.activeTabUnderline,
-                    ]}
+            <View style={styles.dialogContainer}>
+              <View style={styles.dialogHeader}>
+                <Text style={styles.dialogTitle}>NANNY SERVICES</Text>
+                <View style={styles.tabContainer}>
+                  <TouchableOpacity 
+                    style={styles.tabButton} 
+                    onPress={() => setActiveTab('baby')}
                   >
-                    <Text style={styles.tabText}>Baby Care</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.tabButton}
-                  onPress={() => setActiveTab('elderly')}
-                >
-                  <View
-                    style={[
-                      styles.tabUnderline,
-                      activeTab === 'elderly' && styles.activeTabUnderline,
-                    ]}
+                    <View style={[styles.tabIndicator, activeTab === 'baby' && styles.activeTabIndicator]}>
+                      <Text style={[styles.tabText, activeTab === 'baby' && styles.activeTabText]}>Baby Care</Text>
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.tabButton} 
+                    onPress={() => setActiveTab('elderly')}
                   >
-                    <Text style={styles.tabText}>Elderly Care</Text>
-                  </View>
-                </TouchableOpacity>
+                    <View style={[styles.tabIndicator, activeTab === 'elderly' && styles.activeTabIndicator]}>
+                      <Text style={[styles.tabText, activeTab === 'elderly' && styles.activeTabText]}>Elderly Care</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-            
-            {/* Package Sections */}
-            <View style={styles.packagesContainer}>
-              {activeTab === 'baby' ? (
-                <>
-                  {/* Baby Care - Day */}
-                  {renderPackage(
-                    'day',
-                    babyPackages.day,
-                    true,
-                    'Baby Care - Day',
-                    4.8,
-                    '#e17055',
-                    '1.5M reviews',
-                    '₹16,000 - ₹17,600',
-                    'Daytime care',
-                    [
-                      'Professional daytime baby care',
-                      'Age-appropriate activities',
-                      'Meal preparation and feeding',
-                    ]
+              
+              <View style={styles.packagesContainer}>
+                {activeTab === 'baby' ? (
+                  <>
+                    {renderBabyPackage('day')}
+                    {renderBabyPackage('night')}
+                    {renderBabyPackage('fullTime')}
+                  </>
+                ) : (
+                  <>
+                    {renderElderlyPackage('day')}
+                    {renderElderlyPackage('night')}
+                    {renderElderlyPackage('fullTime')}
+                  </>
+                )}
+              </View>
+              
+              <View style={styles.voucherContainer}>
+                <Text style={styles.voucherTitle}>Apply Voucher</Text>
+                <View style={styles.voucherInputContainer}>
+                  <TextInput
+                    style={styles.voucherInput}
+                    placeholder="Enter voucher code"
+                    value={voucherCode}
+                    onChangeText={setVoucherCode}
+                  />
+                  <TouchableOpacity 
+                    style={styles.voucherButton}
+                    onPress={handleApplyVoucher}
+                  >
+                    <Text style={styles.voucherButtonText}>APPLY</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              <View style={styles.footerContainer}>
+                <View>
+                  <Text style={styles.footerText}>
+                    Total for {getSelectedPackagesCount()} service{getSelectedPackagesCount() !== 1 ? 's' : ''}
+                  </Text>
+                  <Text style={styles.footerPrice}>₹{calculateTotal().toLocaleString()}</Text>
+                </View>
+                
+                <View style={styles.footerButtons}>
+                  {!loggedInUser && (
+                    <>
+                      <TouchableOpacity style={styles.infoButton}>
+                        <Icon name="info-outline" size={20} color="#666" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.loginButton}
+                        onPress={handleLogin}
+                      >
+                        <Text style={styles.loginButtonText}>LOGIN TO CONTINUE</Text>
+                      </TouchableOpacity>
+                    </>
                   )}
                   
-                  {/* Baby Care - Night */}
-                  {renderPackage(
-                    'night',
-                    babyPackages.night,
-                    true,
-                    'Baby Care - Night',
-                     4.9,
-                    '#00b894',
-                    '1.2M reviews',
-                    '₹20,000 - ₹22,000',
-                    'Overnight care',
-                    [
-                      'Professional overnight baby care',
-                      'Night feeding and diaper changes',
-                      'Sleep routine establishment',
-                    ]
+                  {loggedInUser && (
+                    <TouchableOpacity
+                      style={[styles.checkoutButton, calculateTotal() === 0 && styles.disabledButton]}
+                      onPress={handleCheckout}
+                      disabled={calculateTotal() === 0}
+                    >
+                      {loading ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.checkoutButtonText}>CHECKOUT</Text>
+                      )}
+                    </TouchableOpacity>
                   )}
-                  
-                  {/* 24 Hours In-House Care */}
-                  {renderPackage(
-                    'fullTime',
-                    babyPackages.fullTime,
-                    true,
-                    '24 Hours In-House Care',
-                    4.9,
-                    '#0984e3',
-                    '980K reviews',
-                    '₹23,000 - ₹25,000',
-                    'Full-time care',
-                    [
-                      'Round-the-clock professional care',
-                      'All daily care activities included',
-                      'Live-in nanny service',
-                    ]
-                  )}
-                </>
-              ) : (
-                <>
-                  {/* Elderly Care - Day */}
-                  {renderPackage(
-                    'day',
-                    elderlyPackages.day,
-                    false,
-                    'Elderly Care - Day',
-                    4.7,
-                    '#e17055',
-                    '1.1M reviews',
-                    '₹16,000 - ₹17,600',
-                    'Daytime care',
-                    [
-                      'Professional daytime elderly care',
-                      'Medication management',
-                      'Meal preparation and assistance',
-                    ]
-                  )}
-                  
-                  {/* Elderly Care - Night */}
-                  {renderPackage(
-                    'night',
-                    elderlyPackages.night,
-                    false,
-                    'Elderly Care - Night',
-                    4.8,
-                    '#00b894',
-                    '950K reviews',
-                    '₹20,000 - ₹22,000',
-                    'Overnight care',
-                    [
-                      'Professional overnight elderly care',
-                      'Night-time assistance and monitoring',
-                      'Sleep comfort and safety',
-                    ]
-                  )}
-                  
-                  {/* 24 Hours In-House Elderly Care */}
-                  {renderPackage(
-                    'fullTime',
-                    elderlyPackages.fullTime,
-                    false,
-                    '24 Hours In-House Care',
-                    4.9,
-                    '#0984e3',
-                    '850K reviews',
-                    '₹23,000 - ₹25,000',
-                    'Full-time care',
-                    [
-                      'Round-the-clock professional care',
-                      'All daily care activities included',
-                      'Live-in caregiver service',
-                    ]
-                  )}
-                </>
-              )}
-            </View>
-            
-            {/* Voucher Section */}
-            <View style={styles.voucherContainer}>
-              <Text style={styles.voucherTitle}>Apply Voucher</Text>
-              <View style={styles.voucherInputContainer}>
-                <TextInput
-                  placeholder="Enter voucher code"
-                  style={styles.voucherInput}
-                  value={voucherCode}
-                  onChangeText={setVoucherCode}
-                />
-                <TouchableOpacity
-                  onPress={handleApplyVoucher}
-                  style={styles.applyButton}
-                >
-                  <Text style={styles.applyButtonText}>APPLY</Text>
-                </TouchableOpacity>
+                </View>
               </View>
             </View>
           </ScrollView>
-          
-          {/* Footer with Checkout */}
-          <View style={styles.footer}>
-            <View>
-              <Text style={styles.totalLabel}>
-                Total for {getSelectedPackagesCount()} service{getSelectedPackagesCount() !== 1 ? 's' : ''}
-              </Text>
-              <Text style={styles.totalAmount}>
-                ₹{calculateTotal().toLocaleString()}
-              </Text>
-            </View>
-            
-            <View style={styles.checkoutContainer}>
-              {!loggedInUser && (
-                <>
-                  <TouchableOpacity
-                    style={styles.loginButton}
-                    onPress={handleLogin}
-                  >
-                    <Text style={styles.loginButtonText}>LOGIN TO CONTINUE</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-              
-              {loggedInUser && (
-                <TouchableOpacity
-                  style={[
-                    styles.checkoutButton,
-                    calculateTotal() === 0 && styles.disabledCheckoutButton,
-                  ]}
-                  onPress={handleCheckout}
-                  disabled={calculateTotal() === 0}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <Text style={styles.checkoutButtonText}>CHECKOUT</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
         </View>
       </Modal>
 
-      {/* Login Modal */}
-      <Modal
-        visible={loginVisible}
+      <Modal 
+        visible={loginOpen}
         animationType="slide"
-        transparent={false}
         onRequestClose={handleLoginClose}
       >
-        <View style={styles.loginContainer}>
-          {/* You would implement your Login component here */}
-          <Text style={styles.loginTitle}>Login</Text>
-          <TouchableOpacity onPress={handleLoginClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>Close</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleBookingPage} style={styles.loginSubmitButton}>
-            <Text style={styles.loginSubmitButtonText}>Login</Text>
-          </TouchableOpacity>
+        <View style={styles.loginModal}>
+          <Login bookingPage={handleBookingPage}/>
         </View>
       </Modal>
     </>
@@ -604,281 +776,273 @@ const NannyServiceDialog: React.FC<NannyServiceDialogProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
+  modalContainer: {
     flex: 1,
     backgroundColor: '#fff',
   },
   scrollContent: {
-    paddingBottom: 100, // Space for the footer
+    paddingBottom: 30,
   },
-  header: {
+  dialogContainer: {
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
-  headerTitle: {
-    color: '#2d3436',
-    marginBottom: 15,
+  dialogHeader: {
+    marginBottom: 20,
+  },
+  dialogTitle: {
     fontSize: 24,
     fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#333',
   },
   tabContainer: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    justifyContent: 'center',
+    marginBottom: 20,
   },
   tabButton: {
     flex: 1,
-    padding: 15,
-    backgroundColor: '#fff',
+    alignItems: 'center',
   },
-  tabText: {
-    fontWeight: 'bold',
-    color: '#2d3436',
-    textAlign: 'center',
-  },
-  tabUnderline: {
+  tabIndicator: {
+    paddingVertical: 10,
+    width: '100%',
+    alignItems: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
-    width: '50%',
-    marginLeft: '25%',
-    paddingBottom: 5,
   },
-  activeTabUnderline: {
-    borderBottomColor: '#e17055',
+  activeTabIndicator: {
+    borderBottomColor: '#3399cc',
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  activeTabText: {
+    color: '#3399cc',
+    fontWeight: 'bold',
   },
   packagesContainer: {
-    padding: 20,
+    marginBottom: 20,
   },
-  packageContainer: {
-    borderWidth: 1,
-    borderColor: '#dfe6e9',
+  packageCard: {
+    backgroundColor: '#fff',
     borderRadius: 10,
     padding: 15,
-    marginBottom: 20,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  selectedPackageCard: {
+    borderColor: '#3399cc',
+    borderWidth: 2,
   },
   packageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 15,
   },
   packageTitle: {
-    color: '#2d3436',
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
     marginBottom: 5,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
-  ratingText: {
+  ratingValue: {
+    fontSize: 16,
     fontWeight: 'bold',
+    marginRight: 5,
   },
   reviewsText: {
-    color: '#636e72',
-    fontSize: 14,
-    marginLeft: 5,
+    fontSize: 12,
+    color: '#666',
   },
   priceContainer: {
     alignItems: 'flex-end',
   },
-  priceText: {
+  priceValue: {
+    fontSize: 16,
     fontWeight: 'bold',
-    fontSize: 18,
+    marginBottom: 5,
   },
-  priceDescription: {
-    color: '#636e72',
+  careType: {
+    fontSize: 12,
+    color: '#666',
+  },
+  personsControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  personsLabel: {
     fontSize: 14,
+    color: '#333',
+    marginRight: 10,
   },
-  ageSelectorContainer: {
+  personsInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 15,
-  },
-  ageLabel: {
-    marginRight: 15,
-    color: '#2d3436',
-  },
-  ageControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#dfe6e9',
-    borderRadius: 20,
   },
   ageButton: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    backgroundColor: '#f5f5f5',
-    borderRightWidth: 1,
-    borderRightColor: '#dfe6e9',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   ageButtonText: {
+    fontSize: 18,
+    color: '#333',
+  },
+  personsValue: {
     fontSize: 16,
+    marginHorizontal: 10,
+    color: '#333',
   },
-  ageValue: {
-    paddingVertical: 5,
-    paddingHorizontal: 15,
-    minWidth: 20,
-    textAlign: 'center',
+  descriptionList: {
+    marginBottom: 15,
   },
-  featuresContainer: {
-    marginVertical: 15,
-  },
-  featureItem: {
+  descriptionItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 5,
   },
-  featureBullet: {
-    marginRight: 10,
-    color: '#2d3436',
+  descriptionBullet: {
+    marginRight: 8,
+    color: '#666',
   },
-  featureText: {
-    color: '#2d3436',
+  descriptionText: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   selectButton: {
-    width: '100%',
-    padding: 12,
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#e17055',
-    borderRadius: 6,
+    borderColor: '#ddd',
     alignItems: 'center',
-    marginTop: 10,
+    marginRight: 10,
   },
   selectButtonText: {
+    fontSize: 14,
     fontWeight: 'bold',
+    color: '#666',
+  },
+  cartButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  cartButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
   voucherContainer: {
-    padding: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#f8f9fa',
+    marginBottom: 20,
   },
   voucherTitle: {
-    color: '#2d3436',
-    marginBottom: 10,
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
   },
   voucherInputContainer: {
     flexDirection: 'row',
-    gap: 10,
   },
   voucherInput: {
     flex: 1,
-    padding: 10,
     borderWidth: 1,
-    borderColor: '#dfe6e9',
-    borderRadius: 6,
-    fontSize: 14,
-    backgroundColor: '#fff',
-  },
-  applyButton: {
+    borderColor: '#ddd',
+    borderRadius: 5,
     padding: 10,
-    backgroundColor: '#27ae60',
-    borderRadius: 6,
+    marginRight: 10,
+  },
+  voucherButton: {
+    backgroundColor: '#3399cc',
+    borderRadius: 5,
+    paddingHorizontal: 15,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  applyButtonText: {
-    color: 'white',
+  voucherButtonText: {
+    color: '#fff',
     fontWeight: 'bold',
   },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    backgroundColor: '#fff',
+  footerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 5,
-      },
-    }),
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
-  totalLabel: {
-    color: '#636e72',
+  footerText: {
     fontSize: 14,
+    color: '#666',
   },
-  totalAmount: {
+  footerPrice: {
+    fontSize: 18,
     fontWeight: 'bold',
-    fontSize: 20,
-    color: '#2d3436',
+    color: '#333',
   },
-  checkoutContainer: {
+  footerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  infoButton: {
+    marginRight: 10,
+  },
   loginButton: {
-    padding: 8,
-    backgroundColor: '#1976d2',
-    borderRadius: 6,
+    backgroundColor: '#3399cc',
+    borderRadius: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
   },
   loginButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: 'bold',
-    fontSize: 12,
   },
   checkoutButton: {
+    backgroundColor: '#3399cc',
+    borderRadius: 5,
     paddingVertical: 12,
-    paddingHorizontal: 25,
-    backgroundColor: '#e17055',
-    borderRadius: 6,
+    paddingHorizontal: 20,
+    minWidth: 120,
+    alignItems: 'center',
   },
-  disabledCheckoutButton: {
-    backgroundColor: '#bdc3c7',
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
   checkoutButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: 'bold',
-  },
-  loginContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loginTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  closeButton: {
-    padding: 10,
-    backgroundColor: '#e17055',
-    borderRadius: 5,
-    marginBottom: 20,
-  },
-  closeButtonText: {
-    color: 'white',
-  },
-  loginSubmitButton: {
-    padding: 15,
-    backgroundColor: '#27ae60',
-    borderRadius: 5,
-  },
-  loginSubmitButtonText: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+  },
+  loginModal: {
+    flex: 1,
   },
 });
 
-export default NannyServiceDialog;
+export default NannyServicesDialog;

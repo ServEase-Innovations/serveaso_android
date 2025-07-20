@@ -1,47 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  ScrollView,
-  Alert,
-  Platform,
-} from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { EnhancedProviderDetails } from './types/ProviderDetailsType';
 import { useDispatch, useSelector } from 'react-redux';
 import { BookingDetails } from './types/engagementRequest';
 import { BOOKINGS } from './Constants/pagesConstants';
+import { Modal, View, Text, TouchableOpacity, TextInput, ScrollView, Alert, StyleSheet } from 'react-native';
 import Login from './Login';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import InfoIcon from 'react-native-vector-icons/MaterialIcons';
+import AddShoppingCartIcon from 'react-native-vector-icons/MaterialIcons';
+import RemoveShoppingCartIcon from 'react-native-vector-icons/MaterialIcons';
 import axiosInstance from './axiosInstance';
+import { usePricingFilterService } from './utils/PricingFilter';
+import { addToCart, removeFromCart, updateCartItem } from './features/addToSlice';
+import { MealPackage } from './types/mealPackage';
+import { useAuth0 } from 'react-native-auth0';
+// import { useAuth0 } from "@auth0/auth0-react";
 
 interface CookServicesDialogProps {
   open: boolean;
   handleClose: () => void;
   providerDetails?: EnhancedProviderDetails;
   sendDataToParent?: (data: string) => void;
-    visible: boolean;        // Changed from 'open' to 'visible'
-  onClose: () => void;  
-
-}
-
-interface MealPackage {
-  selected: boolean;
-  persons: number;
-  basePrice: number;
-  calculatedPrice: number;
-  maxPersons: number;
-  description: string[];
-  preparationTime: string;
-  rating: number;
-  reviews: string;
-  category: string;
-  jobDescription: string;
-  remarks: string;
 }
 
 interface PackagesState {
@@ -52,27 +32,36 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
   open, 
   handleClose, 
   providerDetails,
-  sendDataToParent,
-  visible,
-  onClose
+  sendDataToParent
 }) => {
-  const bookingType = useSelector((state: any) => state.bookingType?.value);
-  const user = useSelector((state: any) => state.user?.value);
-  const pricing = useSelector((state: any) => state.pricing?.groupedServices);
-  const cookServices = pricing?.cook?.filter((service: any) => service.Type === "Regular") || [];
+  const dispatch = useDispatch();
   
+  const users = useSelector((state: any) => state.user?.value);
+  // const pricing = useSelector((state: any) => state.pricing?.groupedServices);
   const [packages, setPackages] = useState<PackagesState>({});
   const [loginOpen, setLoginOpen] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>(null);
-  const dispatch = useDispatch();
-
-  const customerId = user?.customerDetails?.customerId || null;
-  const currentLocation = user?.customerDetails?.currentLocation;
-  const firstName = user?.customerDetails?.firstName;
-  const lastName = user?.customerDetails?.lastName;
-  const customerName = `${firstName} ${lastName}`;
+  const cart = useSelector((state: any) => state.addToCart?.items || []);
+  const { getBookingType, getPricingData, getFilteredPricing } = usePricingFilterService();
+  const bookingType = getBookingType();
+  console.log("bookingType",bookingType)
+  const currentLocation = users?.customerDetails?.currentLocation;
+  const firstName = users?.customerDetails?.firstName;
+  const lastName = users?.customerDetails?.lastName;
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
+ const { user, isAuthenticated} =  useAuth0();
+const pricing = useSelector((state: any) => state.pricing?.groupedServices);
+console.log('Pricing data from Redux:', pricing);
 
+   useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log("User Info:", user);
+       console.log("Name:", user.name);
+      console.log("Customer ID:", user.customerid);
+    }
+  }, [isAuthenticated, user]);
+  
+  
   const bookingDetails: BookingDetails = {
     serviceProviderId: 0,
     serviceProviderName: "",
@@ -85,8 +74,9 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
     timeslot: "",
     monthlyAmount: 0,
     paymentMode: "UPI",
-    bookingType: "MEAL_PACKAGE",
+    bookingType: "",
     taskStatus: "NOT_STARTED", 
+    serviceType: "COOK",
     responsibilities: [],
   };
 
@@ -109,34 +99,55 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
     return basePrice;
   };
 
+  const cookServices = useMemo(() => getFilteredPricing("cook"), [getFilteredPricing]);
+
   useEffect(() => {
-    if (cookServices.length > 0 && Object.keys(packages).length === 0) {
-      const initialPackages: PackagesState = {};
-      
-      cookServices.forEach((service: any) => {
-        const category = service.Categories.toLowerCase();
-        const maxPersons = parseInt(service["Numbers/Size"].replace('<=', '')) || 3;
-        const basePrice = service["Price /Month (INR)"];
-        
-        initialPackages[category] = {
-          selected: false,
-          persons: 1,
-          basePrice,
-          calculatedPrice: calculatePriceForPersons(basePrice, 1),
-          maxPersons,
-          description: service["Job Description"].split('\n').filter((line: string) => line.trim() !== ''),
-          preparationTime: getPreparationTime(category),
-          rating: 4.84,
-          reviews: getReviewsText(category),
-          category: service.Categories,
-          jobDescription: service["Job Description"],
-          remarks: service["Remarks/Conditions"]
-        };
-      });
-      
-      setPackages(initialPackages);
+    const updatedCookServices = getFilteredPricing("cook");
+    
+    if (!updatedCookServices || updatedCookServices.length === 0) {
+      setPackages({});
+      return;
     }
-  }, [cookServices, packages]);
+
+    const initialPackages: PackagesState = {};
+
+    updatedCookServices.forEach((service: any) => {
+      const category = service.Categories.toLowerCase();
+      const maxPersons = parseInt(service["Numbers/Size"].replace('<=', '')) || 3;
+      let basePrice = 0;
+      if(bookingType?.bookingPreference?.toLowerCase() === "date") {
+        basePrice = service["Price /Day (INR)"];
+      } else {
+        basePrice = service["Price /Month (INR)"];
+      }
+      const cartItem = Array.isArray(cart) 
+        ? cart.find((item: any) => 
+            item.type === 'meal' && 
+            item.mealType.toLowerCase() === category
+          )
+        : null;
+      
+      initialPackages[category] = {
+        selected: !!cartItem,
+        persons: cartItem?.persons || 1,
+        basePrice,
+        calculatedPrice: cartItem ? cartItem.price : calculatePriceForPersons(basePrice, 1),
+        maxPersons,
+        description: service["Job Description"]
+          .split('\n')
+          .filter((line: string) => line.trim() !== ''),
+        preparationTime: getPreparationTime(category),
+        rating: 4.84,
+        reviews: getReviewsText(category),
+        category: service.Categories,
+        jobDescription: service["Job Description"],
+        remarks: service["Remarks/Conditions"],
+        inCart: !!cartItem
+      };
+    });
+
+    setPackages(initialPackages);
+  }, [pricing, bookingType, cart]);
 
   useEffect(() => {
     if (user?.role === 'CUSTOMER') {
@@ -212,18 +223,169 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
       const currentPackage = prev[packageName];
       if (!currentPackage) return prev;
 
+      const newSelectedState = !currentPackage.selected;
+      const shouldBeInCart = newSelectedState;
+      if (shouldBeInCart && !currentPackage.inCart) {
+        dispatch(addToCart({
+          type: 'meal',
+          id: packageName.toUpperCase(),
+          mealType: packageName.toUpperCase(),
+          persons: currentPackage.persons,
+          price: currentPackage.calculatedPrice,
+          description: currentPackage.description.join(', '),
+          basePrice: currentPackage.basePrice,
+          maxPersons: currentPackage.maxPersons
+        }));
+      } else if (!shouldBeInCart && currentPackage.inCart) {
+        dispatch(removeFromCart({
+          id: packageName.toUpperCase(),
+          type: 'meal'
+        }));
+      }
+
       return {
         ...prev,
         [packageName]: {
           ...currentPackage,
-          selected: !currentPackage.selected
+          selected: newSelectedState,
+          inCart: shouldBeInCart
         }
       };
     });
   };
 
+  const toggleCart = (packageName: string) => {
+    setPackages(prev => {
+      const currentPackage = prev[packageName];
+      if (!currentPackage) return prev;
+
+      const newInCartState = !currentPackage.inCart;
+      const shouldBeSelected = newInCartState;
+
+      if (newInCartState) {
+        const existingItemIndex = cart.findIndex(
+          (item: any) => 
+            item.type === 'meal' && 
+            item.id === packageName.toUpperCase()
+        );
+
+        if (existingItemIndex >= 0) {
+          dispatch(updateCartItem({
+            id: packageName.toUpperCase(),
+            type: 'meal',
+            updates: {
+              persons: currentPackage.persons,
+              price: currentPackage.calculatedPrice,
+              description: currentPackage.description.join(', '),
+              basePrice: currentPackage.basePrice,
+              maxPersons: currentPackage.maxPersons
+            }
+          }));
+        } else {
+          dispatch(addToCart({
+            type: 'meal',
+            id: packageName.toUpperCase(),
+            mealType: packageName.toUpperCase(),
+            persons: currentPackage.persons,
+            price: currentPackage.calculatedPrice,
+            description: currentPackage.description.join(', '),
+            basePrice: currentPackage.basePrice,
+            maxPersons: currentPackage.maxPersons
+          }));
+        }
+      } else {
+        dispatch(removeFromCart({
+          id: packageName.toUpperCase(),
+          type: 'meal'
+        }));
+      }
+
+      return {
+        ...prev,
+        [packageName]: {
+          ...currentPackage,
+          inCart: newInCartState,
+          selected: shouldBeSelected
+        }
+      };
+    });
+  };
+
+  useEffect(() => {
+  const updatedCookServices = getFilteredPricing("cook");
+  console.log('Filtered cook services:', updatedCookServices);
+  
+  if (!updatedCookServices || updatedCookServices.length === 0) {
+    console.warn('No cook services found in filtered data');
+    setPackages({});
+    return;
+  }
+    // const updatedCookServices = getFilteredPricing("cook");
+    
+    // if (!updatedCookServices || updatedCookServices.length === 0) {
+    //   setPackages({});
+    //   return;
+    // }
+
+    const initialPackages: PackagesState = {};
+
+    updatedCookServices.forEach((service: any) => {
+      const category = service.Categories.toLowerCase();
+      const maxPersons = parseInt(service["Numbers/Size"].replace('<=', '')) || 3;
+      let basePrice = 0;
+      if(bookingType?.bookingPreference?.toLowerCase() === "date") {
+        basePrice = service["Price /Day (INR)"];
+      } else {
+        basePrice = service["Price /Month (INR)"];
+      }
+
+      const cartItem = Array.isArray(cart) 
+        ? cart.find((item: any) => 
+            item.type === 'meal' && 
+            item.mealType.toLowerCase() === category
+          )
+        : null;
+      
+      const persons = cartItem?.persons || 1;
+      const calculatedPrice = calculatePriceForPersons(basePrice, persons);
+
+      initialPackages[category] = {
+        selected: !!cartItem,
+        persons,
+        basePrice,
+        calculatedPrice,
+        maxPersons,
+        description: service["Job Description"]
+          .split('\n')
+          .filter((line: string) => line.trim() !== ''),
+        preparationTime: getPreparationTime(category),
+        rating: 4.84,
+        reviews: getReviewsText(category),
+        category: service.Categories,
+        jobDescription: service["Job Description"],
+        remarks: service["Remarks/Conditions"],
+        inCart: !!cartItem
+      };
+    });
+
+    setPackages(initialPackages);
+  }, [pricing, bookingType, cart]);
+
+  useEffect(() => {
+  console.log('Packages data:', packages);
+}, [packages]);
+
   const handleApplyVoucher = () => {
-    // Voucher logic here
+    // Voucher application logic
+  };
+
+  const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
+    if (!bookingPreference) return 'MONTHLY'; // default
+    
+    const pref = bookingPreference.toLowerCase();
+    if (pref === 'date') return 'ON_DEMAND';
+    if (pref === 'short term') return 'SHORT_TERM';
+    return 'MONTHLY';
   };
 
   const handleCheckout = async () => {
@@ -245,9 +407,10 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
         (sum, pkg) => sum + pkg.price,
         0
       );
-
+    const customerName = user?.name || "Guest";
+    const customerId = user?.customerid || "guest-id";
       const response = await axios.post(
-        "https://utils-dmua.onrender.com/create-order",
+        "https://utils-ndt3.onrender.com/create-order",
         { amount: totalAmount * 100 },
         { headers: { "Content-Type": "application/json" } }
       );
@@ -269,16 +432,14 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
         bookingDetails.customerId = customerId;
         bookingDetails.customerName = customerName;
         bookingDetails.address = currentLocation;
-        bookingDetails.startDate =
-          bookingType?.startDate || new Date().toISOString().split("T")[0];
+        bookingDetails.startDate =bookingType?.startDate || "",
         bookingDetails.endDate = bookingType?.endDate || "";
-
         bookingDetails.engagements = selectedPackages
           .map((pkg) => `${pkg.mealType} for ${pkg.persons} persons`)
           .join(", ");
         bookingDetails.monthlyAmount = totalAmount;
         bookingDetails.timeslot = bookingType.timeRange;
-
+         bookingDetails.bookingType = getBookingTypeFromPreference(bookingType?.bookingPreference);
         const options = {
           key: "rzp_test_lTdgjtSRlEwreA",
           amount,
@@ -287,7 +448,9 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
           description: "Meal Package Booking",
           order_id: orderId,
           handler: async function (razorpayResponse: any) {
-            Alert.alert(`Payment successful! Payment ID: ${razorpayResponse.razorpay_payment_id}`);
+            Alert.alert(
+              `Payment successful! Payment ID: ${razorpayResponse.razorpay_payment_id}`
+            );
 
             try {
               const bookingResponse = await axiosInstance.post(
@@ -301,7 +464,6 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
               );
 
               if (bookingResponse.status === 201) {
-                // Notification logic inserted here
                 try {
                   const notifyResponse = await fetch(
                     "http://localhost:4000/send-notification",
@@ -357,96 +519,103 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
   };
 
   const renderPackageSections = () => {
+  if (Object.keys(packages).length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyStateText}>No meal packages available</Text>
+      </View>
+    );
+  }
     return Object.entries(packages).map(([packageName, pkg]) => {
       const categoryColor = getCategoryColor(packageName);
-      
+
       return (
         <View 
           key={packageName}
           style={[
-            styles.packageContainer,
-            {
-              backgroundColor: pkg.selected ? `${categoryColor}10` : '#fff',
-              borderLeftWidth: pkg.selected ? 3 : 1,
-              borderLeftColor: pkg.selected ? categoryColor : '#dfe6e9'
-            }
+            styles.packageCard,
+            pkg.selected && { borderColor: categoryColor, borderWidth: 2 }
           ]}
         >
           <View style={styles.packageHeader}>
             <View>
-              <Text style={[styles.packageTitle, { textTransform: 'capitalize' }]}>
-                {packageName}
-              </Text>
+              <Text style={[styles.packageTitle, { color: categoryColor }]}>{packageName}</Text>
               <View style={styles.ratingContainer}>
-                <Text style={[styles.ratingText, { color: categoryColor }]}>{pkg.rating}</Text>
+                <Text style={[styles.ratingValue, { color: categoryColor }]}>{pkg.rating}</Text>
                 <Text style={styles.reviewsText}>{pkg.reviews}</Text>
               </View>
             </View>
             <View style={styles.priceContainer}>
-              <Text style={[styles.priceText, { color: categoryColor }]}>
-                ₹{pkg.calculatedPrice.toFixed(2)}
-              </Text>
-              <Text style={styles.timeText}>{pkg.preparationTime}</Text>
+              <Text style={[styles.priceValue, { color: categoryColor }]}>₹{pkg.calculatedPrice.toFixed(2)}</Text>
+              <Text style={styles.preparationTime}>{pkg.preparationTime}</Text>
             </View>
           </View>
           
-          <View style={styles.personSelectorContainer}>
-            <Text style={styles.personLabel}>Persons:</Text>
-            <View style={styles.personSelector}>
+          <View style={styles.personsControl}>
+            <Text style={styles.personsLabel}>Persons:</Text>
+            <View style={styles.personsInput}>
               <TouchableOpacity 
+                style={styles.personButton}
                 onPress={() => handlePersonChange(packageName, 'decrement')}
-                style={[
-                  styles.personButton, 
-                  styles.leftPersonButton,
-                  pkg.persons <= 1 && styles.disabledButton
-                ]}
                 disabled={pkg.persons <= 1}
               >
                 <Text style={styles.personButtonText}>-</Text>
               </TouchableOpacity>
-              <Text style={styles.personCount}>{pkg.persons}</Text>
+              <Text style={styles.personsValue}>{pkg.persons}</Text>
               <TouchableOpacity 
+                style={styles.personButton}
                 onPress={() => handlePersonChange(packageName, 'increment')}
-                style={[
-                  styles.personButton, 
-                  styles.rightPersonButton,
-                  pkg.persons >= 15 && styles.disabledButton
-                ]}
                 disabled={pkg.persons >= 15}
               >
                 <Text style={styles.personButtonText}>+</Text>
               </TouchableOpacity>
             </View>
             {pkg.persons > pkg.maxPersons && (
-              <Text style={styles.extraChargeText}>*Additional charges applied</Text>
+              <Text style={styles.additionalCharges}>*Additional charges applied</Text>
             )}
           </View>
           
-          <View style={styles.descriptionContainer}>
+          <View style={styles.descriptionList}>
             {pkg.description.map((item, index) => (
               item.trim() && (
                 <View key={index} style={styles.descriptionItem}>
-                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={[styles.descriptionBullet, { color: categoryColor }]}>•</Text>
                   <Text style={styles.descriptionText}>{item.trim()}</Text>
                 </View>
               )
             ))}
           </View>
           
-          <TouchableOpacity 
-            onPress={() => togglePackageSelection(packageName)}
-            style={[
-              styles.selectButton,
-              {
-                backgroundColor: pkg.selected ? categoryColor : '#fff',
-                borderColor: pkg.selected ? categoryColor : '#dfe6e9'
-              }
-            ]}
-          >
-            <Text style={[styles.selectButtonText, { color: pkg.selected ? '#fff' : categoryColor }]}>
-              {pkg.selected ? 'SELECTED' : 'SELECT PACKAGE'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.buttonsContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.cartButton,
+                { backgroundColor: pkg.inCart ? '#f5f5f5' : categoryColor }
+              ]}
+              onPress={() => toggleCart(packageName)}
+            >
+              <Icon 
+                name={pkg.inCart ? "remove-shopping-cart" : "add-shopping-cart"} 
+                size={20} 
+                color={pkg.inCart ? categoryColor : '#fff'} 
+              />
+              <Text style={[styles.cartButtonText, { color: pkg.inCart ? categoryColor : '#fff' }]}>
+                {pkg.inCart ? 'ADDED TO CART' : 'ADD TO CART'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.selectButton,
+                { backgroundColor: pkg.selected ? categoryColor : '#f5f5f5' }
+              ]}
+              onPress={() => togglePackageSelection(packageName)}
+            >
+              <Text style={[styles.selectButtonText, { color: pkg.selected ? '#fff' : categoryColor }]}>
+                {pkg.selected ? 'SELECTED' : 'SELECT PACKAGE'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     });
@@ -460,76 +629,58 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
   return (
     <>
       <Modal
-      visible={visible}    // Changed from open
-        onRequestClose={onClose} 
-        // visible={open}
+        visible={open}
+        onRequestClose={handleClose}
         animationType="slide"
         transparent={false}
-        // onRequestClose={handleClose}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.header}>
-            <Text style={styles.headerText}>MEAL PACKAGES</Text>
-          </View>
-          
-          <ScrollView style={styles.contentContainer}>
-            {renderPackageSections()}
-          </ScrollView>
-          
-          <View style={styles.voucherContainer}>
-            <Text style={styles.voucherTitle}>Apply Voucher</Text>
-            <View style={styles.voucherInputContainer}>
-              <TextInput
-                placeholder="Enter voucher code"
-                style={styles.voucherInput}
-              />
-              <TouchableOpacity 
-                onPress={handleApplyVoucher}
-                style={styles.applyButton}
-              >
-                <Text style={styles.applyButtonText}>APPLY</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          
-          <View style={styles.footer}>
-            <View>
-              <Text style={styles.totalItemsText}>
-                Total for {totalItems} item{totalItems !== 1 ? 's' : ''} ({totalPersons} person{totalPersons !== 1 ? 's' : ''})
-              </Text>
-              <Text style={styles.totalPriceText}>₹{totalPrice.toFixed(2)}</Text>
+        <View style={styles.dialogContent}>
+          <View style={styles.dialogContainer}>
+            <View style={styles.dialogHeader}>
+              <Text style={styles.dialogHeaderText}>MEAL PACKAGES</Text>
             </View>
             
-            <View style={styles.checkoutContainer}>
-              {!loggedInUser && (
-                <>
-                  <Icon 
-                    name="info-outline" 
-                    size={20} 
-                    color="#666" 
-                    style={styles.infoIcon}
-                  />
-                  <TouchableOpacity
-                    style={styles.loginButton}
-                    onPress={handleLogin}
-                  >
-                    <Text style={styles.loginButtonText}>LOGIN TO CONTINUE</Text>
-                  </TouchableOpacity>
-                </>
-              )}
+            <ScrollView style={styles.packagesContainer}>
+              {renderPackageSections()}
+            </ScrollView>
+            
+            <View style={styles.voucherContainer}>
+              <Text style={styles.voucherTitle}>Apply Voucher</Text>
+              <View style={styles.voucherInputContainer}>
+                <TextInput
+                  style={styles.voucherInput}
+                  placeholder="Enter voucher code"
+                  placeholderTextColor="#999"
+                />
+                <TouchableOpacity 
+                  style={styles.voucherButton}
+                  onPress={handleApplyVoucher}
+                >
+                  <Text style={styles.voucherButtonText}>APPLY</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            <View style={styles.footerContainer}>
+              <View>
+                <Text style={styles.footerText}>
+                  Total for {totalItems} item{totalItems !== 1 ? 's' : ''} ({totalPersons} person{totalPersons !== 1 ? 's' : ''})
+                </Text>
+                <Text style={styles.footerPrice}>₹{totalPrice.toFixed(2)}</Text>
+              </View>
               
-              {loggedInUser && (
+              <View style={styles.footerButtons}>
                 <TouchableOpacity
                   style={[
                     styles.checkoutButton,
-                    totalItems === 0 && styles.disabledCheckoutButton
+                    totalItems === 0 && { opacity: 0.5 }
                   ]}
                   onPress={handleCheckout}
                   disabled={totalItems === 0}
                 >
                   <Text style={styles.checkoutButtonText}>CHECKOUT</Text>
                 </TouchableOpacity>
-              )}
+              </View>
             </View>
           </View>
         </View>
@@ -537,247 +688,228 @@ const CookServicesDialog: React.FC<CookServicesDialogProps> = ({
 
       <Modal
         visible={loginOpen}
+        onRequestClose={handleLoginClose}
         animationType="slide"
         transparent={false}
-        onRequestClose={handleLoginClose}
       >
-        <Login bookingPage={handleBookingPage} />
+        {/* <Login bookingPage={handleBookingPage} /> */}
       </Modal>
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  dialogContent: {
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+  dialogContainer: {
+    flex: 1,
+    padding: 16,
   },
-  headerText: {
-    color: '#2d3436',
+  dialogHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  dialogHeaderText: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
   },
-  contentContainer: {
-    padding: 20,
+  packagesContainer: {
+    flex: 1,
   },
-  packageContainer: {
-    borderWidth: 1,
-    borderColor: '#dfe6e9',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
+  packageCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   packageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   packageTitle: {
-    color: '#2d3436',
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 5,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginTop: 4,
   },
-  ratingText: {
+  ratingValue: {
+    fontSize: 14,
     fontWeight: 'bold',
+    marginRight: 4,
   },
   reviewsText: {
-    color: '#636e72',
-    fontSize: 14,
-    marginLeft: 5,
+    fontSize: 12,
+    color: '#666',
   },
   priceContainer: {
     alignItems: 'flex-end',
   },
-  priceText: {
-    fontWeight: 'bold',
+  priceValue: {
     fontSize: 18,
+    fontWeight: 'bold',
   },
-  timeText: {
-    color: '#636e72',
+  preparationTime: {
+    fontSize: 12,
+    color: '#666',
+  },
+  personsControl: {
+    marginBottom: 12,
+  },
+  personsLabel: {
     fontSize: 14,
+    color: '#333',
+    marginBottom: 8,
   },
-  personSelectorContainer: {
+  personsInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 15,
-  },
-  personLabel: {
-    marginRight: 15,
-    color: '#2d3436',
-  },
-  personSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#dfe6e9',
-    borderRadius: 20,
   },
   personButton: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    backgroundColor: '#f5f5f5',
-  },
-  leftPersonButton: {
-    borderTopLeftRadius: 20,
-    borderBottomLeftRadius: 20,
-    borderRightWidth: 1,
-    borderRightColor: '#dfe6e9',
-  },
-  rightPersonButton: {
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
-    borderLeftWidth: 1,
-    borderLeftColor: '#dfe6e9',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   personButtonText: {
+    fontSize: 18,
+    color: '#333',
+  },
+  personsValue: {
+    marginHorizontal: 12,
     fontSize: 16,
+    fontWeight: 'bold',
   },
-  personCount: {
-    paddingVertical: 5,
-    paddingHorizontal: 15,
-    minWidth: 20,
-    textAlign: 'center',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  extraChargeText: {
-    color: '#e17055',
+  additionalCharges: {
     fontSize: 12,
-    marginLeft: 10,
+    color: '#e74c3c',
+    marginTop: 4,
   },
-  descriptionContainer: {
-    marginVertical: 15,
+  descriptionList: {
+    marginBottom: 16,
   },
   descriptionItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  bulletPoint: {
-    marginRight: 10,
-    color: '#2d3436',
+  descriptionBullet: {
+    marginRight: 8,
   },
   descriptionText: {
     flex: 1,
+    fontSize: 14,
+    color: '#333',
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cartButton: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  cartButtonText: {
+    marginLeft: 8,
+    fontWeight: 'bold',
   },
   selectButton: {
-    width: '100%',
-    padding: 12,
-    borderWidth: 1,
-    borderRadius: 6,
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: 4,
   },
   selectButtonText: {
     fontWeight: 'bold',
   },
   voucherContainer: {
-    padding: 15,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#f0f0f0',
-    backgroundColor: '#f8f9fa',
+    marginVertical: 16,
   },
   voucherTitle: {
-    color: '#2d3436',
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 8,
+    color: '#333',
   },
   voucherInputContainer: {
     flexDirection: 'row',
-    gap: 10,
   },
   voucherInput: {
     flex: 1,
-    padding: 10,
     borderWidth: 1,
-    borderColor: '#dfe6e9',
-    borderRadius: 6,
-    fontSize: 14,
-    backgroundColor: '#fff',
-  },
-  applyButton: {
+    borderColor: '#ddd',
+    borderRadius: 4,
     padding: 10,
-    backgroundColor: '#27ae60',
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: 8,
   },
-  applyButtonText: {
-    color: 'white',
+  voucherButton: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 4,
+    justifyContent: 'center',
+  },
+  voucherButtonText: {
+    color: '#fff',
     fontWeight: 'bold',
   },
-  footer: {
-    padding: 15,
-    borderTopWidth: 1,
-    borderColor: '#f0f0f0',
-    backgroundColor: '#fff',
+  footerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 5,
-      },
-    }),
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
-  totalItemsText: {
-    color: '#636e72',
+  footerText: {
     fontSize: 14,
+    color: '#333',
   },
-  totalPriceText: {
+  footerPrice: {
+    fontSize: 18,
     fontWeight: 'bold',
-    fontSize: 20,
-    color: '#2d3436',
+    color: '#333',
   },
-  checkoutContainer: {
+  footerButtons: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  infoIcon: {
-    marginRight: 8,
-  },
-  loginButton: {
-    padding: 8,
-    backgroundColor: '#1976d2',
-    borderRadius: 6,
-  },
-  loginButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 12,
   },
   checkoutButton: {
+    backgroundColor: '#2ecc71',
+    paddingHorizontal: 24,
     paddingVertical: 12,
-    paddingHorizontal: 25,
-    backgroundColor: '#e17055',
-    borderRadius: 6,
-  },
-  disabledCheckoutButton: {
-    backgroundColor: '#bdc3c7',
+    borderRadius: 4,
   },
   checkoutButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: 'bold',
+  },
+   emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#666',
   },
 });
 

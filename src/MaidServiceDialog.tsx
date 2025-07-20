@@ -16,8 +16,11 @@ import { BookingDetails } from './types/engagementRequest';
 import { BOOKINGS } from './Constants/pagesConstants';
 import { EnhancedProviderDetails } from './types/ProviderDetailsType';
 import axiosInstance from './axiosInstance';
-import Icon from 'react-native-vector-icons/MaterialIcons'; 
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Login from './Login';
+import { addToCart, removeFromCart, selectCartItems } from './features/addToSlice';
+import { isMaidCartItem } from './types/cartSlice';
 
 interface MaidServiceDialogProps {
   visible: boolean;
@@ -55,9 +58,8 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   providerDetails,
   sendDataToParent,
 }) => {
-  
   const [activeTab, setActiveTab] = useState('regular');
- const [packageStates, setPackageStates] = useState<PackageStates>({
+  const [packageStates, setPackageStates] = useState<PackageStates>({
     utensilCleaning: {
       persons: 3,
       selected: false,
@@ -92,6 +94,139 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   const lastName = user?.customerDetails?.lastName;
   const customerName = `${firstName} ${lastName}`;
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
+
+  // Cart functionality
+  const allCartItems = useSelector(selectCartItems);
+  const maidCartItems = allCartItems.filter(isMaidCartItem);
+  const [cartItems, setCartItems] = useState<Record<string, boolean>>(() => {
+    const initialCartItems = {
+      utensilCleaning: false,
+      sweepingMopping: false,
+      bathroomCleaning: false,
+      bathroomDeepCleaning: false,
+      normalDusting: false,
+      deepDusting: false,
+      utensilDrying: false,
+      clothesDrying: false
+    };
+
+    // Set initial state based on items already in Redux store
+    maidCartItems.forEach(item => {
+      if (item.serviceType === 'package') {
+        initialCartItems[item.name] = true;
+      } else if (item.serviceType === 'addon') {
+        initialCartItems[item.name] = true;
+      }
+    });
+
+    return initialCartItems;
+  });
+
+  const handleAddPackageToCart = (packageName: string) => {
+    const packageDetails = {
+      id: `package_${packageName}`,
+      type: 'maid' as const,
+      serviceType: 'package' as const,
+      name: packageName,
+      price: getPackagePrice(packageName),
+      description: getPackageDescription(packageName),
+      details: getPackageDetails(packageName)
+    };
+
+    if (cartItems[packageName]) {
+      dispatch(removeFromCart({ id: packageDetails.id, type: 'maid' }));
+    } else {
+      dispatch(addToCart(packageDetails));
+    }
+
+    setCartItems(prev => ({
+      ...prev,
+      [packageName]: !prev[packageName]
+    }));
+  };
+
+  const handleAddAddOnToCart = (addOnName: string) => {
+    const addOnDetails = {
+      id: `addon_${addOnName}`,
+      type: 'maid' as const,
+      serviceType: 'addon' as const,
+      name: addOnName,
+      price: getAddOnPrice(addOnName),
+      description: getAddOnDescription(addOnName)
+    };
+
+    if (cartItems[addOnName]) {
+      dispatch(removeFromCart({ id: addOnDetails.id, type: 'maid' }));
+    } else {
+      dispatch(addToCart(addOnDetails));
+    }
+
+    setCartItems(prev => ({
+      ...prev,
+      [addOnName]: !prev[addOnName]
+    }));
+  };
+
+  // Helper functions for package and add-on details
+  const getPackagePrice = (packageName: string): number => {
+    switch(packageName) {
+      case 'utensilCleaning': return 1200;
+      case 'sweepingMopping': return 1200;
+      case 'bathroomCleaning': return 600;
+      default: return 0;
+    }
+  };
+
+  const getPackageDescription = (packageName: string): string => {
+    switch(packageName) {
+      case 'utensilCleaning': 
+        return 'All kind of daily utensil cleaning\nParty used type utensil cleaning';
+      case 'sweepingMopping':
+        return 'Daily sweeping and mopping';
+      case 'bathroomCleaning':
+        return 'Weekly cleaning of bathrooms';
+      default: return '';
+    }
+  };
+
+  const getPackageDetails = (packageName: string) => {
+    switch(packageName) {
+      case 'utensilCleaning':
+        return { persons: packageStates.utensilCleaning.persons };
+      case 'sweepingMopping':
+        return { houseSize: packageStates.sweepingMopping.houseSize };
+      case 'bathroomCleaning':
+        return { bathrooms: packageStates.bathroomCleaning.bathrooms };
+      default: return {};
+    }
+  };
+
+  const getAddOnPrice = (addOnName: string): number => {
+    switch(addOnName) {
+      case 'bathroomDeepCleaning': return 1000;
+      case 'normalDusting': return 1000;
+      case 'deepDusting': return 1500;
+      case 'utensilDrying': return 1000;
+      case 'clothesDrying': return 1000;
+      default: return 0;
+    }
+  };
+
+  const getAddOnDescription = (addOnName: string): string => {
+    switch(addOnName) {
+      case 'bathroomDeepCleaning':
+        return 'Weekly cleaning of bathrooms, all bathroom walls cleaned';
+      case 'normalDusting':
+        return 'Daily furniture dusting, doors, carpet, bed making';
+      case 'deepDusting':
+        return 'Includes chemical agents cleaning: décor items, furniture';
+      case 'utensilDrying':
+        return 'Househelp will dry and make proper arrangements';
+      case 'clothesDrying':
+        return 'Househelp will get clothes from/to drying place';
+      default: return '';
+    }
+  };
 
   const bookingDetails: BookingDetails = {
     serviceProviderId: 0,
@@ -174,7 +309,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     }));
   };
 
-   const handlePackageSelect = (packageName: keyof PackageStates) => {
+  const handlePackageSelect = (packageName: keyof PackageStates) => {
     setPackageStates((prev) => ({
       ...prev,
       [packageName]: {
@@ -288,8 +423,6 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
         bookingDetails.monthlyAmount = totalAmount;
         bookingDetails.timeslot = bookingType.timeRange;
 
-        // In React Native, you would integrate with Razorpay's React Native SDK
-        // Here's a simplified version - you'll need to implement the actual integration
         Alert.alert(
           'Payment Successful',
           `Total amount: ₹${totalAmount}`,
@@ -445,26 +578,48 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  style={[
-                    styles.selectButton,
-                    packageStates.utensilCleaning.selected &&
-                      styles.selectedButton1,
-                  ]}
-                  onPress={() => handlePackageSelect('utensilCleaning')}
-                >
-                  <Text
+                <View style={styles.buttonGroup}>
+                  <TouchableOpacity
                     style={[
-                      styles.selectButtonText,
+                      styles.selectButton,
                       packageStates.utensilCleaning.selected &&
-                        styles.selectedButtonText,
+                        styles.selectedButton1,
                     ]}
+                    onPress={() => handlePackageSelect('utensilCleaning')}
                   >
-                    {packageStates.utensilCleaning.selected
-                      ? 'SELECTED'
-                      : 'SELECT SERVICE'}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.selectButtonText,
+                        packageStates.utensilCleaning.selected &&
+                          styles.selectedButtonText,
+                      ]}
+                    >
+                      {packageStates.utensilCleaning.selected
+                        ? 'SELECTED'
+                        : 'SELECT SERVICE'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.cartButton,
+                      cartItems.utensilCleaning && styles.selectedCartButton1,
+                    ]}
+                    onPress={() => handleAddPackageToCart('utensilCleaning')}
+                  >
+                    {cartItems.utensilCleaning ? (
+                      <>
+                        <MaterialCommunityIcons name="cart-remove" size={20} color="#fff" />
+                        <Text style={styles.cartButtonText}>ADDED TO CART</Text>
+                      </>
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="cart-plus" size={20} color="#e17055" />
+                        <Text style={[styles.cartButtonText, { color: '#e17055' }]}>ADD TO CART</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Sweeping & Mopping */}
@@ -524,26 +679,48 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  style={[
-                    styles.selectButton,
-                    packageStates.sweepingMopping.selected &&
-                      styles.selectedButton2,
-                  ]}
-                  onPress={() => handlePackageSelect('sweepingMopping')}
-                >
-                  <Text
+                <View style={styles.buttonGroup}>
+                  <TouchableOpacity
                     style={[
-                      styles.selectButtonText,
+                      styles.selectButton,
                       packageStates.sweepingMopping.selected &&
-                        styles.selectedButtonText,
+                        styles.selectedButton2,
                     ]}
+                    onPress={() => handlePackageSelect('sweepingMopping')}
                   >
-                    {packageStates.sweepingMopping.selected
-                      ? 'SELECTED'
-                      : 'SELECT SERVICE'}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.selectButtonText,
+                        packageStates.sweepingMopping.selected &&
+                          styles.selectedButtonText,
+                      ]}
+                    >
+                      {packageStates.sweepingMopping.selected
+                        ? 'SELECTED'
+                        : 'SELECT SERVICE'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.cartButton,
+                      cartItems.sweepingMopping && styles.selectedCartButton2,
+                    ]}
+                    onPress={() => handleAddPackageToCart('sweepingMopping')}
+                  >
+                    {cartItems.sweepingMopping ? (
+                      <>
+                        <MaterialCommunityIcons name="cart-remove" size={20} color="#fff" />
+                        <Text style={styles.cartButtonText}>ADDED TO CART</Text>
+                      </>
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="cart-plus" size={20} color="#00b894" />
+                        <Text style={[styles.cartButtonText, { color: '#00b894' }]}>ADD TO CART</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Bathroom Cleaning */}
@@ -603,26 +780,48 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  style={[
-                    styles.selectButton,
-                    packageStates.bathroomCleaning.selected &&
-                      styles.selectedButton3,
-                  ]}
-                  onPress={() => handlePackageSelect('bathroomCleaning')}
-                >
-                  <Text
+                <View style={styles.buttonGroup}>
+                  <TouchableOpacity
                     style={[
-                      styles.selectButtonText,
+                      styles.selectButton,
                       packageStates.bathroomCleaning.selected &&
-                        styles.selectedButtonText,
+                        styles.selectedButton3,
                     ]}
+                    onPress={() => handlePackageSelect('bathroomCleaning')}
                   >
-                    {packageStates.bathroomCleaning.selected
-                      ? 'SELECTED'
-                      : 'SELECT SERVICE'}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.selectButtonText,
+                        packageStates.bathroomCleaning.selected &&
+                          styles.selectedButtonText,
+                      ]}
+                    >
+                      {packageStates.bathroomCleaning.selected
+                        ? 'SELECTED'
+                        : 'SELECT SERVICE'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.cartButton,
+                      cartItems.bathroomCleaning && styles.selectedCartButton3,
+                    ]}
+                    onPress={() => handleAddPackageToCart('bathroomCleaning')}
+                  >
+                    {cartItems.bathroomCleaning ? (
+                      <>
+                        <MaterialCommunityIcons name="cart-remove" size={20} color="#fff" />
+                        <Text style={styles.cartButtonText}>ADDED TO CART</Text>
+                      </>
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="cart-plus" size={20} color="#0984e3" />
+                        <Text style={[styles.cartButtonText, { color: '#0984e3' }]}>ADD TO CART</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Add-ons Section */}
@@ -651,7 +850,10 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                         styles.addOnButton,
                         addOns.bathroomDeepCleaning && styles.selectedAddOnButton2,
                       ]}
-                      onPress={() => handleAddOnSelect('bathroomDeepCleaning')}
+                      onPress={() => {
+                        handleAddOnSelect('bathroomDeepCleaning');
+                        handleAddAddOnToCart('bathroomDeepCleaning');
+                      }}
                     >
                       <Text
                         style={[
@@ -685,7 +887,10 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                         styles.addOnButton,
                         addOns.normalDusting && styles.selectedAddOnButton3,
                       ]}
-                      onPress={() => handleAddOnSelect('normalDusting')}
+                      onPress={() => {
+                        handleAddOnSelect('normalDusting');
+                        handleAddAddOnToCart('normalDusting');
+                      }}
                     >
                       <Text
                         style={[
@@ -719,7 +924,10 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                         styles.addOnButton,
                         addOns.deepDusting && styles.selectedAddOnButton1,
                       ]}
-                      onPress={() => handleAddOnSelect('deepDusting')}
+                      onPress={() => {
+                        handleAddOnSelect('deepDusting');
+                        handleAddAddOnToCart('deepDusting');
+                      }}
                     >
                       <Text
                         style={[
@@ -727,7 +935,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                           addOns.deepDusting && styles.selectedAddOnButtonText,
                         ]}
                       >
-                        {addOns.deepDusting ? 'ADDED' : 'Add This Service'}
+                        {addOns.deepDusting ? 'ADDED' : '+ Add This Service'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -753,7 +961,10 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                         styles.addOnButton,
                         addOns.utensilDrying && styles.selectedAddOnButton2,
                       ]}
-                      onPress={() => handleAddOnSelect('utensilDrying')}
+                      onPress={() => {
+                        handleAddOnSelect('utensilDrying');
+                        handleAddAddOnToCart('utensilDrying');
+                      }}
                     >
                       <Text
                         style={[
@@ -787,7 +998,10 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                         styles.addOnButton,
                         addOns.clothesDrying && styles.selectedAddOnButton3,
                       ]}
-                      onPress={() => handleAddOnSelect('clothesDrying')}
+                      onPress={() => {
+                        handleAddOnSelect('clothesDrying');
+                        handleAddAddOnToCart('clothesDrying');
+                      }}
                     >
                       <Text
                         style={[
@@ -833,18 +1047,18 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
 
             <View style={styles.checkoutContainer}>
               {!loggedInUser && (
-          <>
-            <TouchableOpacity style={styles.infoButton}>
-              <Icon name="info-outline" size={20} color="#636e72" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.loginButton}
-              onPress={handleLogin}
-            >
-              <Text style={styles.loginButtonText}>LOGIN TO CONTINUE</Text>
-            </TouchableOpacity>
-          </>
-        )}
+                <>
+                  <TouchableOpacity style={styles.infoButton}>
+                    <Icon name="info-outline" size={20} color="#636e72" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.loginButton}
+                    onPress={handleLogin}
+                  >
+                    <Text style={styles.loginButtonText}>LOGIN TO CONTINUE</Text>
+                  </TouchableOpacity>
+                </>
+              )}
 
               {loggedInUser && (
                 <TouchableOpacity
@@ -865,19 +1079,19 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
 
       {/* Login Modal */}
       <Modal
-  visible={loginVisible}
-  onRequestClose={handleLoginClose}
-  animationType="slide"
-  transparent={false}
->
-  <Login 
-    onClose={handleLoginClose}
-    onLoginSuccess={() => {
-      handleLoginClose();
-      setLoggedInUser(user); // This will update the UI to show checkout button
-    }}
-  />
-  </Modal>
+        visible={loginVisible}
+        onRequestClose={handleLoginClose}
+        animationType="slide"
+        transparent={false}
+      >
+        <Login 
+          onClose={handleLoginClose}
+          onLoginSuccess={() => {
+            handleLoginClose();
+            setLoggedInUser(user); // This will update the UI to show checkout button
+          }}
+        />
+      </Modal>
     </>
   );
 };

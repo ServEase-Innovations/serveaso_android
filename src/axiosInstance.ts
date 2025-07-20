@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create an axios instance with the base URL
 const axiosInstance = axios.create({
-  baseURL: 'http://3.109.59.100:8080', // Change this to your API's base URL
+  baseURL: 'https://servease-be-5x7f.onrender.com', // Change this to your API's base URL
 });
 
 // Request Interceptor

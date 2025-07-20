@@ -22,6 +22,8 @@ import { add, update } from "./features/bookingTypeSlice";
 import NannyServiceDialog from "./NannyServiceDialog";
 import MaidServiceDialog from "./MaidServiceDialog";
 import DemoCook from "./demoCook";
+import CookServicesDialog from "./CookServiceDialog";
+import CookServiceDialog from "./CookServiceDialog";
 
 
 // Types
@@ -239,9 +241,19 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     return (endTotalMinutes - startTotalMinutes) / 60;
   };
 
-  const handleLogin = () => {
-    setOpen(true);
-  };
+ const handleLogin = () => {
+  if (!loggedInUser) {
+    setOpen(true); // Show login modal if not logged in
+  } else {
+    // For services that have dialogs (Maid, Cook, Nanny), open their dialog
+    if (["MAID", "COOK", "NANNY"].includes(props.housekeepingRole)) {
+      setOpen(true);
+    } else {
+      // For other services, proceed with booking
+      handleBookNow();
+    }
+  }
+};
 
   const handleClose = () => {
     setOpen(false);
@@ -300,31 +312,62 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     endTime
   };
 
-  const renderServiceDialog = () => {
-    switch (props.housekeepingRole) {
-      case "COOK":
-        return <DemoCook 
-            open={open}
-            handleClose={handleClose}
-            providerDetails={providerDetailsData} />;
-      case "MAID":
-        return <MaidServiceDialog 
-            //   open={open} 
-            //   handleClose={handleClose} 
-            providerDetails={providerDetailsData} visible={false} onClose={function (): void {
-                throw new Error("Function not implemented.");
-            } }        />;
-      case "NANNY":
-        return <NannyServiceDialog 
-            //   open={open} 
-            //   handleClose={handleClose} 
-            providerDetails={providerDetailsData} visible={false} onClose={function (): void {
-                throw new Error("Function not implemented.");
-            } } />;
-      default:
-        return null;
-    }
-  };
+  // const renderServiceDialog = () => {
+  //   switch (props.housekeepingRole) {
+  //     case "COOK":
+  //       return <DemoCook 
+  //           open={open}
+  //           handleClose={handleClose}
+  //           providerDetails={providerDetailsData} />;
+  //       // return<CookServicesDialog open={false} handleClose={function (): void {
+  //       //   throw new Error("Function not implemented.");
+  //       // } }/>;
+  //     case "MAID":
+  //       return <MaidServiceDialog 
+  //           //   open={open} 
+  //           //   handleClose={handleClose} 
+  //           providerDetails={providerDetailsData} visible={false} onClose={function (): void {
+  //               throw new Error("Function not implemented.");
+  //           } }        />;
+  //     case "NANNY":
+  //       return <NannyServiceDialog 
+  //           //   open={open} 
+  //           //   handleClose={handleClose} 
+  //           providerDetails={providerDetailsData} visible={false} onClose={function (): void {
+  //               throw new Error("Function not implemented.");
+  //           } } />;
+  //     default:
+  //       return null;
+  //   }
+  // };
+const renderServiceDialog = () => {
+  switch (props.housekeepingRole) {
+    case "COOK":
+      return (
+        <CookServicesDialog />
+      );
+    case "MAID":
+      return (
+        <MaidServiceDialog 
+          visible={open}
+          onClose={handleClose}
+          providerDetails={providerDetailsData}
+        />
+      );
+    case "NANNY":
+      return (
+        <NannyServiceDialog 
+          // visible={open}
+          // onClose={handleClose}
+          providerDetails={providerDetailsData} open={false} handleClose={function (): void {
+            throw new Error("Function not implemented.");
+          } }        />
+      );
+    default:
+      return null;
+  }
+};
+
 
   return (
     <>
@@ -340,13 +383,20 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
               <AddIcon name="add" size={24} color="#1976d2" />
             )}
           </TouchableOpacity>
-
+          <TouchableOpacity
+  style={styles.bookNowButton}
+  onPress={handleLogin}
+  disabled={!isBookNowEnabled && props.housekeepingRole !== "MAID"}
+>
+  <Text style={styles.bookNowText}>Book Now</Text>
+</TouchableOpacity>
+{/* 
           <TouchableOpacity
             style={styles.bookNowButton}
             onPress={handleLogin}
           >
             <Text style={styles.bookNowText}>Book Now</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <View style={styles.content}>
             <View style={styles.essentials}>

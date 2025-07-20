@@ -21,6 +21,10 @@ import RadioButton from './RadioButton';
 import ServiceProviderRegistration from './ServiceProviderRegistration';
 import ServiceDetailsDialog from './ServiceDetailsDialog'; 
 import Chatbot from './Chatbot'; 
+import CookServiceDialog from './CookServiceDialog';
+import MaidServiceDialog from "./MaidServiceDialog";
+import NannyServiceDialog from "./NannyServiceDialog";
+import DemoCook from "./demoCook";
 
 // Import local images
 const cookImage = require("../assets/images/newCook.png");
@@ -52,6 +56,9 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [serviceDetailsOpen, setServiceDetailsOpen] = useState(false);
   const [selectedServiceType, setSelectedServiceType] = useState<"cook" | "maid" | "babycare" | null>(null);
   const [chatbotOpen, setChatbotOpen] = useState(false);
+const [showCookServicesDialog, setShowCookServicesDialog] = useState(false);
+  const [showMaidServiceDialog, setShowMaidServiceDialog] = useState(false);
+  const [showNannyServicesDialog, setShowNannyServicesDialog] = useState(false);
 
     const handleWorkButtonClick = () => {
     setShowRegistration(true);
@@ -92,13 +99,33 @@ const HomePage: React.FC<ChildComponentProps> = ({
       serviceType: selectedType,
     };
 
-    if (selectedRadioButtonValue === "Date") {
-      setOpenServiceDialog(true);
-    }
-
-    if (selectedRadioButtonValue !== "Date") {
+     if (selectedRadioButtonValue === "Date") {
+      switch(selectedType) {
+        case "COOK":
+          setShowCookServicesDialog(true);
+          break;
+        case "MAID":
+          setShowMaidServiceDialog(true);
+          break;
+        case "NANNY":
+          setShowNannyServicesDialog(true);
+          break;
+        default:
+          sendDataToParent(DETAILS);
+      }
+    } else {
       sendDataToParent(DETAILS);
     }
+
+    setOpen(false);
+
+    // if (selectedRadioButtonValue === "Date") {
+    //   setOpenServiceDialog(true);
+    // }
+
+    // if (selectedRadioButtonValue !== "Date") {
+    //   sendDataToParent(DETAILS);
+    // }
 
     dispatch(add(booking));
   };
@@ -429,6 +456,19 @@ const HomePage: React.FC<ChildComponentProps> = ({
           minimumDate={new Date()}
         />
       )}
+
+
+        <Modal visible={showCookServicesDialog} animationType="slide">
+        {/* <CookServiceDialog
+          open={showCookServicesDialog}
+          handleClose={() => setShowCookServicesDialog(false)}
+          // providerDetails={null} // Pass actual provider details if available
+          sendDataToParent={sendDataToParent}
+        /> */}
+        <DemoCook/>
+      </Modal>
+
+
       <ServiceDetailsDialog
   open={serviceDetailsOpen}
   onClose={() => setServiceDetailsOpen(false)}
