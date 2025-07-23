@@ -35,6 +35,8 @@ const heroImage = require("../assets/images/maid-hero.png");
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
   bookingType: (data: string) => void;
+    user?: any; // Add proper type
+  providerDetails?: any; // Add proper type
 }
 
 const HomePage: React.FC<ChildComponentProps> = ({
@@ -59,6 +61,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
 const [showCookServicesDialog, setShowCookServicesDialog] = useState(false);
   const [showMaidServiceDialog, setShowMaidServiceDialog] = useState(false);
   const [showNannyServicesDialog, setShowNannyServicesDialog] = useState(false);
+const [showCookDialog, setShowCookDialog] = useState(false);
 
     const handleWorkButtonClick = () => {
     setShowRegistration(true);
@@ -88,48 +91,39 @@ const [showCookServicesDialog, setShowCookServicesDialog] = useState(false);
     return diffInMs / (1000 * 60 * 60);
   };
 
-  const handleSave = () => {
-    let duration = 0;
-    const booking = {
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
-      startTime: startTime?.toISOString(),
-      endTime: endTime?.toISOString(),
-      bookingPreference: selectedRadioButtonValue,
-      serviceType: selectedType,
-    };
-
-     if (selectedRadioButtonValue === "Date") {
-      switch(selectedType) {
-        case "COOK":
-          setShowCookServicesDialog(true);
-          break;
-        case "MAID":
-          setShowMaidServiceDialog(true);
-          break;
-        case "NANNY":
-          setShowNannyServicesDialog(true);
-          break;
-        default:
-          sendDataToParent(DETAILS);
-      }
-    } else {
-      sendDataToParent(DETAILS);
-    }
-
-    setOpen(false);
-
-    // if (selectedRadioButtonValue === "Date") {
-    //   setOpenServiceDialog(true);
-    // }
-
-    // if (selectedRadioButtonValue !== "Date") {
-    //   sendDataToParent(DETAILS);
-    // }
-
-    dispatch(add(booking));
+const handleSave = () => {
+  let duration = 0;
+  const booking = {
+    startDate: startDate?.toISOString(),
+    endDate: endDate?.toISOString(),
+    startTime: startTime?.toISOString(),
+    endTime: endTime?.toISOString(),
+    bookingPreference: selectedRadioButtonValue,
+    serviceType: selectedType,
   };
 
+ if (selectedRadioButtonValue === "Date") {
+  switch (selectedType) {
+    case "COOK":
+      setShowCookDialog(true); // Show after confirm
+      break;
+    case "MAID":
+      setShowMaidServiceDialog(true);
+      break;
+    case "NANNY":
+      setShowNannyServicesDialog(true);
+      break;
+    default:
+      sendDataToParent(DETAILS);
+  }
+} else {
+  sendDataToParent(DETAILS);
+}
+
+
+  setOpen(false);
+  dispatch(add(booking));
+};
   const isConfirmDisabled = () => {
     if (!startDate) return true;
     if (selectedRadioButtonValue !== "Monthly" && !endDate) return true;
@@ -458,15 +452,23 @@ const [showCookServicesDialog, setShowCookServicesDialog] = useState(false);
       )}
 
 
-        <Modal visible={showCookServicesDialog} animationType="slide">
-        {/* <CookServiceDialog
-          open={showCookServicesDialog}
-          handleClose={() => setShowCookServicesDialog(false)}
-          // providerDetails={null} // Pass actual provider details if available
-          sendDataToParent={sendDataToParent}
-        /> */}
-        <DemoCook/>
-      </Modal>
+      {showCookDialog && (
+  <View style={styles.dialogOverlay}>
+    <View style={styles.dialogBox}>
+      <DemoCook
+        onClose={() => setShowCookDialog(false)}
+        sendDataToParent={sendDataToParent}
+        bookingType={{
+          startDate: startDate?.toISOString(),
+          endDate: endDate?.toISOString(),
+          timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+          bookingPreference: selectedRadioButtonValue
+        }}
+      />
+    </View>
+  </View>
+)}
+
 
 
       <ServiceDetailsDialog
@@ -474,6 +476,7 @@ const [showCookServicesDialog, setShowCookServicesDialog] = useState(false);
   onClose={() => setServiceDetailsOpen(false)}
   serviceType={selectedServiceType}
 />
+
     </ScrollView>
    
 
@@ -745,6 +748,30 @@ timeInputText: {
 },
 disabledInput: {
   backgroundColor: '#f0f0f0',
+},
+dialogOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1000,
+},
+
+dialogBox: {
+  width: '90%',
+  maxHeight: '80%',
+  backgroundColor: '#fff',
+  borderRadius: 8,
+  padding: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 10,
 },
 
 });

@@ -344,7 +344,14 @@ const renderServiceDialog = () => {
   switch (props.housekeepingRole) {
     case "COOK":
       return (
-        <CookServicesDialog />
+        <DemoCook 
+          visible={open}
+          onClose={handleClose}
+          sendDataToParent={handleBookingPage}
+          user={user}
+          providerDetails={providerDetailsData}
+          bookingType={bookingType}
+        />
       );
     case "MAID":
       return (
@@ -357,17 +364,15 @@ const renderServiceDialog = () => {
     case "NANNY":
       return (
         <NannyServiceDialog 
-          // visible={open}
-          // onClose={handleClose}
-          providerDetails={providerDetailsData} open={false} handleClose={function (): void {
-            throw new Error("Function not implemented.");
-          } }        />
+          visible={open}
+          onClose={handleClose}
+          providerDetails={providerDetailsData}
+        />
       );
     default:
       return null;
   }
 };
-
 
   return (
     <>

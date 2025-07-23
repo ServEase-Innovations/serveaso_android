@@ -9,6 +9,7 @@ import DetailsView from './src/DetailsView';
 import Footer from './src/Footer';
 import Chatbot from './src/Chatbot';
 import CookServicesDialog from './src/CookServiceDialog';
+import DemoCook from './src/demoCook';
 
 const App = () => {
   const [chatbotOpen, setChatbotOpen] = useState(false);
@@ -41,7 +42,7 @@ const App = () => {
           {/* Main Content */}
           <SafeAreaView style={styles.body} edges={['bottom']}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
-          
+          {/* <DemoCook/> */}
               {currentView === 'HOME' ? (
                 <HomePage 
                   sendDataToParent={handleViewChange} 
