@@ -25,6 +25,7 @@ import CookServiceDialog from './CookServiceDialog';
 import MaidServiceDialog from "./MaidServiceDialog";
 import NannyServiceDialog from "./NannyServiceDialog";
 import DemoCook from "./demoCook";
+import NannyServicesDialog from "./NannyServiceDialog";
 
 // Import local images
 const cookImage = require("../assets/images/newCook.png");
@@ -102,28 +103,28 @@ const handleSave = () => {
     serviceType: selectedType,
   };
 
- if (selectedRadioButtonValue === "Date") {
-  switch (selectedType) {
-    case "COOK":
-      setShowCookDialog(true); // Show after confirm
-      break;
-    case "MAID":
-      setShowMaidServiceDialog(true);
-      break;
-    case "NANNY":
-      setShowNannyServicesDialog(true);
-      break;
-    default:
-      sendDataToParent(DETAILS);
+  if (selectedRadioButtonValue === "Date") {
+    switch (selectedType) {
+      case "COOK":
+        setShowCookDialog(true);
+        break;
+      case "MAID":
+        setShowMaidServiceDialog(true);
+        break;
+      case "NANNY":
+        setShowNannyServicesDialog(true);
+        break;
+      default:
+        sendDataToParent(DETAILS);
+    }
+  } else {
+    sendDataToParent(DETAILS);
   }
-} else {
-  sendDataToParent(DETAILS);
-}
-
 
   setOpen(false);
   dispatch(add(booking));
 };
+
   const isConfirmDisabled = () => {
     if (!startDate) return true;
     if (selectedRadioButtonValue !== "Monthly" && !endDate) return true;
@@ -452,7 +453,7 @@ const handleSave = () => {
       )}
 
 
-      {showCookDialog && (
+    {showCookDialog && (
   <View style={styles.dialogOverlay}>
     <View style={styles.dialogBox}>
       <DemoCook
@@ -469,9 +470,31 @@ const handleSave = () => {
   </View>
 )}
 
+{showNannyServicesDialog && (
+  <View style={styles.dialogOverlay}>
+    <View style={styles.dialogBox}>
+      <NannyServicesDialog
+        open={showNannyServicesDialog}
+        handleClose={() => setShowNannyServicesDialog(false)}
+        sendDataToParent={sendDataToParent}
+      />
+    </View>
+  </View>
+)}
 
+{showMaidServiceDialog && (
+  <View style={styles.dialogOverlay}>
+    <View style={styles.dialogBox}>
+      <MaidServiceDialog
+        open={showMaidServiceDialog}
+        handleClose={() => setShowMaidServiceDialog(false)}
+        sendDataToParent={sendDataToParent}
+      />
+    </View>
+  </View>
+)}
 
-      <ServiceDetailsDialog
+<ServiceDetailsDialog
   open={serviceDetailsOpen}
   onClose={() => setServiceDetailsOpen(false)}
   serviceType={selectedServiceType}

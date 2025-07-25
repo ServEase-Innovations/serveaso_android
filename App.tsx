@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Button } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Auth0Provider } from 'react-native-auth0';
 import config from './auth0-configuration';
@@ -10,11 +10,28 @@ import Footer from './src/Footer';
 import Chatbot from './src/Chatbot';
 import CookServicesDialog from './src/CookServiceDialog';
 import DemoCook from './src/demoCook';
+import NannyServicesDialog from './src/NannyServiceDialog';
+import MaidServiceDialog from './src/MaidServiceDialog';
 
 const App = () => {
   const [chatbotOpen, setChatbotOpen] = useState(false);
   const [currentView, setCurrentView] = useState('HOME');
   const [selectedBookingType, setSelectedBookingType] = useState('');
+ const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+ 
+  const handleOpenDialog = () => {
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+  };
+
+  const handleDataFromDialog = (data: string) => {
+    console.log('Data received from dialog:', data);
+    // Handle navigation or other actions based on dialog response
+  };
 
   const handleDataFromChild = (data: string) => {
     if (data === 'HOME') {
@@ -35,15 +52,17 @@ const App = () => {
       <SafeAreaProvider>
         <View style={styles.container}>
           {/* Header */}
+          
           <View style={styles.header}>
             <Head sendDataToParent={handleDataFromChild} />
           </View>
+          
 
           {/* Main Content */}
           <SafeAreaView style={styles.body} edges={['bottom']}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* <DemoCook/> */}
-              {currentView === 'HOME' ? (
+          
+              {/* {currentView === 'HOME' ? (
                 <HomePage 
                   sendDataToParent={handleViewChange} 
                   bookingType={handleBookingType}
@@ -55,8 +74,21 @@ const App = () => {
                   sendDataToParent={handleViewChange} 
                   selected={selectedBookingType} 
                 />
-              )}
-               <Footer />
+              )}*/}
+              
+               <Footer /> 
+
+       <Button 
+        title="Open Maid Service Dialog" 
+        onPress={handleOpenDialog} 
+      />
+      <MaidServiceDialog
+        open={isDialogOpen}
+        handleClose={handleCloseDialog}
+    
+        sendDataToParent={handleDataFromDialog}
+      />
+            
             </ScrollView>
           </SafeAreaView>
 

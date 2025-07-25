@@ -24,6 +24,7 @@ import MaidServiceDialog from "./MaidServiceDialog";
 import DemoCook from "./demoCook";
 import CookServicesDialog from "./CookServiceDialog";
 import CookServiceDialog from "./CookServiceDialog";
+import NannyServicesDialog from "./NannyServiceDialog";
 
 
 // Types
@@ -55,7 +56,6 @@ interface EnhancedProviderDetails {
   otherServices?: string;
   availableTimeSlots?: string[];
 }
-
 interface ProviderDetailsProps {
   housekeepingRole: string;
   selectedProvider: (provider: any) => void;
@@ -90,6 +90,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
   const [matchedMorningSelection, setMatchedMorningSelection] = useState<string | null>(null);
   const [matchedEveningSelection, setMatchedEveningSelection] = useState<string | null>(null);
+  const [dialogVisible, setDialogVisible] = useState(true); // Control visibility
 
   const hasCheckedRef = useRef(false);
 
@@ -363,11 +364,10 @@ const renderServiceDialog = () => {
       );
     case "NANNY":
       return (
-        <NannyServiceDialog 
-          visible={open}
-          onClose={handleClose}
-          providerDetails={providerDetailsData}
-        />
+        <NannyServicesDialog 
+        open={dialogVisible}
+           handleClose={() => setDialogVisible(false)}
+            />
       );
     default:
       return null;

@@ -12,28 +12,14 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import axios from 'axios';
-import axiosInstance from './axiosInstance'; // Make sure to import your axios instance
+import RazorpayCheckout from 'react-native-razorpay';
+import { BookingDetails } from './types/engagementRequest';
+import { BOOKINGS } from './Constants/pagesConstants';
+import axiosInstance from './axiosInstance';
+import CheckoutWithAgreement from './CheckoutWithAgreement';
 
 // Redux actions
 import { addToCart, removeFromCart, updateCartItem } from './features/addToSlice';
-
-interface BookingDetails {
-  serviceProviderId: number;
-  serviceProviderName: string;
-  customerId: number;
-  customerName: string; 
-  startDate: string;
-  endDate: string;
-  engagements: string;
-  address: string;
-  timeslot: string;
-  monthlyAmount: number;
-  paymentMode: string;
-  bookingType: string;
-  taskStatus: string; 
-  serviceType: string;
-  responsibilities: string[];
-}
 
 interface Package {
   name: string;
@@ -117,8 +103,37 @@ const DemoCook = ({
   ]);
   
   const [voucher, setVoucher] = useState('');
+  const [agreementDialogOpen, setAgreementDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Sync with cart on mount
+  // User authentication check
+  useEffect(() => {
+    if (user) {
+      console.log("User Info:", user);
+      console.log("Name:", user.name);
+      console.log("Customer ID:", user.customerid);
+    }
+  }, [user]);
+
+  const initialBookingDetails: BookingDetails = {
+    serviceProviderId: 0,
+    serviceProviderName: "",
+    customerId: 0,
+    customerName: "", 
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: "",
+    engagements: "",
+    address: "",
+    timeslot: "",
+    monthlyAmount: 0,
+    paymentMode: "UPI",
+    bookingType: "",
+    taskStatus: "NOT_STARTED", 
+    serviceType: "COOK",
+    responsibilities: [],
+  };
+
+
   useEffect(() => {
     const updatedPackages = packages.map(pkg => {
       const cartItem = cart.find((item: any) => 
@@ -148,7 +163,6 @@ const DemoCook = ({
         currentPackage.persons = (currentPackage.persons || 1) - 1;
       }
       
-      // Update cart if this item is in cart
       if (currentPackage.inCart) {
         dispatch(updateCartItem({
           id: currentPackage.name.toUpperCase(),
@@ -158,7 +172,7 @@ const DemoCook = ({
             price: calculatePriceForPersons(currentPackage.price, currentPackage.persons || 1),
             description: currentPackage.includes.join(', '),
             basePrice: currentPackage.price,
-            maxPersons: 15 // Assuming max 15 persons
+            maxPersons: 15
           }
         }));
       }
@@ -174,7 +188,6 @@ const DemoCook = ({
       const newInCartState = !currentPackage.inCart;
 
       if (newInCartState) {
-        // Add to cart
         dispatch(addToCart({
           type: 'meal',
           id: currentPackage.name.toUpperCase(),
@@ -183,10 +196,9 @@ const DemoCook = ({
           price: calculatePriceForPersons(currentPackage.price, currentPackage.persons || 1),
           description: currentPackage.includes.join(', '),
           basePrice: currentPackage.price,
-          maxPersons: 15 // Assuming max 15 persons
+          maxPersons: 15
         }));
       } else {
-        // Remove from cart
         dispatch(removeFromCart({
           id: currentPackage.name.toUpperCase(),
           type: 'meal'
@@ -210,7 +222,6 @@ const DemoCook = ({
       const newSelectedState = !currentPackage.selected;
 
       if (newSelectedState && !currentPackage.inCart) {
-        // Add to cart if selecting and not already in cart
         dispatch(addToCart({
           type: 'meal',
           id: currentPackage.name.toUpperCase(),
@@ -219,10 +230,9 @@ const DemoCook = ({
           price: calculatePriceForPersons(currentPackage.price, currentPackage.persons || 1),
           description: currentPackage.includes.join(', '),
           basePrice: currentPackage.price,
-          maxPersons: 15 // Assuming max 15 persons
+          maxPersons: 15
         }));
       } else if (!newSelectedState && currentPackage.inCart) {
-        // Remove from cart if deselecting and in cart
         dispatch(removeFromCart({
           id: currentPackage.name.toUpperCase(),
           type: 'meal'
@@ -240,7 +250,7 @@ const DemoCook = ({
   };
 
   const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
-    if (!bookingPreference) return 'MONTHLY'; // default
+    if (!bookingPreference) return 'MONTHLY';
     
     const pref = bookingPreference.toLowerCase();
     if (pref === 'date') return 'ON_DEMAND';
@@ -248,100 +258,120 @@ const DemoCook = ({
     return 'MONTHLY';
   };
 
-  const handleCheckout = async () => {
-    try {
-      const selectedPackages = packages
-        .filter(pkg => pkg.selected)
-        .map(pkg => ({
-          mealType: pkg.name.toUpperCase(),
-          persons: pkg.persons || 1,
-          price: calculatePriceForPersons(pkg.price, pkg.persons || 1),
-        }));
-
-      if (selectedPackages.length === 0) {
-        Alert.alert("Please select at least one package");
-        return;
-      }
-
-      const totalAmount = selectedPackages.reduce(
-        (sum, pkg) => sum + pkg.price,
-        0
-      );
-
-      const customerName = user?.name || "Guest";
-      const customerId = user?.customerid || "guest-id";
-      const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
-
-      // Create booking details
-      const bookingDetails: BookingDetails = {
-        serviceProviderId: providerDetails?.serviceproviderId
-          ? Number(providerDetails.serviceproviderId)
-          : 0,
-        serviceProviderName: providerFullName,
-        customerId: Number(customerId) || 0,
-        customerName: customerName,
-        address: user?.customerDetails?.currentLocation || "",
-        startDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
-        endDate: bookingType?.endDate || "",
-        engagements: selectedPackages
-          .map(pkg => `${pkg.mealType} for ${pkg.persons} persons`)
-          .join(", "),
-        monthlyAmount: totalAmount,
-        timeslot: bookingType?.timeRange || "",
-        paymentMode: "UPI",
-        bookingType: getBookingTypeFromPreference(bookingType?.bookingPreference),
-        taskStatus: "NOT_STARTED",
-        serviceType: "COOK",
-        responsibilities: [],
-      };
-
-      // Simulate payment success
-      Alert.alert(
-        "Payment Successful",
-        "Your booking has been confirmed!",
-        [
-          {
-            text: "OK",
-            onPress: async () => {
-              try {
-                // Save booking to backend
-                const bookingResponse = await axiosInstance.post(
-                  "/api/serviceproviders/engagement/add",
-                  bookingDetails,
-                  {
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                  }
-                );
-
-                if (bookingResponse.status === 201) {
-                  // Clear selected items from cart
-                  selectedPackages.forEach(pkg => {
-                    dispatch(removeFromCart({
-                      id: pkg.mealType,
-                      type: 'meal'
-                    }));
-                  });
-
-                  if (sendDataToParent) {
-                    sendDataToParent("BOOKINGS"); // Or pass bookingDetails if needed
-                  }
-                  onClose();
-                }
-              } catch (error) {
-                console.error("Error saving booking:", error);
-                Alert.alert("Error", "Failed to save booking details");
-              }
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.log("error => ", error);
-      Alert.alert("Error", "Failed to initiate payment. Please try again.");
+  const handleOpenAgreementDialog = () => {
+    const selectedCount = packages.filter(pkg => pkg.selected).length;
+    if (selectedCount === 0) {
+      Alert.alert("Please select at least one package");
+      return;
     }
+    setAgreementDialogOpen(true);
   };
+
+  const handleProceedToPayment = async () => {
+    setAgreementDialogOpen(false);
+    await handleCheckout();
+  };
+
+const handleCheckout = async () => {
+  try {
+    setLoading(true);
+    
+    // Validate selected packages
+    const selectedPackages = packages.filter(pkg => pkg.selected);
+    if (selectedPackages.length === 0) {
+      Alert.alert("Please select at least one package");
+      setLoading(false);
+      return;
+    }
+
+    // Calculate total amount (in paise)
+    const totalAmount = selectedPackages.reduce(
+      (sum, pkg) => sum + calculatePriceForPersons(pkg.price, pkg.persons || 1),
+      0
+    ) * 100; // Convert to paise
+
+    // Prepare booking details
+    const bookingDetails: BookingDetails = {
+      serviceProviderId: providerDetails?.serviceproviderId || 1,
+      serviceProviderName: `${providerDetails?.firstName || ''} ${providerDetails?.lastName || ''}`.trim(),
+      customerId: user?.customerid || 1,
+      customerName: user?.name || "Demo User",
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: '',
+      engagements: selectedPackages.map(p => `${p.name.toUpperCase()} (${p.persons || 1} persons)`).join(', '),
+      address: 'Demo Address',
+      timeslot: '10:00 AM - 2:00 PM',
+      monthlyAmount: totalAmount / 100, // Convert back to rupees
+      paymentMode: 'UPI',
+      bookingType: bookingType || 'DEMO',
+      taskStatus: 'COMPLETED',
+      serviceType: 'COOK',
+      responsibilities: []
+    };
+
+    // Generate order ID
+    const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    
+    // Initiate payment
+    await handleRazorpayPayment(bookingDetails, totalAmount, orderId);
+
+  } catch (error) {
+    console.error('Checkout error:', error);
+    Alert.alert('Error', 'Failed to process checkout');
+    setLoading(false);
+  }
+};
+
+const handleRazorpayPayment = async (bookingDetails: BookingDetails, amount: number, orderId: string) => {
+  try {
+    const options = {
+      description: 'Meal Package Booking',
+      image: 'https://i.imgur.com/3g7nmJC.png',
+      currency: 'INR',
+      key: 'rzp_test_1DP5mmOlF5G5ag', // Make sure this is your actual test key
+      amount: amount,
+      name: 'Serveaso',
+      order_id: orderId,
+      prefill: {
+        email: user?.email || 'customer@example.com',
+        contact: user?.mobileNo || '9123456780',
+        name: user?.name || 'Guest',
+      },
+      theme: { color: '#F37254' },
+      timeout: 300, // 5 minutes timeout
+      retry: {
+        enabled: true,
+        max_count: 3
+      }
+    };
+
+    RazorpayCheckout.open(options)
+      .then((razorpayResponse) => {
+        console.log('Payment success:', razorpayResponse);
+        handleSuccessfulPayment(razorpayResponse, bookingDetails);
+      })
+      .catch((error) => {
+        console.log('Payment error:', error);
+        
+        // More specific error handling
+        if (error.error && error.error.description) {
+          if (error.error.description.includes('cancelled')) {
+            Alert.alert('Payment Cancelled', 'You cancelled the payment');
+          } else {
+            Alert.alert('Payment Failed', error.error.description);
+          }
+        } else {
+          Alert.alert('Payment Failed', 'Something went wrong with the payment');
+        }
+        
+        setLoading(false);
+      });
+  } catch (error) {
+    console.log("Razorpay initialization error:", error);
+    Alert.alert('Error', 'Failed to initialize payment');
+    setLoading(false);
+  }
+};
 
   const getTotal = () => {
     return packages.reduce((sum, pkg, idx) => {
@@ -356,6 +386,62 @@ const DemoCook = ({
   }, 0);
 
   const selectedCount = packages.filter(pkg => pkg.selected).length;
+
+
+
+   const handleSuccessfulPayment = async (razorpayResponse: any, bookingDetails: BookingDetails) => {
+    try {
+      // Save booking to backend
+      const bookingResponse = await axiosInstance.post(
+        "/api/serviceproviders/engagement/add",
+        bookingDetails,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (bookingResponse.status === 201) {
+        // Send notification
+        try {
+          await fetch(
+            "http://localhost:4000/send-notification",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                title: "Hello from ServEaso!",
+                body: `Your booking for ${bookingDetails.engagements} has been confirmed!`,
+                url: "http://localhost:3000",
+              }),
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        } catch (error) {
+          console.error("Notification error:", error);
+        }
+
+        // Clear cart
+        const selectedPackages = packages.filter(pkg => pkg.selected);
+        selectedPackages.forEach(pkg => {
+          dispatch(removeFromCart({
+            id: pkg.name.toUpperCase(),
+            type: 'meal'
+          }));
+        });
+
+        if (sendDataToParent) {
+          sendDataToParent(BOOKINGS);
+        }
+        onClose();
+      }
+    } catch (error) {
+      console.error("Booking error:", error);
+      Alert.alert("Error", "Failed to save booking details");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -450,8 +536,11 @@ const DemoCook = ({
             </View>
             
             <TouchableOpacity 
-              style={styles.continueButton} 
-              onPress={handleCheckout}
+              style={[
+                styles.continueButton, 
+                selectedCount === 0 && styles.continueButtonDisabled
+              ]} 
+              onPress={handleOpenAgreementDialog}
               disabled={selectedCount === 0}
             >
               <Text style={styles.continueButtonText}>CHECKOUT</Text>
@@ -463,6 +552,13 @@ const DemoCook = ({
           </ScrollView>
         </View>
       </View>
+
+      {/* Use the custom CheckoutWithAgreement component */}
+      <CheckoutWithAgreement
+        open={agreementDialogOpen}
+        onClose={() => setAgreementDialogOpen(false)}
+        onProceed={handleProceedToPayment}
+      />
     </Modal>
   );
 };
