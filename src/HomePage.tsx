@@ -28,16 +28,16 @@ import DemoCook from "./demoCook";
 import NannyServicesDialog from "./NannyServiceDialog";
 
 // Import local images
-const cookImage = require("../assets/images/newCook.png");
-const maidImage = require("../assets/images/newMaid.png");
-const nannyImage = require("../assets/images/newNanny.png");
+const cookImage = require("../assets/images/CookAi.png");
+const maidImage = require("../assets/images/MaidAi.png");
+const nannyImage = require("../assets/images/NannyAi.png");
 const heroImage = require("../assets/images/maid-hero.png");
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
   bookingType: (data: string) => void;
-    user?: any; // Add proper type
-  providerDetails?: any; // Add proper type
+  user?: any;
+  providerDetails?: any;
 }
 
 const HomePage: React.FC<ChildComponentProps> = ({
@@ -59,12 +59,13 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [serviceDetailsOpen, setServiceDetailsOpen] = useState(false);
   const [selectedServiceType, setSelectedServiceType] = useState<"cook" | "maid" | "babycare" | null>(null);
   const [chatbotOpen, setChatbotOpen] = useState(false);
-const [showCookServicesDialog, setShowCookServicesDialog] = useState(false);
+  const [showCookServicesDialog, setShowCookServicesDialog] = useState(false);
   const [showMaidServiceDialog, setShowMaidServiceDialog] = useState(false);
   const [showNannyServicesDialog, setShowNannyServicesDialog] = useState(false);
-const [showCookDialog, setShowCookDialog] = useState(false);
+  const [showCookDialog, setShowCookDialog] = useState(false);
+  const [hoveredService, setHoveredService] = useState<string | null>(null);
 
-    const handleWorkButtonClick = () => {
+  const handleWorkButtonClick = () => {
     setShowRegistration(true);
   };
 
@@ -92,38 +93,38 @@ const [showCookDialog, setShowCookDialog] = useState(false);
     return diffInMs / (1000 * 60 * 60);
   };
 
-const handleSave = () => {
-  let duration = 0;
-  const booking = {
-    startDate: startDate?.toISOString(),
-    endDate: endDate?.toISOString(),
-    startTime: startTime?.toISOString(),
-    endTime: endTime?.toISOString(),
-    bookingPreference: selectedRadioButtonValue,
-    serviceType: selectedType,
-  };
+  const handleSave = () => {
+    let duration = 0;
+    const booking = {
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+      startTime: startTime?.toISOString(),
+      endTime: endTime?.toISOString(),
+      bookingPreference: selectedRadioButtonValue,
+      serviceType: selectedType,
+    };
 
-  if (selectedRadioButtonValue === "Date") {
-    switch (selectedType) {
-      case "COOK":
-        setShowCookDialog(true);
-        break;
-      case "MAID":
-        setShowMaidServiceDialog(true);
-        break;
-      case "NANNY":
-        setShowNannyServicesDialog(true);
-        break;
-      default:
-        sendDataToParent(DETAILS);
+    if (selectedRadioButtonValue === "Date") {
+      switch (selectedType) {
+        case "COOK":
+          setShowCookDialog(true);
+          break;
+        case "MAID":
+          setShowMaidServiceDialog(true);
+          break;
+        case "NANNY":
+          setShowNannyServicesDialog(true);
+          break;
+        default:
+          sendDataToParent(DETAILS);
+      }
+    } else {
+      sendDataToParent(DETAILS);
     }
-  } else {
-    sendDataToParent(DETAILS);
-  }
 
-  setOpen(false);
-  dispatch(add(booking));
-};
+    setOpen(false);
+    dispatch(add(booking));
+  };
 
   const isConfirmDisabled = () => {
     if (!startDate) return true;
@@ -195,8 +196,20 @@ const handleSave = () => {
     setServiceDetailsOpen(true);
   };
 
+  const getServiceRole = (serviceType: string) => {
+    switch (serviceType) {
+      case "COOK":
+        return "Cook";
+      case "MAID":
+        return "Maid";
+      case "NANNY":
+        return "Nanny";
+      default:
+        return "";
+    }
+  };
+
   return (
- 
     <ScrollView style={styles.container}>
       {/* Hero Section */}
       <View style={styles.heroSection}>
@@ -209,54 +222,91 @@ const handleSave = () => {
             demand. Safe, affordable and instant.
           </Text>
           <View style={styles.serviceIconsContainer}>
-            <TouchableOpacity
-              style={styles.serviceIconContainer}
-              onPress={() => handleClick("COOK")}
-            >
-              <Image source={cookImage} style={styles.serviceImage} />
-            </TouchableOpacity>
+            {/* Cook Service */}
+            <View style={styles.serviceTooltipContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.serviceIconContainer,
+                  hoveredService === "COOK" && styles.serviceIconContainerHover,
+                ]}
+                onPress={() => handleClick("COOK")}
+                onPressIn={() => setHoveredService("COOK")}
+                onPressOut={() => setHoveredService(null)}
+              >
+                <Image source={cookImage} style={styles.serviceImage} />
+              </TouchableOpacity>
+              {hoveredService === "COOK" && (
+                <View style={styles.tooltip}>
+                  <Text style={styles.tooltipText}>{getServiceRole("COOK")}</Text>
+                </View>
+              )}
+            </View>
 
-            <TouchableOpacity 
-              style={styles.serviceIconContainer}
-              onPress={() => handleClick("MAID")}
-            >
-              <Image source={maidImage} style={styles.serviceImage} />
-            </TouchableOpacity>
+            {/* Maid Service */}
+            <View style={styles.serviceTooltipContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.serviceIconContainer,
+                  hoveredService === "MAID" && styles.serviceIconContainerHover,
+                ]}
+                onPress={() => handleClick("MAID")}
+                onPressIn={() => setHoveredService("MAID")}
+                onPressOut={() => setHoveredService(null)}
+              >
+                <Image source={maidImage} style={styles.serviceImage} />
+              </TouchableOpacity>
+              {hoveredService === "MAID" && (
+                <View style={styles.tooltip}>
+                  <Text style={styles.tooltipText}>{getServiceRole("MAID")}</Text>
+                </View>
+              )}
+            </View>
 
-            <TouchableOpacity 
-              style={styles.serviceIconContainer}
-              onPress={() => handleClick("NANNY")}
-            >
-              <Image source={nannyImage} style={styles.serviceImage} />
-            </TouchableOpacity>
+            {/* Nanny Service */}
+            <View style={styles.serviceTooltipContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.serviceIconContainer,
+                  hoveredService === "NANNY" && styles.serviceIconContainerHover,
+                ]}
+                onPress={() => handleClick("NANNY")}
+                onPressIn={() => setHoveredService("NANNY")}
+                onPressOut={() => setHoveredService(null)}
+              >
+                <Image source={nannyImage} style={styles.serviceImage} />
+              </TouchableOpacity>
+              {hoveredService === "NANNY" && (
+                <View style={styles.tooltip}>
+                  <Text style={styles.tooltipText}>{getServiceRole("NANNY")}</Text>
+                </View>
+              )}
+            </View>
           </View>
           <View style={styles.buttonContainer}>
-           <TouchableOpacity style={styles.outlineButton} onPress={() => setChatbotOpen(true)}>
-  <Text style={styles.outlineButtonText}>I need help</Text>
-</TouchableOpacity>
+            <TouchableOpacity style={styles.outlineButton} onPress={() => setChatbotOpen(true)}>
+              <Text style={styles.outlineButtonText}>I need help</Text>
+            </TouchableOpacity>
   
-              <TouchableOpacity 
-        style={styles.outlineButton}
-        onPress={handleWorkButtonClick}
-      >
-        <Text style={styles.outlineButtonText}>I want to work</Text>
-      </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.outlineButton}
+              onPress={handleWorkButtonClick}
+            >
+              <Text style={styles.outlineButtonText}>I want to work</Text>
+            </TouchableOpacity>
 
-   <Chatbot 
-  open={chatbotOpen} 
-  onClose={() => setChatbotOpen(false)} 
-/>
+            <Chatbot 
+              open={chatbotOpen} 
+              onClose={() => setChatbotOpen(false)} 
+            />
 
-        {/* Add the registration modal */}
-      <Modal visible={showRegistration} animationType="slide">
-        <ServiceProviderRegistration
-          onBackToLogin={() => setShowRegistration(false)}
-          onRegistrationSuccess={() => setShowRegistration(false)}
-        />
-      </Modal>
-   
+            {/* Add the registration modal */}
+            <Modal visible={showRegistration} animationType="slide">
+              <ServiceProviderRegistration
+                onBackToLogin={() => setShowRegistration(false)}
+                onRegistrationSuccess={() => setShowRegistration(false)}
+              />
+            </Modal>
           </View>
-         
         </View>
         <View style={styles.heroImageContainer}>
           <Image source={heroImage} style={styles.heroImage} />
@@ -452,57 +502,53 @@ const handleSave = () => {
         />
       )}
 
+      {showCookDialog && (
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogBox}>
+            <DemoCook
+              onClose={() => setShowCookDialog(false)}
+              sendDataToParent={sendDataToParent}
+              bookingType={{
+                startDate: startDate?.toISOString(),
+                endDate: endDate?.toISOString(),
+                timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+                bookingPreference: selectedRadioButtonValue
+              }}
+            />
+          </View>
+        </View>
+      )}
 
-    {showCookDialog && (
-  <View style={styles.dialogOverlay}>
-    <View style={styles.dialogBox}>
-      <DemoCook
-        onClose={() => setShowCookDialog(false)}
-        sendDataToParent={sendDataToParent}
-        bookingType={{
-          startDate: startDate?.toISOString(),
-          endDate: endDate?.toISOString(),
-          timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
-          bookingPreference: selectedRadioButtonValue
-        }}
+      {showNannyServicesDialog && (
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogBox}>
+            <NannyServicesDialog
+              open={showNannyServicesDialog}
+              handleClose={() => setShowNannyServicesDialog(false)}
+              sendDataToParent={sendDataToParent}
+            />
+          </View>
+        </View>
+      )}
+
+      {showMaidServiceDialog && (
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogBox}>
+            <MaidServiceDialog
+              open={showMaidServiceDialog}
+              handleClose={() => setShowMaidServiceDialog(false)}
+              sendDataToParent={sendDataToParent}
+            />
+          </View>
+        </View>
+      )}
+
+      <ServiceDetailsDialog
+        open={serviceDetailsOpen}
+        onClose={() => setServiceDetailsOpen(false)}
+        serviceType={selectedServiceType}
       />
-    </View>
-  </View>
-)}
-
-{showNannyServicesDialog && (
-  <View style={styles.dialogOverlay}>
-    <View style={styles.dialogBox}>
-      <NannyServicesDialog
-        open={showNannyServicesDialog}
-        handleClose={() => setShowNannyServicesDialog(false)}
-        sendDataToParent={sendDataToParent}
-      />
-    </View>
-  </View>
-)}
-
-{showMaidServiceDialog && (
-  <View style={styles.dialogOverlay}>
-    <View style={styles.dialogBox}>
-      <MaidServiceDialog
-        open={showMaidServiceDialog}
-        handleClose={() => setShowMaidServiceDialog(false)}
-        sendDataToParent={sendDataToParent}
-      />
-    </View>
-  </View>
-)}
-
-<ServiceDetailsDialog
-  open={serviceDetailsOpen}
-  onClose={() => setServiceDetailsOpen(false)}
-  serviceType={selectedServiceType}
-/>
-
     </ScrollView>
-   
-
   );
 };
 
@@ -514,6 +560,7 @@ interface Styles {
   heroSubtitle: TextStyle;
   serviceIconsContainer: ViewStyle;
   serviceIconContainer: ViewStyle;
+  serviceIconContainerHover: ViewStyle;
   serviceImage: ImageStyle;
   buttonContainer: ViewStyle;
   outlineButton: ViewStyle;
@@ -552,6 +599,9 @@ interface Styles {
   timeInput: ViewStyle;
   dateBlock: ViewStyle;
   modalButtons: ViewStyle;
+  serviceTooltipContainer: ViewStyle;
+  tooltip: ViewStyle;
+  tooltipText: TextStyle;
 }
 
 const styles = StyleSheet.create<Styles>({
@@ -584,12 +634,52 @@ const styles = StyleSheet.create<Styles>({
     justifyContent: "space-around",
     marginBottom: 16,
   },
+  serviceTooltipContainer: {
+    alignItems: "center",
+    position: 'relative',
+  },
   serviceIconContainer: {
     alignItems: "center",
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#ddd",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    transitionDuration: '200ms',
+  },
+  serviceIconContainerHover: {
+    transform: [{ scale: 1.05 }],
+    shadowColor: "#1976d2",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+    borderColor: "#1976d2",
   },
   serviceImage: {
     width: 100,
     height: 100,
+  },
+  tooltip: {
+    position: 'absolute',
+    bottom: -30,
+    backgroundColor: '#333',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    zIndex: 10,
+  },
+  tooltipText: {
+    color: '#fff',
+    fontSize: 12,
   },
   buttonContainer: {
     flexDirection: "row",
@@ -612,9 +702,9 @@ const styles = StyleSheet.create<Styles>({
     marginTop: 16,
   },
   heroImage: {
-    width: "100%",
+    width: "80%",
     maxWidth: 400,
-    height: 280,
+    height: 450,
     borderRadius: 12,
   },
   servicesSection: {
@@ -764,39 +854,37 @@ const styles = StyleSheet.create<Styles>({
     gap: 8,
   },
   dateInputText: {
-  color: '#000', // or any color you prefer
-},
-timeInputText: {
-  color: '#000', // or any color you prefer
-},
-disabledInput: {
-  backgroundColor: '#f0f0f0',
-},
-dialogOverlay: {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 1000,
-},
-
-dialogBox: {
-  width: '90%',
-  maxHeight: '80%',
-  backgroundColor: '#fff',
-  borderRadius: 8,
-  padding: 16,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.3,
-  shadowRadius: 4,
-  elevation: 10,
-},
-
+    color: '#000',
+  },
+  timeInputText: {
+    color: '#000',
+  },
+  disabledInput: {
+    backgroundColor: '#f0f0f0',
+  },
+  dialogOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  dialogBox: {
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 10,
+  },
 });
 
 export default HomePage;
