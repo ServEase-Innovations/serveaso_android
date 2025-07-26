@@ -9,6 +9,7 @@ import {
   Modal,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import axios from 'axios';
@@ -17,6 +18,7 @@ import { BookingDetails } from './types/engagementRequest';
 import { BOOKINGS } from './Constants/pagesConstants';
 import axiosInstance from './axiosInstance';
 import CheckoutWithAgreement from './CheckoutWithAgreement';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // Redux actions
 import { addToCart, removeFromCart, updateCartItem } from './features/addToSlice';
@@ -48,6 +50,7 @@ const calculatePriceForPersons = (basePrice: number, persons: number): number =>
 const DemoCook = ({
   visible,
   onClose,
+  handleClose, 
   sendDataToParent,
   user,
   providerDetails,
@@ -106,7 +109,6 @@ const DemoCook = ({
   const [agreementDialogOpen, setAgreementDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // User authentication check
   useEffect(() => {
     if (user) {
       console.log("User Info:", user);
@@ -132,7 +134,6 @@ const DemoCook = ({
     serviceType: "COOK",
     responsibilities: [],
   };
-
 
   useEffect(() => {
     const updatedPackages = packages.map(pkg => {
@@ -215,40 +216,6 @@ const DemoCook = ({
     });
   };
 
-  const togglePackageSelection = (index: number) => {
-    setPackages(prev => {
-      const updated = [...prev];
-      const currentPackage = updated[index];
-      const newSelectedState = !currentPackage.selected;
-
-      if (newSelectedState && !currentPackage.inCart) {
-        dispatch(addToCart({
-          type: 'meal',
-          id: currentPackage.name.toUpperCase(),
-          mealType: currentPackage.name.toUpperCase(),
-          persons: currentPackage.persons || 1,
-          price: calculatePriceForPersons(currentPackage.price, currentPackage.persons || 1),
-          description: currentPackage.includes.join(', '),
-          basePrice: currentPackage.price,
-          maxPersons: 15
-        }));
-      } else if (!newSelectedState && currentPackage.inCart) {
-        dispatch(removeFromCart({
-          id: currentPackage.name.toUpperCase(),
-          type: 'meal'
-        }));
-      }
-
-      updated[index] = {
-        ...currentPackage,
-        selected: newSelectedState,
-        inCart: newSelectedState
-      };
-      
-      return updated;
-    });
-  };
-
   const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
     if (!bookingPreference) return 'MONTHLY';
     
@@ -259,9 +226,9 @@ const DemoCook = ({
   };
 
   const handleOpenAgreementDialog = () => {
-    const selectedCount = packages.filter(pkg => pkg.selected).length;
+    const selectedCount = packages.filter(pkg => pkg.inCart).length;
     if (selectedCount === 0) {
-      Alert.alert("Please select at least one package");
+      Alert.alert("Please add at least one package to cart");
       return;
     }
     setAgreementDialogOpen(true);
@@ -272,126 +239,117 @@ const DemoCook = ({
     await handleCheckout();
   };
 
-const handleCheckout = async () => {
-  try {
-    setLoading(true);
-    
-    // Validate selected packages
-    const selectedPackages = packages.filter(pkg => pkg.selected);
-    if (selectedPackages.length === 0) {
-      Alert.alert("Please select at least one package");
-      setLoading(false);
-      return;
-    }
-
-    // Calculate total amount (in paise)
-    const totalAmount = selectedPackages.reduce(
-      (sum, pkg) => sum + calculatePriceForPersons(pkg.price, pkg.persons || 1),
-      0
-    ) * 100; // Convert to paise
-
-    // Prepare booking details
-    const bookingDetails: BookingDetails = {
-      serviceProviderId: providerDetails?.serviceproviderId || 1,
-      serviceProviderName: `${providerDetails?.firstName || ''} ${providerDetails?.lastName || ''}`.trim(),
-      customerId: user?.customerid || 1,
-      customerName: user?.name || "Demo User",
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: '',
-      engagements: selectedPackages.map(p => `${p.name.toUpperCase()} (${p.persons || 1} persons)`).join(', '),
-      address: 'Demo Address',
-      timeslot: '10:00 AM - 2:00 PM',
-      monthlyAmount: totalAmount / 100, // Convert back to rupees
-      paymentMode: 'UPI',
-      bookingType: bookingType || 'DEMO',
-      taskStatus: 'COMPLETED',
-      serviceType: 'COOK',
-      responsibilities: []
-    };
-
-    // Generate order ID
-    const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    
-    // Initiate payment
-    await handleRazorpayPayment(bookingDetails, totalAmount, orderId);
-
-  } catch (error) {
-    console.error('Checkout error:', error);
-    Alert.alert('Error', 'Failed to process checkout');
-    setLoading(false);
-  }
-};
-
-const handleRazorpayPayment = async (bookingDetails: BookingDetails, amount: number, orderId: string) => {
-  try {
-    const options = {
-      description: 'Meal Package Booking',
-      image: 'https://i.imgur.com/3g7nmJC.png',
-      currency: 'INR',
-      key: 'rzp_test_1DP5mmOlF5G5ag', // Make sure this is your actual test key
-      amount: amount,
-      name: 'Serveaso',
-      order_id: orderId,
-      prefill: {
-        email: user?.email || 'customer@example.com',
-        contact: user?.mobileNo || '9123456780',
-        name: user?.name || 'Guest',
-      },
-      theme: { color: '#F37254' },
-      timeout: 300, // 5 minutes timeout
-      retry: {
-        enabled: true,
-        max_count: 3
-      }
-    };
-
-    RazorpayCheckout.open(options)
-      .then((razorpayResponse) => {
-        console.log('Payment success:', razorpayResponse);
-        handleSuccessfulPayment(razorpayResponse, bookingDetails);
-      })
-      .catch((error) => {
-        console.log('Payment error:', error);
-        
-        // More specific error handling
-        if (error.error && error.error.description) {
-          if (error.error.description.includes('cancelled')) {
-            Alert.alert('Payment Cancelled', 'You cancelled the payment');
-          } else {
-            Alert.alert('Payment Failed', error.error.description);
-          }
-        } else {
-          Alert.alert('Payment Failed', 'Something went wrong with the payment');
-        }
-        
+  const handleCheckout = async () => {
+    try {
+      setLoading(true);
+      
+      const selectedPackages = packages.filter(pkg => pkg.inCart);
+      if (selectedPackages.length === 0) {
+        Alert.alert("Please add at least one package to cart");
         setLoading(false);
-      });
-  } catch (error) {
-    console.log("Razorpay initialization error:", error);
-    Alert.alert('Error', 'Failed to initialize payment');
-    setLoading(false);
-  }
-};
+        return;
+      }
+
+      const totalAmount = selectedPackages.reduce(
+        (sum, pkg) => sum + calculatePriceForPersons(pkg.price, pkg.persons || 1),
+        0
+      ) * 100;
+
+      const bookingDetails: BookingDetails = {
+        serviceProviderId: providerDetails?.serviceproviderId || 1,
+        serviceProviderName: `${providerDetails?.firstName || ''} ${providerDetails?.lastName || ''}`.trim(),
+        customerId: user?.customerid || 1,
+        customerName: user?.name || "Demo User",
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
+        engagements: selectedPackages.map(p => `${p.name.toUpperCase()} (${p.persons || 1} persons)`).join(', '),
+        address: 'Demo Address',
+        timeslot: '10:00 AM - 2:00 PM',
+        monthlyAmount: totalAmount / 100,
+        paymentMode: 'UPI',
+        bookingType: bookingType || 'DEMO',
+        taskStatus: 'COMPLETED',
+        serviceType: 'COOK',
+        responsibilities: []
+      };
+
+      const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      
+      await handleRazorpayPayment(bookingDetails, totalAmount, orderId);
+
+    } catch (error) {
+      console.error('Checkout error:', error);
+      Alert.alert('Error', 'Failed to process checkout');
+      setLoading(false);
+    }
+  };
+
+  const handleRazorpayPayment = async (bookingDetails: BookingDetails, amount: number, orderId: string) => {
+    try {
+      const options = {
+        description: 'Meal Package Booking',
+        image: 'https://i.imgur.com/3g7nmJC.png',
+        currency: 'INR',
+        key: 'rzp_test_1DP5mmOlF5G5ag',
+        amount: amount,
+        name: 'Serveaso',
+        order_id: orderId,
+        prefill: {
+          email: user?.email || 'customer@example.com',
+          contact: user?.mobileNo || '9123456780',
+          name: user?.name || 'Guest',
+        },
+        theme: { color: '#3399cc' },
+        timeout: 300,
+        retry: {
+          enabled: true,
+          max_count: 3
+        }
+      };
+
+      RazorpayCheckout.open(options)
+        .then((razorpayResponse) => {
+          console.log('Payment success:', razorpayResponse);
+          handleSuccessfulPayment(razorpayResponse, bookingDetails);
+        })
+        .catch((error) => {
+          console.log('Payment error:', error);
+          
+          if (error.error && error.error.description) {
+            if (error.error.description.includes('cancelled')) {
+              Alert.alert('Payment Cancelled', 'You cancelled the payment');
+            } else {
+              Alert.alert('Payment Failed', error.error.description);
+            }
+          } else {
+            Alert.alert('Payment Failed', 'Something went wrong with the payment');
+          }
+          
+          setLoading(false);
+        });
+    } catch (error) {
+      console.log("Razorpay initialization error:", error);
+      Alert.alert('Error', 'Failed to initialize payment');
+      setLoading(false);
+    }
+  };
 
   const getTotal = () => {
-    return packages.reduce((sum, pkg, idx) => {
-      if (!pkg.selected) return sum;
+    return packages.reduce((sum, pkg) => {
+      if (!pkg.inCart) return sum;
       return sum + calculatePriceForPersons(pkg.price, pkg.persons || 1);
     }, 0);
   };
 
   const totalPersons = packages.reduce((sum, pkg) => {
-    if (!pkg.selected) return sum;
+    if (!pkg.inCart) return sum;
     return sum + (pkg.persons || 1);
   }, 0);
 
-  const selectedCount = packages.filter(pkg => pkg.selected).length;
+  const selectedCount = packages.filter(pkg => pkg.inCart).length;
 
-
-
-   const handleSuccessfulPayment = async (razorpayResponse: any, bookingDetails: BookingDetails) => {
+  const handleSuccessfulPayment = async (razorpayResponse: any, bookingDetails: BookingDetails) => {
     try {
-      // Save booking to backend
       const bookingResponse = await axiosInstance.post(
         "/api/serviceproviders/engagement/add",
         bookingDetails,
@@ -403,7 +361,6 @@ const handleRazorpayPayment = async (bookingDetails: BookingDetails, amount: num
       );
 
       if (bookingResponse.status === 201) {
-        // Send notification
         try {
           await fetch(
             "http://localhost:4000/send-notification",
@@ -421,8 +378,7 @@ const handleRazorpayPayment = async (bookingDetails: BookingDetails, amount: num
           console.error("Notification error:", error);
         }
 
-        // Clear cart
-        const selectedPackages = packages.filter(pkg => pkg.selected);
+        const selectedPackages = packages.filter(pkg => pkg.inCart);
         selectedPackages.forEach(pkg => {
           dispatch(removeFromCart({
             id: pkg.name.toUpperCase(),
@@ -445,115 +401,148 @@ const handleRazorpayPayment = async (bookingDetails: BookingDetails, amount: num
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalContainer}>
-        <View style={styles.dialogBox}>
-          <ScrollView contentContainerStyle={styles.container}>
-            <Text style={styles.header}>MEAL PACKAGES</Text>
-            
-            {packages.map((pkg, index) => (
-              <View key={index} style={styles.packageCard}>
-                <View style={styles.packageHeader}>
-                  <Text style={styles.packageTitle}>{pkg.name}</Text>
-                  <Text style={styles.price}>
-                    ₹{calculatePriceForPersons(pkg.price, pkg.persons || 1).toFixed(2)}
-                  </Text>
-                </View>
-                <Text style={styles.rating}>
-                  {pkg.rating} ({pkg.reviews}) - {pkg.prepTime}
-                </Text>
-                
-                <View style={styles.personRow}>
-                  <Text>Person:</Text>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.header}>
+             <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
+              <Icon name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.dialogTitle}>MEAL PACKAGES</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeIcon}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.scrollView}>
+            <View style={styles.packagesContainer}>
+              {packages.map((pkg, index) => (
+                <View key={index} style={[
+                  styles.packageCard, 
+                  pkg.inCart && styles.selectedPackage,
+                  { borderLeftColor: '#3399cc' }
+                ]}>
+                  <View style={styles.packageHeader}>
+                    <View>
+                      <Text style={styles.packageTitle}>{pkg.name}</Text>
+                      <View style={styles.ratingContainer}>
+                        <Text style={[styles.ratingValue, { color: '#3399cc' }]}>{pkg.rating}</Text>
+                        <Text style={styles.reviewsText}>({pkg.reviews})</Text>
+                      </View>
+                    </View>
+                    <View style={styles.priceContainer}>
+                      <Text style={[styles.priceValue, { color: '#3399cc' }]}>
+                        ₹{calculatePriceForPersons(pkg.price, pkg.persons || 1).toFixed(2)}
+                      </Text>
+                      <Text style={styles.preparationTime}>{pkg.prepTime}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.personsControl}>
+                    <Text style={styles.personsLabel}>Persons:</Text>
+                    <View style={styles.personsInput}>
+                      <TouchableOpacity 
+                        style={styles.decrementButton}
+                        onPress={() => handlePersonChange(index, 'decrement')}
+                        disabled={(pkg.persons || 1) <= 1}
+                      >
+                        <Text style={styles.buttonText}>-</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.personsValue}>
+                        {pkg.persons}
+                      </Text>
+                      <TouchableOpacity 
+                        style={styles.incrementButton}
+                        onPress={() => handlePersonChange(index, 'increment')}
+                        disabled={(pkg.persons || 1) >= 15}
+                      >
+                        <Text style={styles.buttonText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.descriptionList}>
+                    {pkg.includes.map((item, i) => (
+                      <View key={i} style={styles.descriptionItem}>
+                        <Text style={styles.descriptionBullet}>•</Text>
+                        <Text style={styles.descriptionText}>{item}</Text>
+                      </View>
+                    ))}
+                  </View>
+
                   <TouchableOpacity
-                    style={styles.counterButton}
-                    onPress={() => handlePersonChange(index, 'decrement')}
-                    disabled={(pkg.persons || 1) <= 1}
+                    style={[
+                      styles.cartButton,
+                      pkg.inCart && styles.selectedCartButton
+                    ]}
+                    onPress={() => toggleCart(index)}
                   >
-                    <Text style={styles.counterSymbol}>-</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.personCount}>{pkg.persons}</Text>
-                  <TouchableOpacity
-                    style={styles.counterButton}
-                    onPress={() => handlePersonChange(index, 'increment')}
-                    disabled={(pkg.persons || 1) >= 15}
-                  >
-                    <Text style={styles.counterSymbol}>+</Text>
+                    {pkg.inCart ? (
+                      <Icon name="remove-shopping-cart" size={20} color="white" />
+                    ) : (
+                      <Icon name="add-shopping-cart" size={20} color="#3399cc" />
+                    )}
+                    <Text style={[
+                      styles.cartButtonText,
+                      pkg.inCart && styles.selectedCartButtonText
+                    ]}>
+                      {pkg.inCart ? 'REMOVE FROM CART' : 'ADD TO CART'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
-                
-                <View style={styles.includes}>
-                  {pkg.includes.map((item, i) => (
-                    <Text key={i}>• {item}</Text>
-                  ))}
-                </View>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.cartButton,
-                    pkg.inCart && styles.cartButtonActive,
-                  ]}
-                  onPress={() => toggleCart(index)}
-                >
-                  <Text style={styles.cartButtonText}>
-                    {pkg.inCart ? 'ADDED TO CART' : 'ADD TO CART'}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.selectButton,
-                    pkg.selected && styles.selectedButton,
-                  ]}
-                  onPress={() => togglePackageSelection(index)}
-                >
-                  <Text style={[
-                    styles.selectButtonText,
-                    pkg.selected && styles.selectedButtonText,
-                  ]}>
-                    {pkg.selected ? 'SELECTED' : 'SELECT PACKAGE'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-            
-            <View style={styles.voucherSection}>
+              ))}
+            </View>
+          </ScrollView>
+          
+          <View style={styles.footerContainer}>
+            <View style={styles.voucherContainer}>
               <TextInput
+                style={styles.voucherInput}
                 placeholder="Enter voucher code"
+                placeholderTextColor="#999"
                 value={voucher}
                 onChangeText={setVoucher}
-                style={styles.voucherInput}
               />
-              <TouchableOpacity style={styles.applyButton}>
-                <Text style={styles.applyButtonText}>APPLY</Text>
+              <TouchableOpacity style={styles.voucherButton}>
+                <Text style={styles.voucherButtonText}>Apply Voucher</Text>
               </TouchableOpacity>
             </View>
             
-            <View style={styles.totalRow}>
-              <Text style={styles.totalText}>
+            <View style={styles.totalContainer}>
+              <Text style={styles.footerText}>
                 Total for {selectedCount} item{selectedCount !== 1 ? 's' : ''} ({totalPersons} person{totalPersons !== 1 ? 's' : ''})
               </Text>
-              <Text style={styles.totalPrice}>₹{getTotal().toFixed(2)}</Text>
+              <Text style={styles.footerPrice}>
+                ₹{getTotal().toFixed(2)}
+              </Text>
             </View>
             
-            <TouchableOpacity 
-              style={[
-                styles.continueButton, 
-                selectedCount === 0 && styles.continueButtonDisabled
-              ]} 
-              onPress={handleOpenAgreementDialog}
-              disabled={selectedCount === 0}
-            >
-              <Text style={styles.continueButtonText}>CHECKOUT</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>CLOSE</Text>
-            </TouchableOpacity>
-          </ScrollView>
+            <View style={styles.footerButtons}>
+              <TouchableOpacity 
+                style={styles.closeFooterButton}
+                onPress={onClose}
+              >
+                <Text style={styles.closeFooterButtonText}>CLOSE</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.checkoutButton,
+                  selectedCount === 0 && styles.disabledButton
+                ]}
+                onPress={handleOpenAgreementDialog}
+                disabled={selectedCount === 0}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.checkoutButtonText}>CHECKOUT</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </View>
 
-      {/* Use the custom CheckoutWithAgreement component */}
       <CheckoutWithAgreement
         open={agreementDialogOpen}
         onClose={() => setAgreementDialogOpen(false)}
@@ -566,126 +555,260 @@ const handleRazorpayPayment = async (bookingDetails: BookingDetails, amount: num
 const { height } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  dialogBox: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    margin: 20,
+  modalContainer: {
+    backgroundColor: 'white',
+    marginHorizontal: 15,
+    borderRadius: 15,
     maxHeight: height * 0.85,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  container: { padding: 16 },
-  header: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
-  packageCard: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  packageHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  packageTitle: { fontSize: 18, fontWeight: 'bold' },
-  price: { fontSize: 16, fontWeight: 'bold', color: 'red' },
-  rating: { marginVertical: 8, fontSize: 12, color: '#666' },
-  personRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 8,
-    gap: 8,
-  },
-  counterButton: {
-    borderWidth: 1,
-    borderColor: '#888',
-    paddingHorizontal: 8,
-    borderRadius: 4,
-  },
-  counterSymbol: { fontSize: 16 },
-  personCount: { marginHorizontal: 8, fontSize: 16 },
-  includes: { marginVertical: 8 },
-  cartButton: {
-    borderWidth: 1,
-    borderColor: '#0099cc',
-    borderRadius: 6,
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  cartButtonActive: {
-    backgroundColor: '#0099cc',
-  },
-  cartButtonText: {
-    color: '#0099cc',
-    fontWeight: 'bold',
-  },
-  selectButton: {
-    borderWidth: 1,
-    borderColor: '#009944',
-    borderRadius: 6,
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  selectedButton: {
-    backgroundColor: '#009944',
-  },
-  selectButtonText: {
-    color: '#009944',
-    fontWeight: 'bold',
-  },
-  selectedButtonText: {
-    color: '#fff',
-  },
-  voucherSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  voucherInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
-    padding: 8,
-    flex: 1,
-    marginRight: 8,
-  },
-  applyButton: {
-    backgroundColor: '#009944',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-  },
-  applyButtonText: { color: '#fff', fontWeight: 'bold' },
-  totalRow: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  totalText: { fontWeight: 'bold' },
-  totalPrice: { fontWeight: 'bold', fontSize: 16 },
-  continueButton: {
-    backgroundColor: '#0066cc',
-    padding: 16,
-    borderRadius: 6,
     alignItems: 'center',
-    marginBottom: 10,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  continueButtonDisabled: {
-    backgroundColor: '#cccccc',
+  dialogTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
   },
-  continueButtonText: {
-    color: '#fff',
+  closeIcon: {
+    padding: 5,
+  },
+  scrollView: {
+    paddingHorizontal: 10,
+  },
+  packagesContainer: {
+    marginBottom: 20,
+  },
+  packageCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderLeftWidth: 5,
+  },
+  selectedPackage: {
+    borderColor: '#3399cc',
+    borderWidth: 2,
+  },
+  packageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  packageTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#333',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginRight: 5,
+  },
+  reviewsText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  priceContainer: {
+    alignItems: 'flex-end',
+  },
+  priceValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  preparationTime: {
+    fontSize: 12,
+    color: '#666',
+  },
+  personsControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  personsLabel: {
+    fontSize: 14,
+    marginRight: 10,
+    color: '#333',
+  },
+  personsInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  decrementButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  incrementButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 18,
+    color: '#333',
+  },
+  personsValue: {
+    marginHorizontal: 15,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  descriptionList: {
+    marginBottom: 15,
+  },
+  descriptionItem: {
+    flexDirection: 'row',
+    marginBottom: 5,
+  },
+  descriptionBullet: {
+    marginRight: 10,
+    color: '#666',
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  cartButton: {
+    paddingVertical: 12,
+    borderRadius: 5,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#3399cc',
+  },
+  selectedCartButton: {
+    backgroundColor: '#3399cc',
+    borderColor: '#3399cc',
+  },
+  cartButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 5,
+    color: '#3399cc',
+  },
+  selectedCartButtonText: {
+    color: 'white',
+  },
+  footerContainer: {
+    padding: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#f9f9f9',
+  },
+  voucherContainer: {
+    flexDirection: 'row',
+    marginBottom: 15,
+    justifyContent: 'space-between',
+  },
+  voucherInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    marginRight: 10,
+    backgroundColor: '#fff',
+  },
+  voucherButton: {
+    backgroundColor: '#3399cc',
+    borderRadius: 5,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voucherButtonText: {
+    color: 'white',
     fontWeight: 'bold',
   },
-  closeButton: {
-    alignItems: 'center',
-    paddingVertical: 10,
+  totalContainer: {
+    marginBottom: 15,
   },
-  closeButtonText: {
-    color: '#888',
+  footerText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  footerPrice: {
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+  },
+  footerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  closeFooterButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 5,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  closeFooterButtonText: {
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  checkoutButton: {
+    flex: 1,
+    backgroundColor: '#3399cc',
+    borderRadius: 5,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+  checkoutButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+   backIcon: {
+    padding: 5,
+    marginRight: 10,
   },
 });
 

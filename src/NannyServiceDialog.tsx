@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   BackHandler,
   Platform,
- 
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import axios from 'axios';
@@ -21,6 +20,8 @@ import { EnhancedProviderDetails } from './types/ProviderDetailsType';
 import { BookingDetails } from './types/engagementRequest';
 import axiosInstance from './axiosInstance';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Dimensions } from 'react-native';
+
 
 interface NannyServicesDialogProps {
   open: boolean;
@@ -49,6 +50,9 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
+// Get screen dimensions
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 
   const bookingType = useSelector((state: any) => state.bookingType?.value);
   const allCartItems = useSelector(selectCartItems);
@@ -91,20 +95,17 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   useEffect(() => {
     const updatedCartItems = { ...cartItems };
     
-    // Reset all nanny cart items to false
     Object.keys(cartItems).forEach(key => {
       if (key.startsWith('baby') || key.startsWith('elderly')) {
         updatedCartItems[key] = false;
       }
     });
 
-    // Update based on current cart items
     nannyCartItems.forEach(item => {
       const packageKey = `${item.careType}${item.packageType.charAt(0).toUpperCase() + item.packageType.slice(1)}`;
       updatedCartItems[packageKey as keyof typeof updatedCartItems] = true;
     });
 
-    // Only update if there are actual changes
     const hasChanges = Object.keys(updatedCartItems).some(
       key => updatedCartItems[key] !== cartItems[key]
     );
@@ -250,40 +251,33 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   const renderBabyPackage = (packageType: 'day' | 'night' | 'fullTime') => {
     const packageData = babyPackages[packageType];
     const packageKey = `baby${packageType.charAt(0).toUpperCase() + packageType.slice(1)}`;
-    let color = '#e17055';
-    let price = '₹16,000 - ₹17,600';
-    let reviews = '(1.5M reviews)';
-    let rating = 4.8;
-    let descriptionItems = [
+    const color = '#3399cc'; // Unified blue color
+    const price = `₹${getPackagePrice('baby', packageType).toLocaleString()}`;
+    const reviews = packageType === 'day' ? '(1.5M reviews)' : 
+                   packageType === 'night' ? '(1.2M reviews)' : '(980K reviews)';
+    const rating = packageType === 'day' ? 4.8 : 
+                  packageType === 'night' ? 4.9 : 4.9;
+    
+    const descriptionItems = packageType === 'day' ? [
       'Professional daytime baby care',
       'Age-appropriate activities',
       'Meal preparation and feeding'
+    ] : packageType === 'night' ? [
+      'Professional overnight baby care',
+      'Night feeding and diaper changes',
+      'Sleep routine establishment'
+    ] : [
+      'Round-the-clock professional care',
+      'All daily care activities included',
+      'Live-in nanny service'
     ];
 
-    if (packageType === 'night') {
-      color = '#00b894';
-      price = '₹20,000 - ₹22,000';
-      reviews = '(1.2M reviews)';
-      rating = 4.9;
-      descriptionItems = [
-        'Professional overnight baby care',
-        'Night feeding and diaper changes',
-        'Sleep routine establishment'
-      ];
-    } else if (packageType === 'fullTime') {
-      color = '#0984e3';
-      price = '₹23,000 - ₹25,000';
-      reviews = '(980K reviews)';
-      rating = 4.9;
-      descriptionItems = [
-        'Round-the-clock professional care',
-        'All daily care activities included',
-        'Live-in nanny service'
-      ];
-    }
-
     return (
-      <View key={packageType} style={[styles.packageCard, cartItems[packageKey] && styles.selectedPackage]}>
+      <View key={packageType} style={[
+        styles.packageCard, 
+        cartItems[packageKey] && styles.selectedPackage,
+        { borderLeftColor: color }
+      ]}>
         <View style={styles.packageHeader}>
           <View>
             <Text style={styles.packageTitle}>Baby Care - {packageType.charAt(0).toUpperCase() + packageType.slice(1)}</Text>
@@ -329,18 +323,23 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           ))}
         </View>
         
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
             styles.cartButton,
-            cartItems[packageKey] && { backgroundColor: color }
+            cartItems[packageKey] && styles.selectedCartButton
           ]}
           onPress={() => handleAddToCart(packageKey)}
         >
+          {cartItems[packageKey] ? (
+            <Icon name="remove-shopping-cart" size={20} color="white" />
+          ) : (
+            <Icon name="add-shopping-cart" size={20} color="#3399cc" />
+          )}
           <Text style={[
             styles.cartButtonText,
-            cartItems[packageKey] && { color: 'white' }
+            cartItems[packageKey] && styles.selectedCartButtonText
           ]}>
-            {cartItems[packageKey] ? 'ADDED TO CART' : 'ADD TO CART'}
+            {cartItems[packageKey] ? 'REMOVE FROM CART' : 'ADD TO CART'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -350,40 +349,33 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   const renderElderlyPackage = (packageType: 'day' | 'night' | 'fullTime') => {
     const packageData = elderlyPackages[packageType];
     const packageKey = `elderly${packageType.charAt(0).toUpperCase() + packageType.slice(1)}`;
-    let color = '#e17055';
-    let price = '₹16,000 - ₹17,600';
-    let reviews = '(1.1M reviews)';
-    let rating = 4.7;
-    let descriptionItems = [
+    const color = '#3399cc'; // Unified blue color
+    const price = `₹${getPackagePrice('elderly', packageType).toLocaleString()}`;
+    const reviews = packageType === 'day' ? '(1.1M reviews)' : 
+                   packageType === 'night' ? '(950K reviews)' : '(850K reviews)';
+    const rating = packageType === 'day' ? 4.7 : 
+                  packageType === 'night' ? 4.8 : 4.9;
+    
+    const descriptionItems = packageType === 'day' ? [
       'Professional daytime elderly care',
       'Medication management',
       'Meal preparation and assistance'
+    ] : packageType === 'night' ? [
+      'Professional overnight elderly care',
+      'Night-time assistance and monitoring',
+      'Sleep comfort and safety'
+    ] : [
+      'Round-the-clock professional care',
+      'All daily care activities included',
+      'Live-in caregiver service'
     ];
 
-    if (packageType === 'night') {
-      color = '#00b894';
-      price = '₹20,000 - ₹22,000';
-      reviews = '(950K reviews)';
-      rating = 4.8;
-      descriptionItems = [
-        'Professional overnight elderly care',
-        'Night-time assistance and monitoring',
-        'Sleep comfort and safety'
-      ];
-    } else if (packageType === 'fullTime') {
-      color = '#0984e3';
-      price = '₹23,000 - ₹25,000';
-      reviews = '(850K reviews)';
-      rating = 4.9;
-      descriptionItems = [
-        'Round-the-clock professional care',
-        'All daily care activities included',
-        'Live-in caregiver service'
-      ];
-    }
-
     return (
-      <View key={packageType} style={[styles.packageCard, cartItems[packageKey] && styles.selectedPackage]}>
+      <View key={packageType} style={[
+        styles.packageCard, 
+        cartItems[packageKey] && styles.selectedPackage,
+        { borderLeftColor: color }
+      ]}>
         <View style={styles.packageHeader}>
           <View>
             <Text style={styles.packageTitle}>Elderly Care - {packageType.charAt(0).toUpperCase() + packageType.slice(1)}</Text>
@@ -429,18 +421,23 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           ))}
         </View>
         
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
             styles.cartButton,
-            cartItems[packageKey] && { backgroundColor: color }
+            cartItems[packageKey] && styles.selectedCartButton
           ]}
           onPress={() => handleAddToCart(packageKey)}
         >
+          {cartItems[packageKey] ? (
+            <Icon name="remove-shopping-cart" size={20} color="white" />
+          ) : (
+            <Icon name="add-shopping-cart" size={20} color="#3399cc" />
+          )}
           <Text style={[
             styles.cartButtonText,
-            cartItems[packageKey] && { color: 'white' }
+            cartItems[packageKey] && styles.selectedCartButtonText
           ]}>
-            {cartItems[packageKey] ? 'ADDED TO CART' : 'ADD TO CART'}
+            {cartItems[packageKey] ? 'REMOVE FROM CART' : 'ADD TO CART'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -454,44 +451,42 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       transparent={true}
       onRequestClose={handleClose}
     >
-      <View style={styles.modalOverlay}>
-        {Platform.OS === 'ios' ? (
-          <BlurView style={styles.blurView} blurType="dark" blurAmount={10} />
-        ) : (
-          <View style={[styles.blurView, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
-        )}
-        
-        <View style={styles.modalContainer}>
-          <View style={styles.dialogHeader}>
+      <View style={[styles.modalOverlay, { 
+        paddingTop: SCREEN_HEIGHT * 0.15,  // Reduced from top
+        paddingBottom: SCREEN_HEIGHT * 0.15 // Reduced from bottom
+      }]}>
+         {/* Smaller dialog container */}
+        <View style={[styles.modalContainer, { 
+          maxHeight: SCREEN_HEIGHT * 0.7,  // Reduced height
+          paddingVertical: 10              // Tighter padding
+        }]}>
+          <View style={styles.header}>
+             <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
+              <Icon name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
             <Text style={styles.dialogTitle}>NANNY SERVICES</Text>
-            <View style={styles.tabContainer}>
-              <TouchableOpacity 
-                style={styles.tabButton}
-                onPress={() => setActiveTab('baby')}
-              >
-                <View style={[
-                  styles.tabIndicator,
-                  activeTab === 'baby' && styles.activeTab
-                ]}>
-                  <Text style={activeTab === 'baby' ? styles.activeTabText : styles.tabText}>
-                    Baby Care
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.tabButton}
-                onPress={() => setActiveTab('elderly')}
-              >
-                <View style={[
-                  styles.tabIndicator,
-                  activeTab === 'elderly' && styles.activeTab
-                ]}>
-                  <Text style={activeTab === 'elderly' ? styles.activeTabText : styles.tabText}>
-                    Elderly Care
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={handleClose} style={styles.closeIcon}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity 
+              style={[styles.tabButton, activeTab === 'baby' && styles.activeTab]}
+              onPress={() => setActiveTab('baby')}
+            >
+              <Text style={[styles.tabText, activeTab === 'baby' && styles.activeTabText]}>
+                Baby Care
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.tabButton, activeTab === 'elderly' && styles.activeTab]}
+              onPress={() => setActiveTab('elderly')}
+            >
+              <Text style={[styles.tabText, activeTab === 'elderly' && styles.activeTabText]}>
+                Elderly Care
+              </Text>
+            </TouchableOpacity>
           </View>
           
           <ScrollView style={styles.scrollView}>
@@ -510,56 +505,53 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
                 </>
               )}
             </View>
-            
-            
           </ScrollView>
           
           <View style={styles.footerContainer}>
+            <View style={styles.voucherContainer}>
+              <TextInput
+                style={styles.voucherInput}
+                placeholder="Enter voucher code"
+                placeholderTextColor="#999"
+                value={voucherCode}
+                onChangeText={setVoucherCode}
+              />
+              <TouchableOpacity 
+                style={styles.voucherButton}
+                onPress={handleApplyVoucher}
+              >
+                <Text style={styles.voucherButtonText}>APPLY</Text>
+              </TouchableOpacity>
+            </View>
+            
             <View style={styles.totalContainer}>
               <Text style={styles.footerText}>
                 Total for {getSelectedPackagesCount()} service{getSelectedPackagesCount() !== 1 ? 's' : ''}
               </Text>
               <Text style={styles.footerPrice}>₹{calculateTotal().toLocaleString()}</Text>
             </View>
-            <View style={styles.voucherContainer}>
-              <Text style={styles.voucherTitle}>Apply Voucher</Text>
-              <View style={styles.voucherInputContainer}>
-                <TextInput
-                  style={styles.voucherInput}
-                  placeholder="Enter voucher code"
-                  value={voucherCode}
-                  onChangeText={setVoucherCode}
-                />
-                <TouchableOpacity 
-                  style={styles.voucherButton}
-                  onPress={handleApplyVoucher}
-                >
-                  <Text style={styles.voucherButtonText}>APPLY</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
             
-            <View style={styles.buttonGroup}>
+            <View style={styles.footerButtons}>
               <TouchableOpacity 
-                style={styles.closeButton}
+                style={styles.closeFooterButton}
                 onPress={handleClose}
               >
-                <Text style={styles.closeButtonText}>CLOSE</Text>
+                <Text style={styles.closeFooterButtonText}>CLOSE</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.checkoutButton,
-                  calculateTotal() === 0 && styles.disabledButton
+                  getSelectedPackagesCount() === 0 && styles.disabledButton
                 ]}
                 onPress={() => {
                   handleClose();
                   Alert.alert('Checkout', `Total amount: ₹${calculateTotal().toLocaleString()}`);
                 }}
-                disabled={calculateTotal() === 0}
+                disabled={getSelectedPackagesCount() === 0}
               >
                 {loading ? (
-                  <ActivityIndicator color="white" />
+                  <ActivityIndicator size="small" color="white" />
                 ) : (
                   <Text style={styles.checkoutButtonText}>CHECKOUT</Text>
                 )}
@@ -568,7 +560,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           </View>
         </View>
       </View>
-      
     </Modal>
   );
 };
@@ -576,33 +567,20 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)', // Semi-transparent black
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  blurView: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    right: 0,
+    paddingHorizontal: 10, // Side padding
   },
   modalContainer: {
     backgroundColor: 'white',
-    marginHorizontal: 15,
     borderRadius: 15,
-    maxHeight: '80%',
+    width: '100%',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
-  scrollView: {
-    paddingHorizontal: 10,
-    paddingTop: 10,
-  },
-  dialogHeader: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -610,18 +588,22 @@ const styles = StyleSheet.create({
   dialogTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 15,
     color: '#333',
   },
-  tabContainer: {
+   backIcon: {
+    padding: 5,
+    marginRight: 10,
+  },
+  closeIcon: {
+    padding: 5,
+  },
+  tabsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    marginBottom: 15,
   },
   tabButton: {
     paddingHorizontal: 15,
-  },
-  tabIndicator: {
     paddingVertical: 10,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
@@ -638,6 +620,9 @@ const styles = StyleSheet.create({
     color: '#3399cc',
     fontWeight: 'bold',
   },
+  scrollView: {
+    paddingHorizontal: 10,
+  },
   packagesContainer: {
     marginBottom: 20,
   },
@@ -653,6 +638,7 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderWidth: 1,
     borderColor: '#eee',
+    borderLeftWidth: 5,
   },
   selectedPackage: {
     borderColor: '#3399cc',
@@ -748,37 +734,49 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#3399cc',
+  },
+  selectedCartButton: {
+    backgroundColor: '#3399cc',
+    borderColor: '#3399cc',
   },
   cartButtonText: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
+    marginLeft: 5,
+    color: '#3399cc',
+  },
+  selectedCartButtonText: {
+    color: 'white',
+  },
+  footerContainer: {
+    padding: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#f9f9f9',
   },
   voucherContainer: {
-    marginBottom: 20,
-  },
-  voucherTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  voucherInputContainer: {
     flexDirection: 'row',
+    marginBottom: 15,
+    justifyContent: 'space-between',
   },
   voucherInput: {
     flex: 1,
-    height: 40,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
     marginRight: 10,
+    backgroundColor: '#fff',
   },
   voucherButton: {
     backgroundColor: '#3399cc',
     borderRadius: 5,
-    paddingHorizontal: 15,
+    paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -786,14 +784,8 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-  footerContainer: {
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#f9f9f9',
-  },
   totalContainer: {
-    marginBottom: 5,
+    marginBottom: 15,
   },
   footerText: {
     fontSize: 14,
@@ -805,25 +797,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
-   
   },
-  buttonGroup: {
+  footerButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  closeButton: {
+  closeFooterButton: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 5,
     backgroundColor: '#f0f0f0',
-    marginRight: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 10,
   },
-  closeButtonText: {
+  closeFooterButtonText: {
     color: '#333',
     fontWeight: 'bold',
-    fontSize: 16,
   },
   checkoutButton: {
     flex: 1,
@@ -839,7 +829,6 @@ const styles = StyleSheet.create({
   checkoutButtonText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 16,
   },
 });
 

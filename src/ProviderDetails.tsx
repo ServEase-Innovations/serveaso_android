@@ -6,26 +6,14 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Image, 
-  Modal,
-  ScrollView,
   Alert
 } from "react-native";
 import moment from "moment";
 import AddIcon from 'react-native-vector-icons/MaterialIcons';
 import RemoveIcon from 'react-native-vector-icons/MaterialIcons';
-import InfoIcon from 'react-native-vector-icons/MaterialIcons';
-import CloseIcon from 'react-native-vector-icons/FontAwesome';
 import { useDispatch, useSelector } from "react-redux";
-import axiosInstance from "./axiosInstance";
-import PlusIcon from 'react-native-vector-icons/Feather';
 import { add, update } from "./features/bookingTypeSlice";
-import NannyServiceDialog from "./NannyServiceDialog";
-import MaidServiceDialog from "./MaidServiceDialog";
 import DemoCook from "./demoCook";
-import CookServicesDialog from "./CookServiceDialog";
-import CookServiceDialog from "./CookServiceDialog";
-import NannyServicesDialog from "./NannyServiceDialog";
-
 
 // Types
 interface BookingType {
@@ -56,6 +44,7 @@ interface EnhancedProviderDetails {
   otherServices?: string;
   availableTimeSlots?: string[];
 }
+
 interface ProviderDetailsProps {
   housekeepingRole: string;
   selectedProvider: (provider: any) => void;
@@ -78,19 +67,12 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const [morningSelection, setMorningSelection] = useState<number | null>(null);
   const [eveningSelectionTime, setEveningSelectionTime] = useState<string | null>(null);
   const [morningSelectionTime, setMorningSelectionTime] = useState<string | null>(null);
-  const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const [open, setOpen] = useState(false);
-  const [engagementData, setEngagementData] = useState<any>(null);
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
-  const [missingTimeSlots, setMissingTimeSlots] = useState<string[]>([]);
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("12:00");
   const [warning, setWarning] = useState("");
-  const [missingSlots, setMissingSlots] = useState<string[]>([]);
-  const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
   const [matchedMorningSelection, setMatchedMorningSelection] = useState<string | null>(null);
   const [matchedEveningSelection, setMatchedEveningSelection] = useState<string | null>(null);
-  const [dialogVisible, setDialogVisible] = useState(true); // Control visibility
 
   const hasCheckedRef = useRef(false);
 
@@ -137,62 +119,15 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     }
   };
 
-  const checkMissingTimeSlots = () => {
-    const expectedTimeSlots = [
-      "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
-      "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"
-    ];
-
-    const missing = expectedTimeSlots.filter(slot => !props.availableTimeSlots?.includes(slot));
-    setMissingSlots(missing);
-  };
-
-  const toggleExpand = async () => {
+  const toggleExpand = () => {
     setIsExpanded(!isExpanded);
-
-    if (!isExpanded) {
-      try {
-        if (props.serviceproviderId === bookingType?.serviceproviderId) {
-          setMatchedMorningSelection(bookingType?.morningSelection || null);
-          setMatchedEveningSelection(bookingType?.eveningSelection || null);
-        } else {
-          setMatchedMorningSelection(null);
-          setMatchedEveningSelection(null);
-        }
-
-        const response = await axiosInstance.get(
-          `/api/serviceproviders/get/engagement/by/serviceProvider/${props.serviceproviderId}`
-        );
-
-        const engagementData = response.data.map((engagement: { id?: number; availableTimeSlots?: string[] }) => ({
-          id: engagement.id ?? Math.random(),
-          availableTimeSlots: engagement.availableTimeSlots || [],
-        }));
-
-        const fullTimeSlots: string[] = Array.from({ length: 24 }, (_, i) =>
-          `${i.toString().padStart(2, "0")}:00`
-        );
-
-        const processedSlots = engagementData.map((entry: any) => {
-          const uniqueAvailableTimeSlots = Array.from(new Set(entry.availableTimeSlots)).sort();
-          const missingTimeSlots = fullTimeSlots.filter(slot => !uniqueAvailableTimeSlots.includes(slot));
-
-          return {
-            id: entry.id,
-            uniqueAvailableTimeSlots,
-            missingTimeSlots,
-          };
-        });
-
-        const uniqueMissingSlots: string[] = Array.from(
-          new Set(processedSlots.flatMap((slot: any) => slot.missingTimeSlots))
-        ).sort() as string[];
-
-        setUniqueMissingSlots(uniqueMissingSlots);
-        setAvailableTimeSlots(processedSlots.map((entry: any) => entry.uniqueAvailableTimeSlots));
-      } catch (error) {
-        console.error("Error fetching engagement data:", error);
-      }
+    
+    if (!isExpanded && props.serviceproviderId === bookingType?.serviceproviderId) {
+      setMatchedMorningSelection(bookingType?.morningSelection || null);
+      setMatchedEveningSelection(bookingType?.eveningSelection || null);
+    } else {
+      setMatchedMorningSelection(null);
+      setMatchedEveningSelection(null);
     }
   };
 
@@ -242,19 +177,9 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     return (endTotalMinutes - startTotalMinutes) / 60;
   };
 
- const handleLogin = () => {
-  if (!loggedInUser) {
-    setOpen(true); // Show login modal if not logged in
-  } else {
-    // For services that have dialogs (Maid, Cook, Nanny), open their dialog
-    if (["MAID", "COOK", "NANNY"].includes(props.housekeepingRole)) {
-      setOpen(true);
-    } else {
-      // For other services, proceed with booking
-      handleBookNow();
-    }
-  }
-};
+  const handleLogin = () => {
+    setOpen(true); // Directly open the dialog
+  };
 
   const handleClose = () => {
     setOpen(false);
@@ -262,16 +187,6 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
 
   const handleBookingPage = (e: string | undefined) => {
     setOpen(false);
-  };
-
-  const handleStartTimeChange = (newStartTime: string) => {
-    setStartTime(newStartTime);
-    validateTimeRange(newStartTime, endTime);
-  };
-
-  const handleEndTimeChange = (newEndTime: string) => {
-    setEndTime(newEndTime);
-    validateTimeRange(startTime, newEndTime);
   };
 
   const validateTimeRange = (start: string, end: string) => {
@@ -288,15 +203,10 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   };
 
   useEffect(() => {
-    if (user?.role === 'CUSTOMER') {
-      setLoggedInUser(user);
+    if (!hasCheckedRef.current) {
+      hasCheckedRef.current = true;
     }
-  }, [user]);
-
-  if (!hasCheckedRef.current) {
-    checkMissingTimeSlots();
-    hasCheckedRef.current = true;
-  }
+  }, []);
 
   const dietImage = dietImages[props.diet as keyof typeof dietImages];
   const isBookNowEnabled = 
@@ -313,66 +223,18 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     endTime
   };
 
-  // const renderServiceDialog = () => {
-  //   switch (props.housekeepingRole) {
-  //     case "COOK":
-  //       return <DemoCook 
-  //           open={open}
-  //           handleClose={handleClose}
-  //           providerDetails={providerDetailsData} />;
-  //       // return<CookServicesDialog open={false} handleClose={function (): void {
-  //       //   throw new Error("Function not implemented.");
-  //       // } }/>;
-  //     case "MAID":
-  //       return <MaidServiceDialog 
-  //           //   open={open} 
-  //           //   handleClose={handleClose} 
-  //           providerDetails={providerDetailsData} visible={false} onClose={function (): void {
-  //               throw new Error("Function not implemented.");
-  //           } }        />;
-  //     case "NANNY":
-  //       return <NannyServiceDialog 
-  //           //   open={open} 
-  //           //   handleClose={handleClose} 
-  //           providerDetails={providerDetailsData} visible={false} onClose={function (): void {
-  //               throw new Error("Function not implemented.");
-  //           } } />;
-  //     default:
-  //       return null;
-  //   }
-  // };
-const renderServiceDialog = () => {
-  switch (props.housekeepingRole) {
-    case "COOK":
-      return (
-        <DemoCook 
-          visible={open}
-          onClose={handleClose}
-          sendDataToParent={handleBookingPage}
-          user={user}
-          providerDetails={providerDetailsData}
-          bookingType={bookingType}
-        />
-      );
-    case "MAID":
-      return (
-        <MaidServiceDialog 
-          visible={open}
-          onClose={handleClose}
-          providerDetails={providerDetailsData}
-        />
-      );
-    case "NANNY":
-      return (
-        <NannyServicesDialog 
-        open={dialogVisible}
-           handleClose={() => setDialogVisible(false)}
-            />
-      );
-    default:
-      return null;
-  }
-};
+  const renderServiceDialog = () => {
+    return (
+      <DemoCook 
+        visible={open}
+        onClose={handleClose}
+        sendDataToParent={handleBookingPage}
+        user={user}
+        providerDetails={providerDetailsData}
+        bookingType={bookingType}
+      />
+    );
+  };
 
   return (
     <>
@@ -389,19 +251,11 @@ const renderServiceDialog = () => {
             )}
           </TouchableOpacity>
           <TouchableOpacity
-  style={styles.bookNowButton}
-  onPress={handleLogin}
-  disabled={!isBookNowEnabled && props.housekeepingRole !== "MAID"}
->
-  <Text style={styles.bookNowText}>Book Now</Text>
-</TouchableOpacity>
-{/* 
-          <TouchableOpacity
             style={styles.bookNowButton}
             onPress={handleLogin}
           >
             <Text style={styles.bookNowText}>Book Now</Text>
-          </TouchableOpacity> */}
+          </TouchableOpacity>
 
           <View style={styles.content}>
             <View style={styles.essentials}>
@@ -423,12 +277,10 @@ const renderServiceDialog = () => {
                 <Text style={styles.detailText}>
                   Language: {props.language || "English"}
                 </Text>
-
                 <Text style={styles.detailText}>
                   Experience: {props.experience || "1 year"}, 
                   Other Services: {props.otherServices || "N/A"}
                 </Text>
-                
                 {warning && <Text style={styles.warningText}>{warning}</Text>}
               </View>
             )}

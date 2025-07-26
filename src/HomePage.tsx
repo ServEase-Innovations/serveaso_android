@@ -205,7 +205,7 @@ const handleSave = () => {
             Book trusted household help in minutes
           </Text>
           <Text style={styles.heroSubtitle}>
-            ServEase connects you to trained maids, cooks, and caregivers on
+            ServEaso connects you to trained maids, cooks, and caregivers on
             demand. Safe, affordable and instant.
           </Text>
           <View style={styles.serviceIconsContainer}>

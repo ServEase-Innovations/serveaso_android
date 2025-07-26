@@ -15,7 +15,6 @@ import {
 import axios from 'axios';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-// import { useAuth0 } from "@auth0/auth0-react";
 import { BookingDetails } from './types/engagementRequest';
 import { BOOKINGS } from './Constants/pagesConstants';
 import { EnhancedProviderDetails } from './types/ProviderDetailsType';
@@ -64,43 +63,19 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   });
 
   const [packageStates, setPackageStates] = useState({
-    utensilCleaning: {
-      persons: 3,
-      selected: false
-    },
-    sweepingMopping: {
-      houseSize: '2BHK',
-      selected: false
-    },
-    bathroomCleaning: {
-      bathrooms: 2,
-      selected: false
-    }
+    utensilCleaning: { persons: 3 },
+    sweepingMopping: { houseSize: '2BHK' },
+    bathroomCleaning: { bathrooms: 2 }
   });
   
-  const [addOns, setAddOns] = useState({
-    bathroomDeepCleaning: false,
-    normalDusting: false,
-    deepDusting: false,
-    utensilDrying: false,
-    clothesDrying: false
-  });
-  
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [loggedInUser, setLoggedInUser] = useState<any>(null);
   const dispatch = useDispatch();
-
   const bookingType = useSelector((state: any) => state.bookingType?.value);
   const users = useSelector((state: any) => state.user?.value);
   const currentLocation = users?.customerDetails?.currentLocation;
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
-  const pricing = useSelector((state: any) => state.pricing?.groupedServices);
-  const maidServices = pricing?.maid?.filter((service: any) => service.Type === "Regular" || service.Type === "Regular Add-on") || [];
-  // const { user, loginWithRedirect, isAuthenticated } = useAuth0();
 
   const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
-    if (!bookingPreference) return 'MONTHLY'; // default
-    
+    if (!bookingPreference) return 'MONTHLY';
     const pref = bookingPreference.toLowerCase();
     if (pref === 'date') return 'ON_DEMAND';
     if (pref === 'short term') return 'SHORT_TERM';
@@ -108,30 +83,22 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   };
 
   const bookingDetails: BookingDetails = {
-    serviceProviderId: 0,
-    serviceProviderName: "",
-    customerId: 0,
-    customerName: "", 
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: "",
+    serviceProviderId: providerDetails?.serviceproviderId || 0,
+    serviceProviderName: providerFullName,
+    customerId: users?.customerDetails?.customerId || 0,
+    customerName: `${users?.customerDetails?.firstName} ${users?.customerDetails?.lastName}` || "",
+    startDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
+    endDate: bookingType?.endDate || "",
     engagements: "",
-    address: "",
-    timeslot: "",
+    address: currentLocation || "",
+    timeslot: bookingType?.timeRange || "",
     monthlyAmount: 0,
     paymentMode: "UPI",
     bookingType: getBookingTypeFromPreference(bookingType?.bookingPreference),
-    taskStatus: "NOT_STARTED", 
+    taskStatus: "NOT_STARTED",
     responsibilities: [],
     serviceType: "MAID",
   };
-
-  // useEffect(() => {
-  //   if (isAuthenticated && user) {
-  //     console.log("User Info:", user);
-  //     console.log("Name:", user.name);
-  //     console.log("Customer ID:", user.customerid);
-  //   }
-  // }, [isAuthenticated, user]);
 
   useEffect(() => {
     const backAction = () => {
@@ -146,18 +113,6 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
 
     return () => backHandler.remove();
   }, []);
-
-  const handleLogin = () => {
-    setLoginOpen(true);
-  };
-
-  const handleLoginClose = () => {
-    setLoginOpen(false);
-  };
-
-  const handleBookingPage = () => {
-    setLoginOpen(false);
-  };
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -199,68 +154,6 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
           ? Math.min(prev.bathroomCleaning.bathrooms + 1, 5)
           : Math.max(prev.bathroomCleaning.bathrooms - 1, 1)
       }
-    }));
-  };
-
-  const handlePackageSelect = (packageName: string) => {
-    setPackageStates(prev => ({
-      ...prev,
-      [packageName]: {
-        ...prev[packageName],
-        selected: !prev[packageName].selected
-      }
-    }));
-  };
-
-  const handleAddOnSelect = (addOnName: string) => {
-    setAddOns(prev => ({
-      ...prev,
-      [addOnName]: !prev[addOnName]
-    }));
-  };
-
-  const handleAddPackageToCart = (packageName: string) => {
-    const packageDetails = {
-      id: `package_${packageName}`,
-      type: 'maid' as const,
-      serviceType: 'package' as const,
-      name: packageName,
-      price: getPackagePrice(packageName),
-      description: getPackageDescription(packageName),
-      details: getPackageDetails(packageName)
-    };
-
-    if (cartItems[packageName]) {
-      dispatch(removeFromCart({ id: packageDetails.id, type: 'maid' }));
-    } else {
-      dispatch(addToCart(packageDetails));
-    }
-
-    setCartItems(prev => ({
-      ...prev,
-      [packageName]: !prev[packageName]
-    }));
-  };
-
-  const handleAddAddOnToCart = (addOnName: string) => {
-    const addOnDetails = {
-      id: `addon_${addOnName}`,
-      type: 'maid' as const,
-      serviceType: 'addon' as const,
-      name: addOnName,
-      price: getAddOnPrice(addOnName),
-      description: getAddOnDescription(addOnName)
-    };
-
-    if (cartItems[addOnName]) {
-      dispatch(removeFromCart({ id: addOnDetails.id, type: 'maid' }));
-    } else {
-      dispatch(addToCart(addOnDetails));
-    }
-
-    setCartItems(prev => ({
-      ...prev,
-      [addOnName]: !prev[addOnName]
     }));
   };
 
@@ -324,62 +217,85 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     }
   };
 
+  const handleAddPackageToCart = (packageName: string) => {
+    const packageDetails = {
+      id: `package_${packageName}`,
+      type: 'maid' as const,
+      serviceType: 'package' as const,
+      name: packageName,
+      price: getPackagePrice(packageName),
+      description: getPackageDescription(packageName),
+      details: getPackageDetails(packageName)
+    };
+
+    if (cartItems[packageName]) {
+      dispatch(removeFromCart({ id: packageDetails.id, type: 'maid' }));
+    } else {
+      dispatch(addToCart(packageDetails));
+    }
+
+    setCartItems(prev => ({
+      ...prev,
+      [packageName]: !prev[packageName]
+    }));
+  };
+
+  const handleAddAddOnToCart = (addOnName: string) => {
+    const addOnDetails = {
+      id: `addon_${addOnName}`,
+      type: 'maid' as const,
+      serviceType: 'addon' as const,
+      name: addOnName,
+      price: getAddOnPrice(addOnName),
+      description: getAddOnDescription(addOnName)
+    };
+
+    if (cartItems[addOnName]) {
+      dispatch(removeFromCart({ id: addOnDetails.id, type: 'maid' }));
+    } else {
+      dispatch(addToCart(addOnDetails));
+    }
+
+    setCartItems(prev => ({
+      ...prev,
+      [addOnName]: !prev[addOnName]
+    }));
+  };
+
   const calculateTotal = () => {
     let total = 0;
     
-    if (packageStates.utensilCleaning.selected) total += 1200;
-    if (packageStates.sweepingMopping.selected) total += 1200;
-    if (packageStates.bathroomCleaning.selected) total += 600;
+    // Packages
+    if (cartItems.utensilCleaning) total += getPackagePrice('utensilCleaning');
+    if (cartItems.sweepingMopping) total += getPackagePrice('sweepingMopping');
+    if (cartItems.bathroomCleaning) total += getPackagePrice('bathroomCleaning');
     
-    if (addOns.bathroomDeepCleaning) total += 1000;
-    if (addOns.normalDusting) total += 1000;
-    if (addOns.deepDusting) total += 1500;
-    if (addOns.utensilDrying) total += 1000;
-    if (addOns.clothesDrying) total += 1000;
+    // Add-ons
+    if (cartItems.bathroomDeepCleaning) total += getAddOnPrice('bathroomDeepCleaning');
+    if (cartItems.normalDusting) total += getAddOnPrice('normalDusting');
+    if (cartItems.deepDusting) total += getAddOnPrice('deepDusting');
+    if (cartItems.utensilDrying) total += getAddOnPrice('utensilDrying');
+    if (cartItems.clothesDrying) total += getAddOnPrice('clothesDrying');
     
     return total;
   };
 
-  const countSelectedServices = () => {
-    let count = 0;
-    if (packageStates.utensilCleaning.selected) count++;
-    if (packageStates.sweepingMopping.selected) count++;
-    if (packageStates.bathroomCleaning.selected) count++;
-    return count;
-  };
-
-  const countSelectedAddOns = () => {
-    return Object.values(addOns).filter(Boolean).length;
-  };
-
-  const hasSelectedServices = () => {
-    return countSelectedServices() > 0 || countSelectedAddOns() > 0;
+  const countSelectedItems = () => {
+    return Object.values(cartItems).filter(item => item).length;
   };
 
   const handleCheckout = async () => {
     try {
-      const selectedServices: string[] = [];
-      const selectedAddOns: string[] = Object.entries(addOns)
+      setLoading(true);
+      const selectedItems = Object.entries(cartItems)
         .filter(([_, selected]) => selected)
         .map(([name]) => name);
 
-      if (packageStates.utensilCleaning.selected) {
-        selectedServices.push(`Utensil cleaning for ${packageStates.utensilCleaning.persons} persons`);
-      }
-      if (packageStates.sweepingMopping.selected) {
-        selectedServices.push(`Sweeping & mopping for ${packageStates.sweepingMopping.houseSize}`);
-      }
-      if (packageStates.bathroomCleaning.selected) {
-        selectedServices.push(`Bathroom cleaning for ${packageStates.bathroomCleaning.bathrooms} bathrooms`);
-      }
-
-      if (selectedServices.length === 0 && selectedAddOns.length === 0) {
-        Alert.alert('Error', 'Please select at least one service or add-on');
+      if (selectedItems.length === 0) {
+        Alert.alert('Error', 'Please add at least one item to cart');
         return;
       }
 
-      // const customerName = user?.name || "Guest";
-      // const customerId = user?.customerid || "guest-id";
       const totalAmount = calculateTotal();
       const response = await axios.post(
         "https://utils-ndt3.onrender.com/create-order",
@@ -397,21 +313,8 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
           return;
         }
 
-        bookingDetails.serviceProviderId = providerDetails?.serviceproviderId 
-          ? Number(providerDetails.serviceproviderId) 
-          : null;
-        bookingDetails.serviceProviderName = providerFullName;
-        // bookingDetails.customerId = customerId;
-        // bookingDetails.customerName = customerName;
-        bookingDetails.address = currentLocation;
-        bookingDetails.startDate = bookingType?.startDate || new Date().toISOString().split('T')[0];
-        bookingDetails.endDate = bookingType?.endDate || "";
-        bookingDetails.engagements = [
-          ...selectedServices,
-          ...(selectedAddOns.length > 0 ? [`Add-ons: ${selectedAddOns.join(', ')}`] : [])
-        ].join('; ');
+        bookingDetails.engagements = selectedItems.join(', ');
         bookingDetails.monthlyAmount = totalAmount;
-        bookingDetails.timeslot = bookingType.timeRange;
 
         const options = {
           key: "rzp_test_lTdgjtSRlEwreA",
@@ -435,29 +338,6 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
               );
 
               if (bookingResponse.status === 201) {
-                try {
-                  const notifyResponse = await fetch("http://localhost:4000/send-notification", {
-                    method: "POST",
-                    body: JSON.stringify({
-                      title: "Booking Confirmed",
-                      body: `Thank you, ${customerName}! Your booking has been confirmed.`,
-                      url: "http://localhost:3000",
-                    }),
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                  });
-
-                  if (notifyResponse.ok) {
-                    console.log("Notification sent!");
-                    Alert.alert('Success', 'Notification sent!');
-                  } else {
-                    Alert.alert('Error', 'Failed to send notification');
-                  }
-                } catch (notifyError) {
-                  Alert.alert('Error', 'Error sending notification');
-                }
-
                 if (sendDataToParent) {
                   sendDataToParent(BOOKINGS);
                 }
@@ -467,11 +347,6 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
               Alert.alert('Error', 'Booking saved but failed to update server.');
             }
           },
-          // prefill: {
-          //   name: customerName || "",
-          //   email: user?.email || "",
-          //   contact: user?.mobileNo || "",
-          // },
           theme: {
             color: "#3399cc",
           },
@@ -483,6 +358,8 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     } catch (error) {
       console.log("error => ", error);
       Alert.alert('Error', 'Failed to initiate payment. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -497,11 +374,17 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
+          <View style={styles.header}>
+             <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
+              <Icon name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.dialogTitle}>MAID SERVICE PACKAGES</Text>
+            <TouchableOpacity onPress={handleClose} style={styles.closeIcon}>
+              <Icon name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          
           <ScrollView style={styles.scrollView}>
-            <View style={styles.dialogHeader}>
-              <Text style={styles.dialogTitle}>MAID SERVICE PACKAGES</Text>
-            </View>
-            
             <View style={styles.tabsContainer}>
               <TouchableOpacity 
                 style={[styles.tabButton, activeTab === 'regular' && styles.activeTab]}
@@ -525,19 +408,19 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
               {/* Regular Utensil Cleaning */}
               <View style={[
                 styles.packageCard, 
-                packageStates.utensilCleaning.selected && styles.selectedPackage,
-                { borderLeftColor: '#e17055' }
+                cartItems.utensilCleaning && styles.selectedPackage,
+                { borderLeftColor: '#3399cc' }
               ]}>
                 <View style={styles.packageHeader}>
                   <View>
                     <Text style={styles.packageTitle}>Utensil Cleaning</Text>
                     <View style={styles.ratingContainer}>
-                      <Text style={[styles.ratingValue, { color: '#e17055' }]}>4.7</Text>
+                      <Text style={[styles.ratingValue, { color: '#3399cc' }]}>4.7</Text>
                       <Text style={styles.reviewsText}>(1.2M reviews)</Text>
                     </View>
                   </View>
                   <View style={styles.priceContainer}>
-                    <Text style={[styles.priceValue, { color: '#e17055' }]}>₹1,200</Text>
+                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹1,200</Text>
                     <Text style={styles.preparationTime}>Monthly service</Text>
                   </View>
                 </View>
@@ -574,59 +457,43 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   </View>
                 </View>
 
-                <View style={styles.buttonsContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.selectButton,
-                      packageStates.utensilCleaning.selected && { backgroundColor: '#e17055' }
-                    ]}
-                    onPress={() => handlePackageSelect('utensilCleaning')}
-                  >
-                    <Text style={[
-                      styles.selectButtonText,
-                      packageStates.utensilCleaning.selected && { color: 'white' }
-                    ]}>
-                      {packageStates.utensilCleaning.selected ? 'SELECTED' : 'SELECT SERVICE'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.cartButton,
-                      cartItems.utensilCleaning && { backgroundColor: '#e17055' }
-                    ]}
-                    onPress={() => handleAddPackageToCart('utensilCleaning')}
-                  >
-                    {cartItems.utensilCleaning ? (
-                      <Icon name="remove-shopping-cart" size={20} color="white" />
-                    ) : (
-                      <Icon name="add-shopping-cart" size={20} color="#e17055" />
-                    )}
-                    <Text style={[
-                      styles.cartButtonText,
-                      cartItems.utensilCleaning && { color: 'white' }
-                    ]}>
-                      {cartItems.utensilCleaning ? 'ADDED TO CART' : 'ADD TO CART'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.cartButton,
+                    cartItems.utensilCleaning && styles.selectedCartButton
+                  ]}
+                  onPress={() => handleAddPackageToCart('utensilCleaning')}
+                >
+                  {cartItems.utensilCleaning ? (
+                    <Icon name="remove-shopping-cart" size={20} color="white" />
+                  ) : (
+                    <Icon name="add-shopping-cart" size={20} color="#3399cc" />
+                  )}
+                  <Text style={[
+                    styles.cartButtonText,
+                    cartItems.utensilCleaning && styles.selectedCartButtonText
+                  ]}>
+                    {cartItems.utensilCleaning ? 'REMOVE FROM CART' : 'ADD TO CART'}
+                  </Text>
+                </TouchableOpacity>
               </View>
               
               {/* Sweeping & Mopping */}
               <View style={[
                 styles.packageCard, 
-                packageStates.sweepingMopping.selected && styles.selectedPackage,
-                { borderLeftColor: '#00b894' }
+                cartItems.sweepingMopping && styles.selectedPackage,
+                { borderLeftColor: '#3399cc' }
               ]}>
                 <View style={styles.packageHeader}>
                   <View>
                     <Text style={styles.packageTitle}>Sweeping & Mopping</Text>
                     <View style={styles.ratingContainer}>
-                      <Text style={[styles.ratingValue, { color: '#00b894' }]}>4.8</Text>
+                      <Text style={[styles.ratingValue, { color: '#3399cc' }]}>4.8</Text>
                       <Text style={styles.reviewsText}>(1.5M reviews)</Text>
                     </View>
                   </View>
                   <View style={styles.priceContainer}>
-                    <Text style={[styles.priceValue, { color: '#00b894' }]}>₹1,200</Text>
+                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹1,200</Text>
                     <Text style={styles.preparationTime}>Monthly service</Text>
                   </View>
                 </View>
@@ -659,59 +526,43 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   </View>
                 </View>
 
-                <View style={styles.buttonsContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.selectButton,
-                      packageStates.sweepingMopping.selected && { backgroundColor: '#00b894' }
-                    ]}
-                    onPress={() => handlePackageSelect('sweepingMopping')}
-                  >
-                    <Text style={[
-                      styles.selectButtonText,
-                      packageStates.sweepingMopping.selected && { color: 'white' }
-                    ]}>
-                      {packageStates.sweepingMopping.selected ? 'SELECTED' : 'SELECT SERVICE'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.cartButton,
-                      cartItems.sweepingMopping && { backgroundColor: '#00b894' }
-                    ]}
-                    onPress={() => handleAddPackageToCart('sweepingMopping')}
-                  >
-                    {cartItems.sweepingMopping ? (
-                      <Icon name="remove-shopping-cart" size={20} color="white" />
-                    ) : (
-                      <Icon name="add-shopping-cart" size={20} color="#00b894" />
-                    )}
-                    <Text style={[
-                      styles.cartButtonText,
-                      cartItems.sweepingMopping && { color: 'white' }
-                    ]}>
-                      {cartItems.sweepingMopping ? 'ADDED TO CART' : 'ADD TO CART'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.cartButton,
+                    cartItems.sweepingMopping && styles.selectedCartButton
+                  ]}
+                  onPress={() => handleAddPackageToCart('sweepingMopping')}
+                >
+                  {cartItems.sweepingMopping ? (
+                    <Icon name="remove-shopping-cart" size={20} color="white" />
+                  ) : (
+                    <Icon name="add-shopping-cart" size={20} color="#3399cc" />
+                  )}
+                  <Text style={[
+                    styles.cartButtonText,
+                    cartItems.sweepingMopping && styles.selectedCartButtonText
+                  ]}>
+                    {cartItems.sweepingMopping ? 'REMOVE FROM CART' : 'ADD TO CART'}
+                  </Text>
+                </TouchableOpacity>
               </View>
               
               {/* Bathroom Cleaning */}
               <View style={[
                 styles.packageCard, 
-                packageStates.bathroomCleaning.selected && styles.selectedPackage,
-                { borderLeftColor: '#0984e3' }
+                cartItems.bathroomCleaning && styles.selectedPackage,
+                { borderLeftColor: '#3399cc' }
               ]}>
                 <View style={styles.packageHeader}>
                   <View>
                     <Text style={styles.packageTitle}>Bathroom Cleaning</Text>
                     <View style={styles.ratingContainer}>
-                      <Text style={[styles.ratingValue, { color: '#0984e3' }]}>4.6</Text>
+                      <Text style={[styles.ratingValue, { color: '#3399cc' }]}>4.6</Text>
                       <Text style={styles.reviewsText}>(980K reviews)</Text>
                     </View>
                   </View>
                   <View style={styles.priceContainer}>
-                    <Text style={[styles.priceValue, { color: '#0984e3' }]}>₹600</Text>
+                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹600</Text>
                     <Text style={styles.preparationTime}>Monthly service</Text>
                   </View>
                 </View>
@@ -744,41 +595,25 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   </View>
                 </View>
 
-                <View style={styles.buttonsContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.selectButton,
-                      packageStates.bathroomCleaning.selected && { backgroundColor: '#0984e3' }
-                    ]}
-                    onPress={() => handlePackageSelect('bathroomCleaning')}
-                  >
-                    <Text style={[
-                      styles.selectButtonText,
-                      packageStates.bathroomCleaning.selected && { color: 'white' }
-                    ]}>
-                      {packageStates.bathroomCleaning.selected ? 'SELECTED' : 'SELECT SERVICE'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.cartButton,
-                      cartItems.bathroomCleaning && { backgroundColor: '#0984e3' }
-                    ]}
-                    onPress={() => handleAddPackageToCart('bathroomCleaning')}
-                  >
-                    {cartItems.bathroomCleaning ? (
-                      <Icon name="remove-shopping-cart" size={20} color="white" />
-                    ) : (
-                      <Icon name="add-shopping-cart" size={20} color="#0984e3" />
-                    )}
-                    <Text style={[
-                      styles.cartButtonText,
-                      cartItems.bathroomCleaning && { color: 'white' }
-                    ]}>
-                      {cartItems.bathroomCleaning ? 'ADDED TO CART' : 'ADD TO CART'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.cartButton,
+                    cartItems.bathroomCleaning && styles.selectedCartButton
+                  ]}
+                  onPress={() => handleAddPackageToCart('bathroomCleaning')}
+                >
+                  {cartItems.bathroomCleaning ? (
+                    <Icon name="remove-shopping-cart" size={20} color="white" />
+                  ) : (
+                    <Icon name="add-shopping-cart" size={20} color="#3399cc" />
+                  )}
+                  <Text style={[
+                    styles.cartButtonText,
+                    cartItems.bathroomCleaning && styles.selectedCartButtonText
+                  ]}>
+                    {cartItems.bathroomCleaning ? 'REMOVE FROM CART' : 'ADD TO CART'}
+                  </Text>
+                </TouchableOpacity>
               </View>
               
               {/* Add-ons Section */}
@@ -788,12 +623,12 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   {/* Bathroom Deep Cleaning */}
                   <View style={[
                     styles.addOnCard, 
-                    addOns.bathroomDeepCleaning && styles.selectedAddOn,
-                    { borderLeftColor: '#00b894' }
+                    cartItems.bathroomDeepCleaning && styles.selectedAddOn,
+                    { borderLeftColor: '#3399cc' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Bathroom Deep Cleaning</Text>
-                      <Text style={[styles.addOnPrice, { color: '#00b894' }]}>+₹1,000</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,000</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Weekly cleaning of bathrooms, all bathroom walls cleaned
@@ -801,15 +636,15 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        addOns.bathroomDeepCleaning && { backgroundColor: '#00b894' }
+                        cartItems.bathroomDeepCleaning && styles.selectedAddOnButton
                       ]}
-                      onPress={() => handleAddOnSelect('bathroomDeepCleaning')}
+                      onPress={() => handleAddAddOnToCart('bathroomDeepCleaning')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        addOns.bathroomDeepCleaning && { color: 'white' }
+                        cartItems.bathroomDeepCleaning && styles.selectedAddOnButtonText
                       ]}>
-                        {addOns.bathroomDeepCleaning ? 'ADDED' : '+ Add This Service'}
+                        {cartItems.bathroomDeepCleaning ? 'REMOVE' : 'ADD TO CART'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -817,12 +652,12 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   {/* Normal Dusting */}
                   <View style={[
                     styles.addOnCard, 
-                    addOns.normalDusting && styles.selectedAddOn,
-                    { borderLeftColor: '#0984e3' }
+                    cartItems.normalDusting && styles.selectedAddOn,
+                    { borderLeftColor: '#3399cc' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Normal Dusting</Text>
-                      <Text style={[styles.addOnPrice, { color: '#0984e3' }]}>+₹1,000</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,000</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Daily furniture dusting, doors, carpet, bed making
@@ -830,15 +665,15 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        addOns.normalDusting && { backgroundColor: '#0984e3' }
+                        cartItems.normalDusting && styles.selectedAddOnButton
                       ]}
-                      onPress={() => handleAddOnSelect('normalDusting')}
+                      onPress={() => handleAddAddOnToCart('normalDusting')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        addOns.normalDusting && { color: 'white' }
+                        cartItems.normalDusting && styles.selectedAddOnButtonText
                       ]}>
-                        {addOns.normalDusting ? 'ADDED' : '+ Add This Service'}
+                        {cartItems.normalDusting ? 'REMOVE' : 'ADD TO CART'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -846,12 +681,12 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   {/* Deep Dusting */}
                   <View style={[
                     styles.addOnCard, 
-                    addOns.deepDusting && styles.selectedAddOn,
-                    { borderLeftColor: '#e17055' }
+                    cartItems.deepDusting && styles.selectedAddOn,
+                    { borderLeftColor: '#3399cc' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Deep Dusting</Text>
-                      <Text style={[styles.addOnPrice, { color: '#e17055' }]}>+₹1,500</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,500</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Includes chemical agents cleaning: décor items, furniture
@@ -859,15 +694,15 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        addOns.deepDusting && { backgroundColor: '#e17055' }
+                        cartItems.deepDusting && styles.selectedAddOnButton
                       ]}
-                      onPress={() => handleAddOnSelect('deepDusting')}
+                      onPress={() => handleAddAddOnToCart('deepDusting')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        addOns.deepDusting && { color: 'white' }
+                        cartItems.deepDusting && styles.selectedAddOnButtonText
                       ]}>
-                        {addOns.deepDusting ? 'ADDED' : '+ Add This Service'}
+                        {cartItems.deepDusting ? 'REMOVE' : 'ADD TO CART'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -875,12 +710,12 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   {/* Utensil Drying */}
                   <View style={[
                     styles.addOnCard, 
-                    addOns.utensilDrying && styles.selectedAddOn,
-                    { borderLeftColor: '#00b894' }
+                    cartItems.utensilDrying && styles.selectedAddOn,
+                    { borderLeftColor: '#3399cc' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Utensil Drying</Text>
-                      <Text style={[styles.addOnPrice, { color: '#00b894' }]}>+₹1,000</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,000</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Househelp will dry and make proper arrangements
@@ -888,15 +723,15 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        addOns.utensilDrying && { backgroundColor: '#00b894' }
+                        cartItems.utensilDrying && styles.selectedAddOnButton
                       ]}
-                      onPress={() => handleAddOnSelect('utensilDrying')}
+                      onPress={() => handleAddAddOnToCart('utensilDrying')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        addOns.utensilDrying && { color: 'white' }
+                        cartItems.utensilDrying && styles.selectedAddOnButtonText
                       ]}>
-                        {addOns.utensilDrying ? 'ADDED' : '+ Add This Service'}
+                        {cartItems.utensilDrying ? 'REMOVE' : 'ADD TO CART'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -904,12 +739,12 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   {/* Clothes Drying */}
                   <View style={[
                     styles.addOnCard, 
-                    addOns.clothesDrying && styles.selectedAddOn,
-                    { borderLeftColor: '#0984e3' }
+                    cartItems.clothesDrying && styles.selectedAddOn,
+                    { borderLeftColor: '#3399cc' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Clothes Drying</Text>
-                      <Text style={[styles.addOnPrice, { color: '#0984e3' }]}>+₹1,000</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,000</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Househelp will get clothes from/to drying place
@@ -917,32 +752,18 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        addOns.clothesDrying && { backgroundColor: '#0984e3' }
+                        cartItems.clothesDrying && styles.selectedAddOnButton
                       ]}
-                      onPress={() => handleAddOnSelect('clothesDrying')}
+                      onPress={() => handleAddAddOnToCart('clothesDrying')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        addOns.clothesDrying && { color: 'white' }
+                        cartItems.clothesDrying && styles.selectedAddOnButtonText
                       ]}>
-                        {addOns.clothesDrying ? 'ADDED' : '+ Add This Service'}
+                        {cartItems.clothesDrying ? 'REMOVE' : 'ADD TO CART'}
                       </Text>
                     </TouchableOpacity>
                   </View>
-                </View>
-              </View>
-
-              {/* Voucher Section */}
-              <View style={styles.voucherContainer}>
-                <Text style={styles.voucherTitle}>Apply Voucher</Text>
-                <View style={styles.voucherInputContainer}>
-                  <TextInput
-                    style={styles.voucherInput}
-                    placeholder="Enter voucher code"
-                  />
-                  <TouchableOpacity style={styles.voucherButton}>
-                    <Text style={styles.voucherButtonText}>APPLY</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -950,45 +771,49 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
           
           {/* Footer with Checkout */}
           <View style={styles.footerContainer}>
-            <View>
+             <View style={styles.voucherContainer}>
+            <TextInput
+              style={styles.voucherInput}
+              placeholder="Enter voucher code"
+              placeholderTextColor="#999"
+            />
+            <TouchableOpacity style={styles.voucherButton}>
+              <Text style={styles.voucherButtonText}>Apply Voucher</Text>
+            </TouchableOpacity>
+          </View>
+          
+            <View style={styles.totalContainer}>
               <Text style={styles.footerText}>
-                Total for {countSelectedServices()} services ({countSelectedAddOns()} add-ons)
+                Total for {countSelectedItems()} items
               </Text>
               <Text style={styles.footerPrice}>
                 ₹{calculateTotal().toLocaleString('en-IN')}
               </Text>
             </View>
             
-            {/* <View style={styles.footerButtons}>
-              {!isAuthenticated && (
-                <>
-                  <Icon name="info" size={20} color="#666" style={{ marginRight: 8 }} />
-                  <TouchableOpacity 
-                    style={styles.loginButton}
-                    onPress={() => loginWithRedirect()}
-                  >
-                    <Text style={styles.loginButtonText}>LOGIN TO CONTINUE</Text>
-                  </TouchableOpacity>
-                </>
-              )}
+            <View style={styles.footerButtons}>
+              <TouchableOpacity 
+                style={styles.closeFooterButton}
+                onPress={handleClose}
+              >
+                <Text style={styles.closeFooterButtonText}>CLOSE</Text>
+              </TouchableOpacity>
               
-              {isAuthenticated && (
-                <TouchableOpacity
-                  style={[
-                    styles.checkoutButton,
-                    calculateTotal() === 0 && styles.disabledButton
-                  ]}
-                  onPress={handleCheckout}
-                  disabled={calculateTotal() === 0}
-                >
-                  {loading ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Text style={styles.checkoutButtonText}>CHECKOUT</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View> */}
+              <TouchableOpacity
+                style={[
+                  styles.checkoutButton,
+                  countSelectedItems() === 0 && styles.disabledButton
+                ]}
+                onPress={handleCheckout}
+                disabled={countSelectedItems() === 0}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.checkoutButtonText}>CHECKOUT</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -1014,21 +839,30 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  scrollView: {
-    paddingHorizontal: 10,
-    paddingTop: 10,
-  },
-  dialogHeader: {
+   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  backIcon: {
+    padding: 5,
+    marginRight: 10,
+  },
   dialogTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 15,
     color: '#333',
+    flex: 1,
+    textAlign: 'center',
+  },
+  closeIcon: {
+    padding: 5,
+  },
+  scrollView: {
+    paddingHorizontal: 10,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -1166,37 +1000,29 @@ const styles = StyleSheet.create({
     color: '#666',
     flex: 1,
   },
-  buttonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  selectButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 5,
-    backgroundColor: '#f0f0f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  selectButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-  },
   cartButton: {
-    flex: 1,
     paddingVertical: 12,
     borderRadius: 5,
     backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#3399cc',
+  },
+  selectedCartButton: {
+    backgroundColor: '#3399cc',
+    borderColor: '#3399cc',
   },
   cartButtonText: {
     fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 5,
+    color: '#3399cc',
+  },
+  selectedCartButtonText: {
+    color: 'white',
   },
   addOnsContainer: {
     marginBottom: 20,
@@ -1256,48 +1082,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#3399cc',
+  },
+  selectedAddOnButton: {
+    backgroundColor: '#3399cc',
+    borderColor: '#3399cc',
   },
   addOnButtonText: {
     fontSize: 12,
     fontWeight: 'bold',
+    color: '#3399cc',
   },
-  voucherContainer: {
-    marginBottom: 20,
-  },
-  voucherTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  voucherInputContainer: {
-    flexDirection: 'row',
-  },
-  voucherInput: {
-    flex: 1,
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginRight: 10,
-  },
-  voucherButton: {
-    backgroundColor: '#3399cc',
-    borderRadius: 5,
-    paddingHorizontal: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  voucherButtonText: {
+  selectedAddOnButtonText: {
     color: 'white',
-    fontWeight: 'bold',
   },
   footerContainer: {
-    padding: 20,
+    padding: 15,
     borderTopWidth: 1,
     borderTopColor: '#eee',
     backgroundColor: '#f9f9f9',
+  },
+  totalContainer: {
+    marginBottom: 15,
   },
   footerText: {
     fontSize: 14,
@@ -1309,34 +1116,31 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 15,
   },
   footerButtons: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  loginButton: {
-    backgroundColor: '#3399cc',
-    borderRadius: 5,
+  closeFooterButton: {
+    flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    borderRadius: 5,
+    backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 10,
   },
-  loginButtonText: {
-    color: 'white',
+  closeFooterButtonText: {
+    color: '#333',
     fontWeight: 'bold',
-    fontSize: 14,
   },
   checkoutButton: {
+    flex: 1,
     backgroundColor: '#3399cc',
     borderRadius: 5,
     paddingVertical: 12,
-    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
   },
   disabledButton: {
     backgroundColor: '#ccc',
@@ -1344,7 +1148,32 @@ const styles = StyleSheet.create({
   checkoutButtonText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 16,
+  },
+  voucherContainer: {
+    flexDirection: 'row',
+    marginBottom: 15,
+    justifyContent: 'space-between',
+  },
+  voucherInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    marginRight: 10,
+    backgroundColor: '#fff',
+  },
+  voucherButton: {
+    backgroundColor: '#3399cc',
+    borderRadius: 5,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voucherButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
