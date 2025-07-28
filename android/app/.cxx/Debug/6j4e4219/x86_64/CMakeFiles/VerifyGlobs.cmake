@@ -308,6 +308,44 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/CMakeFiles/cmake.verify_globs")
 endif()
 
+# rnsvg_SRCS at C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt:25 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/*.cpp")
+set(OLD_GLOB
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/rnsvg.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# rnsvg_SRCS at C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt:25 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../../common/cpp/react/renderer/components/rnsvg/*.cpp")
+set(OLD_GLOB
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../../common/cpp/react/renderer/components/rnsvg/RNSVGImageShadowNode.cpp"
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../../common/cpp/react/renderer/components/rnsvg/RNSVGImageState.cpp"
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../../common/cpp/react/renderer/components/rnsvg/RNSVGLayoutableShadowNode.cpp"
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../../common/cpp/react/renderer/components/rnsvg/RNSVGShadowNodes.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
+# rnsvg_codegen_SRCS at C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt:26 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/rnsvg/*cpp")
+set(OLD_GLOB
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/rnsvg/ComponentDescriptors.cpp"
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/rnsvg/EventEmitters.cpp"
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/rnsvg/Props.cpp"
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/rnsvg/ShadowNodes.cpp"
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/rnsvg/States.cpp"
+  "C:/serveaso_android/node_modules/react-native-svg/android/src/main/jni/../../../build/generated/source/codegen/jni/react/renderer/components/rnsvg/rnsvgJSI-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/x86_64/CMakeFiles/cmake.verify_globs")
+endif()
+
 # react_codegen_SRCS at C:/serveaso_android/node_modules/react-native-vector-icons/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "C:/serveaso_android/node_modules/react-native-vector-icons/android/build/generated/source/codegen/jni/*.cpp")
 set(OLD_GLOB

@@ -54,6 +54,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNMapsSpecs_autolinked_build/cmake_install.cmake")
   include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNPermissionsSpec_autolinked_build/cmake_install.cmake")
   include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/safeareacontext_autolinked_build/cmake_install.cmake")
+  include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/rnsvg_autolinked_build/cmake_install.cmake")
   include("C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/arm64-v8a/RNVectorIconsSpec_autolinked_build/cmake_install.cmake")
 
 endif()

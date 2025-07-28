@@ -49,16 +49,33 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   //     sendDataToParent(e);
   //   }
   // };
- const handleClick = (e: any) => {
-    if (e === 'sign_out') {
-      dispatch(remove());
-      sendDataToParent("");
-    } else if (e === 'HOME') {
-      sendDataToParent("HOME"); // This will trigger the view change in App.tsx
-    } else {
-      sendDataToParent(e);
-    }
-  };
+//  const handleClick = (e: any) => {
+//     if (e === 'sign_out') {
+//       dispatch(remove());
+//       sendDataToParent("");
+//     } else if (e === 'HOME') {
+//       sendDataToParent("HOME"); // This will trigger the view change in App.tsx
+//     } else {
+//       sendDataToParent(e);
+//     }
+//   };
+const handleClick = (e: any) => {
+  if (e === 'sign_out') {
+    dispatch(remove());
+    sendDataToParent("");
+  } else if (e === 'HOME') {
+    sendDataToParent("HOME");
+  } else {
+    sendDataToParent(e);
+  }
+};
+
+// ...
+
+const handleBookingHistoryClick = () => {
+  setMenuVisible(false);
+  handleClick(BOOKINGS);
+};
 
   const cart = useSelector((state: any) => state.cart?.value);
   const user = useSelector((state: any) => state.user?.value);
@@ -264,10 +281,10 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
     handleClick(DASHBOARD);
   };
 
-  const handleBookingHistoryClick = () => {
-    setMenuVisible(false);
-    handleClick(BOOKINGS);
-  };
+  // const handleBookingHistoryClick = () => {
+  //   setMenuVisible(false);
+  //   handleClick(BOOKINGS);
+  // };
 
   // const handleSignOut = () => {
   //   setMenuVisible(false);
@@ -473,6 +490,20 @@ const handleLoginClick = async () => {
         >
           <Text style={styles.menuItemText}>Contact Us</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={handleBookingHistoryClick}
+        >
+          <Text style={styles.menuItemText}>Booking History</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+                    style={styles.menuItem} 
+                    onPress={handleDashboardClick}
+                  >
+                    <Text style={styles.menuItemText}>Dashboard</Text>
+                  </TouchableOpacity>
+
       </>
     ) : (
       <>
@@ -483,12 +514,7 @@ const handleLoginClick = async () => {
           <Text style={styles.menuItemText}>Profile</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={handleBookingHistoryClick}
-        >
-          <Text style={styles.menuItemText}>Booking History</Text>
-        </TouchableOpacity>
+      
         
         {loggedInUser?.role === 'admin' && (
           <TouchableOpacity 

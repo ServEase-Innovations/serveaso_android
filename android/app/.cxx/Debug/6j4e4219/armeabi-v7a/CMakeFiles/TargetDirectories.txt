@@ -31,6 +31,9 @@ C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/RNPermissionsSpe
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/safeareacontext_autolinked_build/CMakeFiles/edit_cache.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/safeareacontext_autolinked_build/CMakeFiles/rebuild_cache.dir
+C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir
+C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/rnsvg_autolinked_build/CMakeFiles/edit_cache.dir
+C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/rnsvg_autolinked_build/CMakeFiles/rebuild_cache.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/RNVectorIconsSpec_autolinked_build/CMakeFiles/edit_cache.dir
 C:/serveaso_android/android/app/.cxx/Debug/6j4e4219/armeabi-v7a/RNVectorIconsSpec_autolinked_build/CMakeFiles/rebuild_cache.dir

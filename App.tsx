@@ -8,24 +8,52 @@ import HomePage from './src/HomePage';
 import DetailsView from './src/DetailsView';
 import Footer from './src/Footer';
 import Chatbot from './src/Chatbot';
+import Booking from './src/Bookings';
+import Dashboard from './src/ServiceProvider/Dashboard'; // Import the Dashboard component
+import { BOOKINGS, DASHBOARD } from './src/Constants/pagesConstants'; // Add DASHBOARD to the import
 
 const App = () => {
   const [chatbotOpen, setChatbotOpen] = useState(false);
   const [currentView, setCurrentView] = useState('HOME');
   const [selectedBookingType, setSelectedBookingType] = useState('');
 
-  const handleDataFromChild = (data: string) => {
-    if (data === 'HOME') {
-      setCurrentView('HOME');
-    }
-  };
-
   const handleViewChange = (view: string) => {
-    setCurrentView(view);
+    if (view === 'HOME') {
+      setCurrentView('HOME');
+    } else if (view === BOOKINGS) {
+      setCurrentView(BOOKINGS);
+    } else if (view === DASHBOARD) { // Add this condition
+      setCurrentView(DASHBOARD);
+    } else {
+      setCurrentView(view);
+    }
   };
 
   const handleBookingType = (type: string) => {
     setSelectedBookingType(type);
+  };
+
+  const renderContent = () => {
+    switch (currentView) {
+      case 'HOME':
+        return (
+          <HomePage 
+            sendDataToParent={handleViewChange} 
+            bookingType={handleBookingType}
+          />
+        );
+      case BOOKINGS:
+        return <Booking />;
+      case DASHBOARD: // Add this case
+        return <Dashboard />;
+      default:
+        return (
+          <DetailsView 
+            sendDataToParent={handleViewChange} 
+            selected={selectedBookingType} 
+          />
+        );
+    }
   };
 
   return (
@@ -36,28 +64,21 @@ const App = () => {
           <View style={styles.container}>
             {/* Fixed Header */}
             <View style={styles.header}>
-              <Head sendDataToParent={handleDataFromChild} />
+              <Head sendDataToParent={handleViewChange} />
             </View>
 
             {/* Scrollable Content */}
             <View style={styles.contentContainer}>
               <SafeAreaView style={styles.body} edges={['bottom']}>
                 <ScrollView 
-                  contentContainerStyle={styles.scrollContent}
+                  contentContainerStyle={[
+                    styles.scrollContent,
+                    (currentView === BOOKINGS || currentView === DASHBOARD) && styles.fullScreenScrollContent
+                  ]}
                   contentInsetAdjustmentBehavior="automatic"
                 >
-                  {currentView === 'HOME' ? (
-                    <HomePage 
-                      sendDataToParent={handleViewChange} 
-                      bookingType={handleBookingType}
-                    />
-                  ) : (
-                    <DetailsView 
-                      sendDataToParent={handleViewChange} 
-                      selected={selectedBookingType} 
-                    />
-                  )}
-                  <Footer />
+                  {renderContent()}
+                  {currentView !== BOOKINGS && currentView !== DASHBOARD && <Footer />}
                 </ScrollView>
               </SafeAreaView>
             </View>
@@ -89,11 +110,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     zIndex: 10,
     paddingTop: 0,
-     height: 45, // Remove any manual padding here
+    height: 45,
   },
   contentContainer: {
     flex: 1,
-    // No need for marginTop as SafeAreaView handles it
   },
   body: {
     flex: 1,
@@ -102,6 +122,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 20,
+  },
+  fullScreenScrollContent: { // Renamed from bookingScrollContent to be more generic
+    paddingBottom: 0,
   },
 });
 
