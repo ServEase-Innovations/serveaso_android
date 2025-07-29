@@ -51,9 +51,7 @@
         android:pathPrefix="/android/com.awesomeproject/callback" />
 </intent-filter>
         </activity>
-
         <uses-library android:name="org.apache.http.legacy" android:required="false" />
-
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyBWoIIAX-gE7fvfAkiquz70WFgDaL7YXSk" />
