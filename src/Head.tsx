@@ -291,35 +291,45 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
   //   handleClick('sign_out');
   // };
   const handleSignOut = async () => {
-  try {
-    await clearSession({}, {});
-    dispatch(remove());
-    setMenuVisible(false);
-    handleClick('sign_out');
-  } catch (e) {
-    console.log('Log out error:', e);
-  }
-};
+    try {
+      await clearSession({
+        federated: false, // optional, set to true if you want to log out from identity provider too
+      });
+  
+      dispatch(remove());
+      setMenuVisible(false);
+      handleClick('sign_out');
+    } catch (e) {
+      console.log('Log out error:', e);
+    }
+  };
+  
 
   // const handleLoginClick = () => {
   //   setMenuVisible(false);
   //   handleClick(LOGIN);
   // };
   // Modify the handleLoginClick function to use Auth0
-const handleLoginClick = async () => {
-  setMenuVisible(false);
-  try {
-    await authorize({}, {});
-    const credentials = await getCredentials();
-    if (credentials?.accessToken) {
-      Alert.alert('Login Successful');
-      // Here you would typically handle the user data and store it in your app state
-      // For example: dispatch(setUser(auth0User));
+  const handleLoginClick = async () => {
+    setMenuVisible(false);
+    try {
+      await authorize(
+        {
+          scope: 'openid profile email',
+          redirectUrl: 'com.awesomeproject://dev-plavkbiy7v55pbg4.us.auth0.com/android/com.awesomeproject/callback',
+        }
+      );
+  
+      const credentials = await getCredentials();
+  
+      if (credentials?.accessToken) {
+        Alert.alert('Login Successful');
+        // Optional: dispatch(setUser(auth0User));
+      }
+    } catch (e) {
+      console.log('Login error:', e);
     }
-  } catch (e) {
-    console.log('Login error:', e);
-  }
-};
+  };
 
   return (
     <View style={{ position: 'relative' }}>
