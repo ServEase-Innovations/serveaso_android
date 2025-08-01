@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,14 @@ import {
   StyleSheet,
   ScrollView,
   FlatList,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { removeFromCart, selectCartItems, updateCartItem } from './features/addToSlice';
 import { CartItem, isMaidCartItem, isMealCartItem, isNannyCartItem } from './types/cartSlice';
+import RazorpayCheckout from 'react-native-razorpay';
 
 interface CartDialogProps {
   open: boolean;
@@ -42,7 +45,8 @@ export const CartDialog: React.FC<CartDialogProps> = ({
   const mealCartItems = allCartItems.filter(isMealCartItem);
   const maidCartItems = allCartItems.filter(isMaidCartItem);
   const nannyCartItems = allCartItems.filter(isNannyCartItem);
-  
+   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+   
   // Calculate totals
   const mealCartTotal = mealCartItems.reduce((sum, item) => sum + item.price, 0);
   const maidCartTotal = maidCartItems.reduce((sum, item) => sum + item.price, 0);
@@ -54,7 +58,61 @@ export const CartDialog: React.FC<CartDialogProps> = ({
   const handleRemoveItem = (id: string, itemType: CartItem['type']) => {
     dispatch(removeFromCart({ id, type: itemType }));
   };
+ const handleRazorpayCheckout = async () => {
+    if (allCartItems.length === 0 || isProcessingPayment) return;
 
+    setIsProcessingPayment(true);
+
+    try {
+      // Prepare Razorpay options
+      const options = {
+        description: 'ServEaso Services Payment',
+        image: 'https://your-serveaso-logo-url.com/logo.png', // Replace with your logo
+        currency: 'INR',
+        key: 'rzp_test_1DP5mmOlF5G5ag', // Test key - replace with production key when ready
+        amount: Math.round(grandTotal * 100), // Razorpay expects amount in paise
+        name: 'ServEaso',
+        order_id: `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`, // Generate unique order ID
+        prefill: {
+          email: 'customer@serveaso.com', // You can get this from user profile
+          contact: '9191919191', // You can get this from user profile
+          name: 'ServEaso Customer'
+        },
+        theme: { color: '#3b82f6' } // Match your brand color
+      };
+
+      const data = await RazorpayCheckout.open(options);
+      
+      // Payment successful
+      Alert.alert(
+        'Payment Successful', 
+        `Payment ID: ${data.razorpay_payment_id}`,
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              handleClose();
+              // Here you would typically:
+              // 1. Send payment confirmation to your backend
+              // 2. Clear the cart
+              // 3. Navigate to order confirmation screen
+            } 
+          }
+        ]
+      );
+      
+    } catch (error: any) {
+      // Payment failed or was cancelled
+      if (error.code !== 2) { // Code 2 means user cancelled
+        Alert.alert(
+          'Payment Failed',
+          error.description || 'Payment was not completed'
+        );
+      }
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
   return (
     <Modal
       visible={open}
@@ -167,7 +225,7 @@ export const CartDialog: React.FC<CartDialogProps> = ({
                 <Text style={styles.continueButtonText}>Continue Booking</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 style={[styles.checkoutButton, allCartItems.length === 0 && styles.disabledButton]}
                 onPress={handleCheckout}
                 disabled={allCartItems.length === 0}
@@ -175,7 +233,24 @@ export const CartDialog: React.FC<CartDialogProps> = ({
                 <Text style={styles.checkoutButtonText}>
                   Proceed to Checkout (₹{grandTotal.toFixed(2)})
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
+                <TouchableOpacity
+            style={[
+              styles.checkoutButton, 
+              allCartItems.length === 0 && styles.disabledButton,
+              isProcessingPayment && styles.processingButton
+            ]}
+            onPress={handleRazorpayCheckout}
+            disabled={allCartItems.length === 0 || isProcessingPayment}
+          >
+            {isProcessingPayment ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.checkoutButtonText}>
+                Proceed to Checkout (₹{grandTotal.toFixed(2)})
+              </Text>
+            )}
+          </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -653,5 +728,8 @@ const styles = StyleSheet.create({
     color: '#2d3748',
     fontWeight: '600',
     fontSize: 14,
+  },
+    processingButton: {
+    backgroundColor: '#93c5fd', // Lighter blue when processing
   },
 });

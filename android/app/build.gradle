@@ -1,5 +1,5 @@
-apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.android.application"
 apply plugin: "com.facebook.react"
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
 
@@ -86,7 +86,7 @@ android {
         versionCode 1
         versionName "1.0"
         manifestPlaceholders = [auth0Domain: "dev-y0yafxo2cjqtu8y2.us.auth0.com", auth0Scheme: "${applicationId}.auth0"]
-
+        manifestPlaceholders = [razorpayKey: "rzp_test_1DP5mmOlF5G5ag"]
     }
     signingConfigs {
         debug {
