@@ -1,57 +1,10 @@
-# Node modules
-/node_modules
-*.log
-
-# OS metadata
-.DS_Store
-
-# Build outputs
 android/app/build/
 android/build/
 *.apk
-*.ap_
 *.so
-*.dex
-*.class
-
-# Gradle & Android Studio
-android/.gradle/
-android/.idea/
-android/local.properties
-android/.cxx/
-.gradle/
-
-# React Native Gradle Plugin caches
-node_modules/@react-native/gradle-plugin/.gradle/
-
-# Lock files (optional, if managed manually)
-package-lock.json
-yarn.lock
-
-# Gradle cache and build history
-android/.gradle/8.*/executionHistory/
-android/.gradle/8.*/fileHashes/
-android/.gradle/buildOutputCleanup/
-android/.gradle/file-system.probe
-
-# NDK build files
-android/app/.cxx/
-
-# Metro bundler cache
-.expo/
-.expo-shared/
-dist/
-tmp/
-tmp/**
-
-# Misc
-*.iml
-*.keystore
-*.jks
-.env
-.env.*
-*.lock
-*.probe
-
-# macOS
-*.DS_Store
+/node_modules
+/android/app/build/android/app/build/
+*.apk
+*.so
+node_modules
+node_modules
