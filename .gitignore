@@ -8,3 +8,4 @@ android/build/
 *.so
 node_modules
 node_modules
+android/app/debug.keystore
