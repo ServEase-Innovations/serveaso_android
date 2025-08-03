@@ -473,10 +473,12 @@ const handleLeaveSubmit = async () => {
 
 const styles = StyleSheet.create({
   container: {
+   
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
   tabContainer: {
+    
     marginTop: 20,
     paddingHorizontal: 10,
   },

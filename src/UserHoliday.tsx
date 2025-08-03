@@ -1,99 +1,145 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Modal,
   View,
   Text,
-  Modal,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
+  Platform,
+  Button as RNButton,
+  ToastAndroid,
   Alert,
-  Platform
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import dayjs, { Dayjs } from 'dayjs';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import Booking from './Bookings';
 
 interface UserHolidayProps {
   open: boolean;
   onClose: () => void;
   booking: Booking | null;
-  onLeaveSubmit: (startDate: string, endDate: string) => Promise<void>;
+  onLeaveSubmit: (startDate: string, endDate: string, serviceType: string) => Promise<void>;
 }
 
 const UserHoliday: React.FC<UserHolidayProps> = ({ open, onClose, booking, onLeaveSubmit }) => {
-  const [leaveStartDate, setLeaveStartDate] = useState<string>('');
-  const [leaveEndDate, setLeaveEndDate] = useState<string>('');
+  const [leaveStartDate, setLeaveStartDate] = useState<Dayjs | null>(null);
+  const [leaveEndDate, setLeaveEndDate] = useState<Dayjs | null>(null);
+  const [minDate, setMinDate] = useState<Dayjs | undefined>();
+  const [maxDate, setMaxDate] = useState<Dayjs | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
   useEffect(() => {
-    setLeaveStartDate(booking?.startDate || '');
-    setLeaveEndDate(booking?.endDate || '');
+    if (booking) {
+      const start = dayjs(booking.startDate);
+      const end = dayjs(booking.endDate);
+      setMinDate(start);
+      setMaxDate(end);
+      setLeaveStartDate(start);
+      setLeaveEndDate(end);
+    }
   }, [booking]);
 
   const handleSubmit = async () => {
-    if (!leaveStartDate || !leaveEndDate) {
-      Alert.alert("Validation", "Please fill both dates.");
+    if (!leaveStartDate || !leaveEndDate || !booking?.serviceType) return;
+
+    if (leaveStartDate.isBefore(minDate) || leaveEndDate.isAfter(maxDate)) {
+       Alert.alert('Holiday dates must be within your booked period');
+      return;
+    }
+
+    const diffInDays = leaveEndDate.diff(leaveStartDate, 'day') + 1;
+    if (diffInDays < 10) {
+      Alert.alert('Leave duration must be at least 10 days');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await onLeaveSubmit(leaveStartDate, leaveEndDate);
-      Alert.alert("Success", "Leave application submitted successfully!");
+      await onLeaveSubmit(
+        leaveStartDate.format('YYYY-MM-DD'),
+        leaveEndDate.format('YYYY-MM-DD'),
+        booking.serviceType
+      );
+      ToastAndroid.show('Leave application submitted successfully!', ToastAndroid.SHORT);
       onClose();
     } catch (error) {
       console.error("Error submitting leave:", error);
-      Alert.alert("Error", "Failed to submit leave.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowStartPicker(false);
+    if (selectedDate) {
+      setLeaveStartDate(dayjs(selectedDate));
+    }
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowEndPicker(false);
+    if (selectedDate) {
+      setLeaveEndDate(dayjs(selectedDate));
+    }
+  };
+
   return (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={open}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
+    <Modal visible={open} animationType="slide" transparent>
+      <View style={styles.overlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.title}>Apply Leave</Text>
-
-          <Text style={styles.label}>Start Date</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="YYYY-MM-DD"
-            value={leaveStartDate}
-            onChangeText={setLeaveStartDate}
-            editable={!isSubmitting}
-          />
-
-          <Text style={styles.label}>End Date</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="YYYY-MM-DD"
-            value={leaveEndDate}
-            onChangeText={setLeaveEndDate}
-            editable={!isSubmitting}
-          />
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={onClose}
-              disabled={isSubmitting}
-            >
-              <Text style={styles.buttonText}>Cancel</Text>
+          <View style={styles.header}>
+            <Text style={styles.title}>Apply Holiday</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Icon name="close" size={24} color="gray" />
             </TouchableOpacity>
+          </View>
 
-            <TouchableOpacity
-              style={[styles.button, styles.submitButton]}
+          <TouchableOpacity onPress={() => setShowStartPicker(true)} style={styles.datePicker}>
+            <Text>Start Date: {leaveStartDate?.format('DD/MM/YYYY HH:mm') || 'Select Date'}</Text>
+          </TouchableOpacity>
+          {showStartPicker && (
+            <DateTimePicker
+              value={leaveStartDate?.toDate() || new Date()}
+              mode="datetime"
+              minimumDate={minDate?.toDate()}
+              maximumDate={maxDate?.toDate()}
+              onChange={handleStartDateChange}
+            />
+          )}
+
+          <TouchableOpacity onPress={() => setShowEndPicker(true)} style={styles.datePicker}>
+            <Text>End Date: {leaveEndDate?.format('DD/MM/YYYY HH:mm') || 'Select Date'}</Text>
+          </TouchableOpacity>
+          {showEndPicker && (
+            <DateTimePicker
+              value={leaveEndDate?.toDate() || new Date()}
+              mode="datetime"
+              minimumDate={leaveStartDate?.toDate() || minDate?.toDate()}
+              maximumDate={maxDate?.toDate()}
+              onChange={handleEndDateChange}
+            />
+          )}
+
+          {booking && (
+            <View style={styles.info}>
+              <Text>Booked Period: {dayjs(booking.startDate).format('DD/MM/YYYY')} - {dayjs(booking.endDate).format('DD/MM/YYYY')}</Text>
+              <Text>Service Type: {booking.serviceType}</Text>
+              <Text>Booking Type: {booking.bookingType}</Text>
+            </View>
+          )}
+
+          <View style={styles.actions}>
+            <RNButton title="Cancel" onPress={onClose} disabled={isSubmitting} />
+            <RNButton
+              title={isSubmitting ? "Submitting..." : "Submit Leave"}
               onPress={handleSubmit}
               disabled={isSubmitting || !leaveStartDate || !leaveEndDate}
-            >
-              <Text style={styles.buttonText}>
-                {isSubmitting ? 'Submitting...' : 'Submit Leave'}
-              </Text>
-            </TouchableOpacity>
+              color="#6200EE"
+            />
           </View>
         </View>
       </View>
@@ -104,56 +150,38 @@ const UserHoliday: React.FC<UserHolidayProps> = ({ open, onClose, booking, onLea
 export default UserHoliday;
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  overlay: {
     flex: 1,
+    backgroundColor: '#00000088',
     justifyContent: 'center',
-    backgroundColor: '#000000aa',
     padding: 20,
   },
   modalContainer: {
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 20,
-    elevation: 5,
+    elevation: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 15,
-    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
-  label: {
-    fontSize: 14,
-    marginBottom: 5,
-    color: '#333',
+  datePicker: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: '#ccc',
+    marginTop: 20,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#999',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    marginBottom: 15,
-    fontSize: 16,
+  info: {
+    marginVertical: 20,
   },
-  buttonContainer: {
+  actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-  },
-  button: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 6,
-  },
-  cancelButton: {
-    backgroundColor: '#ccc',
-  },
-  submitButton: {
-    backgroundColor: '#007BFF',
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '500',
+    justifyContent: 'space-between',
   },
 });

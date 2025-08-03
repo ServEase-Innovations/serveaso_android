@@ -257,6 +257,7 @@ export default function Dashboard() {
 
 const styles = StyleSheet.create({
   container: {
+     paddingTop:15,
     flex: 1,
     backgroundColor: '#f9fafb',
   },
@@ -266,20 +267,25 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
     paddingVertical: 16,
     paddingHorizontal: 16,
+    
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingLeft: 1,
   },
+
   logoText: {
     fontSize: 20,
     fontWeight: 'bold',
