@@ -86,7 +86,7 @@ android {
         versionCode 1
         versionName "1.0"
         manifestPlaceholders = [auth0Domain: "dev-y0yafxo2cjqtu8y2.us.auth0.com", auth0Scheme: "${applicationId}.auth0"]
-
+       
     }
     signingConfigs {
         debug {

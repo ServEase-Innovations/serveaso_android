@@ -594,7 +594,7 @@ const Booking: React.FC = () => {
                           style={styles.actionButton}
                           onPress={() => handleApplyLeaveClick(booking)}
                         >
-                          <Text style={styles.actionButtonText}>Apply Holiday</Text>
+                          <Text style={styles.actionButtonText}>Add Vaccation</Text>
                         </TouchableOpacity>
                       )}
                       <TouchableOpacity 
@@ -1029,7 +1029,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
     color: '#3b82f6',
   },
@@ -1053,6 +1053,7 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderStyle: 'dashed',
   },
+  
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',

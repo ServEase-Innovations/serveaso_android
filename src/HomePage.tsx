@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   TextStyle,
   ViewStyle,
   ImageStyle,
+  Animated,
 } from "react-native";
 import { useDispatch } from "react-redux";
 import { add } from "./features/bookingTypeSlice";
@@ -64,6 +65,135 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [showNannyServicesDialog, setShowNannyServicesDialog] = useState(false);
   const [showCookDialog, setShowCookDialog] = useState(false);
   const [hoveredService, setHoveredService] = useState<string | null>(null);
+
+const HowItWorksSection = () => {
+  const slides = [
+    {
+      icon: "✋",
+      title: "Choose your service",
+      desc: "Select from a variety of tasks that suit your needs.",
+      color: "#FF9E9E", // Light red
+      iconColor: "#FF5C5C",
+    },
+    {
+      icon: "📅",
+      title: "Schedule in minutes",
+      desc: "Book a time that works for you, quickly and easily.",
+      color: "#9ED2FF", // Light blue
+      iconColor: "#5C9EFF",
+    },
+    {
+      icon: "🏠",
+      title: "Relax, we'll handle the rest",
+      desc: "Our verified professionals ensure your peace of mind.",
+      color: "#9EFFB2", // Light green
+      iconColor: "#5CFF7A",
+    },
+  ];
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      // Slide out animation
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: -50,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setCurrentSlide((prev) => (prev + 1) % slides.length);
+        // Reset animation values for next slide
+        slideAnim.setValue(50);
+        // Slide in animation
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(50);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [currentSlide]);
+
+  return (
+    <View style={styles.howItWorksSection}>
+      <Text style={styles.sectionTitle}>How It Works</Text>
+      <View style={styles.slideshowContainer}>
+        <Animated.View
+          style={[
+            styles.slide,
+            {
+              backgroundColor: slides[currentSlide].color,
+              opacity: fadeAnim,
+              transform: [{ translateX: slideAnim }],
+              shadowColor: slides[currentSlide].iconColor,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 10,
+              elevation: 10,
+            },
+          ]}
+        >
+          <View style={styles.iconContainer}>
+            <Text style={[styles.stepIcon, { color: slides[currentSlide].iconColor }]}>
+              {slides[currentSlide].icon}
+            </Text>
+          </View>
+          <Text style={styles.stepTitle}>{slides[currentSlide].title}</Text>
+          <Text style={styles.stepDesc}>{slides[currentSlide].desc}</Text>
+        </Animated.View>
+      </View>
+      <View style={styles.dotsContainer}>
+        {slides.map((_, index) => (
+          <Animated.View
+            key={index}
+            style={[
+              styles.dot,
+              index === currentSlide && [
+                styles.activeDot,
+                { backgroundColor: slides[index].iconColor },
+              ],
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+};
 
   const handleWorkButtonClick = () => {
     setShowRegistration(true);
@@ -218,8 +348,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
             Book trusted household help in minutes
           </Text>
           <Text style={styles.heroSubtitle}>
-            ServEaso connects you to trained maids, cooks, and caregivers on
-            demand. Safe, affordable and instant.
+           ServEaso delivers instant, regular and short term access to safe, affordable, and trained maids, cooks, and caregivers.
           </Text>
           <View style={styles.serviceIconsContainer}>
             {/* Cook Service */}
@@ -348,33 +477,8 @@ const HomePage: React.FC<ChildComponentProps> = ({
         </View>
       </View>
 
-      {/* How it works */}
-      <View style={styles.howItWorksSection}>
-        <Text style={styles.sectionTitle}>How It Works</Text>
-        <View style={styles.stepsContainer}>
-          <View style={styles.step}>
-            <Text style={styles.stepIcon}>✋</Text>
-            <Text style={styles.stepTitle}>Choose your service</Text>
-            <Text style={styles.stepDesc}>
-              Select from a variety of tasks that suit your needs.
-            </Text>
-          </View>
-          <View style={styles.step}>
-            <Text style={styles.stepIcon}>📅</Text>
-            <Text style={styles.stepTitle}>Schedule in minutes</Text>
-            <Text style={styles.stepDesc}>
-              Book a time that works for you, quickly and easily.
-            </Text>
-          </View>
-          <View style={styles.step}>
-            <Text style={styles.stepIcon}>🏠</Text>
-            <Text style={styles.stepTitle}>Relax, we'll handle the rest</Text>
-            <Text style={styles.stepDesc}>
-              Our verified professionals ensure your peace of mind.
-            </Text>
-          </View>
-        </View>
-      </View>
+      {/* How it works - replaced with new slideshow component */}
+      <HowItWorksSection />
 
       {/* Booking Dialog */}
       <Modal visible={open} animationType="slide" transparent={true}>
@@ -577,8 +681,11 @@ interface Styles {
   serviceDesc: TextStyle;
   learnMoreLink: TextStyle;
   howItWorksSection: ViewStyle;
-  stepsContainer: ViewStyle;
-  step: ViewStyle;
+  slideshowContainer: ViewStyle;
+  slide: ViewStyle;
+  dotsContainer: ViewStyle;
+  dot: ViewStyle;
+  activeDot: ViewStyle;
   stepIcon: TextStyle;
   stepTitle: TextStyle;
   stepDesc: TextStyle;
@@ -602,6 +709,11 @@ interface Styles {
   serviceTooltipContainer: ViewStyle;
   tooltip: ViewStyle;
   tooltipText: TextStyle;
+  dateInputText: TextStyle;
+  timeInputText: TextStyle;
+  disabledInput: ViewStyle;
+  dialogOverlay: ViewStyle;
+  dialogBox: ViewStyle;
 }
 
 const styles = StyleSheet.create<Styles>({
@@ -639,32 +751,31 @@ const styles = StyleSheet.create<Styles>({
     position: 'relative',
   },
   serviceIconContainer: {
-  alignItems: "center",
-  width: 100,
-  height: 100,
-  borderRadius: 50,
-  backgroundColor: "#f0f0f0",
-  justifyContent: "center",
-  overflow: "hidden",
-  borderWidth: 1,
-  borderColor: "#1976d2", // Changed from #ddd to blue
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 2,
-  transitionDuration: '200ms',
-},
- serviceIconContainerHover: {
-  transform: [{ scale: 1.05 }],
-  shadowColor: "#1976d2",
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.3,
-  shadowRadius: 6,
-  elevation: 6,
-  borderColor: "#0d47a1", // Darker blue on hover
-  borderWidth: 3, // Thicker border on hover
-},
+    alignItems: "center",
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#1976d2",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  serviceIconContainerHover: {
+    transform: [{ scale: 1.05 }],
+    shadowColor: "#1976d2",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+    borderColor: "#0d47a1",
+    borderWidth: 3,
+  },
   serviceImage: {
     width: 100,
     height: 100,
@@ -758,12 +869,42 @@ const styles = StyleSheet.create<Styles>({
     padding: 40,
     paddingVertical: 20,
   },
-  stepsContainer: {
-    flexDirection: "column",
-    gap: 24,
+  slideshowContainer: {
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  step: {
-    alignItems: "center",
+  iconContainer: {
+  backgroundColor: 'rgba(255,255,255,0.3)',
+  width: 70,
+  height: 70,
+  borderRadius: 35,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 16,
+},
+  slide: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 30,
+  borderRadius: 20,
+  width: '90%',
+  maxWidth: 350,
+},
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ccc',
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: '#1976d2',
   },
   stepIcon: {
     fontSize: 32,

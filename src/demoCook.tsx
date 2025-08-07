@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,16 +12,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
 import RazorpayCheckout from 'react-native-razorpay';
 import { BookingDetails } from './types/engagementRequest';
 import { BOOKINGS } from './Constants/pagesConstants';
 import axiosInstance from './axiosInstance';
-import CheckoutWithAgreement from './CheckoutWithAgreement';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { usePricingFilterService } from './utils/PricingFilter';
 
 // Redux actions
 import { addToCart, removeFromCart, updateCartItem } from './features/addToSlice';
+import { CartDialog } from './CartDialog';
 
 interface Package {
   name: string;
@@ -33,18 +33,43 @@ interface Package {
   selected?: boolean;
   persons?: number;
   inCart?: boolean;
+  bookingType?: string;
 }
 
-const calculatePriceForPersons = (basePrice: number, persons: number): number => {
-  if (persons <= 3) return basePrice;
-  if (persons <= 6) return basePrice + basePrice * 0.2 * (persons - 3);
-  if (persons <= 9) {
+interface MealCartItem {
+  type: 'meal';
+  id: string;
+  mealType: string;
+  persons: number;
+  price: number;
+  description: string;
+  basePrice: number;
+  maxPersons: number;
+  bookingType: string;
+}
+
+const calculatePriceForPersons = (basePrice: number, persons: number, bookingType: string): number => {
+  if (bookingType === 'ON_DEMAND') {
+    if (persons <= 3) return basePrice;
+    if (persons <= 6) return basePrice + basePrice * 0.2 * (persons - 3);
+    if (persons <= 9) {
+      const base = basePrice + basePrice * 0.2 * 3;
+      return base + base * 0.1 * (persons - 6);
+    }
     const base = basePrice + basePrice * 0.2 * 3;
-    return base + base * 0.1 * (persons - 6);
+    const extraBase = base + base * 0.1 * 3;
+    return extraBase + extraBase * 0.05 * (persons - 9);
+  } else {
+    if (persons <= 3) return basePrice;
+    if (persons <= 6) return basePrice + basePrice * 0.2 * (persons - 3);
+    if (persons <= 9) {
+      const base = basePrice + basePrice * 0.2 * 3;
+      return base + base * 0.1 * (persons - 6);
+    }
+    const base = basePrice + basePrice * 0.2 * 3;
+    const extraBase = base + base * 0.1 * 3;
+    return extraBase + extraBase * 0.05 * (persons - 9);
   }
-  const base = basePrice + basePrice * 0.2 * 3;
-  const extraBase = base + base * 0.1 * 3;
-  return extraBase + extraBase * 0.05 * (persons - 9);
 };
 
 const DemoCook = ({
@@ -58,88 +83,108 @@ const DemoCook = ({
 }: any) => {
   const dispatch = useDispatch();
   const cart = useSelector((state: any) => state.addToCart?.items || []);
+  const { getFilteredPricing } = usePricingFilterService();
   
-  const [packages, setPackages] = useState<Package[]>([
-    {
-      name: 'Breakfast',
-      price: 2000,
-      rating: 4.8,
-      reviews: '2.9M reviews',
-      prepTime: '30 mins preparation',
-      includes: ['5-8 chapatis/parathas', '1 dry veg/non-veg item'],
-      selected: false,
-      persons: 1,
-      inCart: false,
-    },
-    {
-      name: 'Lunch',
-      price: 3500,
-      rating: 4.84,
-      reviews: '1.7M reviews',
-      prepTime: '45 mins preparation',
-      includes: [
-        '5-8 chapatis/parathas',
-        '1 dry veg/non-veg item',
-        '1 gravy veg/non-veg item',
-        'Rice',
-      ],
-      selected: false,
-      persons: 1,
-      inCart: false,
-    },
-    {
-      name: 'Dinner',
-      price: 3500,
-      rating: 4.84,
-      reviews: '2.7M reviews',
-      prepTime: '1.5 hrs preparation',
-      includes: [
-        '5-8 chapatis/parathas',
-        '1 dry veg/non-veg item',
-        '1 gravy veg/non-veg item',
-        'Rice',
-      ],
-      selected: false,
-      persons: 1,
-      inCart: false,
-    },
-  ]);
-  
+  const cookPricing = useMemo(() => getFilteredPricing('COOK'), [getFilteredPricing]);
+  const [showCartDialog, setShowCartDialog] = useState(false);
+
+  const [packages, setPackages] = useState<Package[]>([]);
   const [voucher, setVoucher] = useState('');
   const [agreementDialogOpen, setAgreementDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      console.log("User Info:", user);
-      console.log("Name:", user.name);
-      console.log("Customer ID:", user.customerid);
+  const getIncludesForPackage = useCallback((serviceName: string, bookingType: string): string[] => {
+    if (bookingType === 'ON_DEMAND') {
+      if (serviceName === 'Breakfast') {
+        return ['5-8 chapatis/parathas', '1 dry veg/non-veg item'];
+      } else {
+        return ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice'];
+      }
+    } else {
+      if (serviceName === 'Breakfast') {
+        return ['5-8 chapatis/parathas', '1 dry veg/non-veg item', 'Daily service'];
+      } else {
+        return ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice', 'Daily service'];
+      }
     }
-  }, [user]);
+  }, []);
 
-  const initialBookingDetails: BookingDetails = {
-    serviceProviderId: 0,
-    serviceProviderName: "",
-    customerId: 0,
-    customerName: "", 
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: "",
-    engagements: "",
-    address: "",
-    timeslot: "",
-    monthlyAmount: 0,
-    paymentMode: "UPI",
-    bookingType: "",
-    taskStatus: "NOT_STARTED", 
-    serviceType: "COOK",
-    responsibilities: [],
-  };
+  const initialPackages = useMemo(() => {
+    const isOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
+    
+    if (cookPricing && cookPricing.length > 0) {
+      return cookPricing.map((item: any) => ({
+        name: item.ServiceName || '',
+        price: item.Price || 0,
+        rating: 4.8,
+        reviews: '1.7M reviews',
+        prepTime: item.BookingType === 'On Demand' ? '30 mins preparation' : '45 mins preparation',
+        includes: getIncludesForPackage(item.ServiceName, item.BookingType === 'On Demand' ? 'ON_DEMAND' : 'REGULAR'),
+        selected: false,
+        persons: 1,
+        inCart: false,
+        bookingType: item.BookingType === 'On Demand' ? 'ON_DEMAND' : 'REGULAR'
+      }));
+    }
+
+    return [
+      {
+        name: 'Breakfast',
+        price: isOnDemand ? 200 : 2000,
+        rating: 4.8,
+        reviews: '2.9M reviews',
+        prepTime: isOnDemand ? '30 mins preparation' : '45 mins preparation',
+        includes: isOnDemand 
+          ? ['5-8 chapatis/parathas', '1 dry veg/non-veg item'] 
+          : ['5-8 chapatis/parathas', '1 dry veg/non-veg item', 'Daily service'],
+        selected: false,
+        persons: 1,
+        inCart: false,
+        bookingType: isOnDemand ? 'ON_DEMAND' : 'REGULAR'
+      },
+      {
+        name: 'Lunch',
+        price: isOnDemand ? 300 : 3500,
+        rating: 4.84,
+        reviews: '1.7M reviews',
+        prepTime: isOnDemand ? '45 mins preparation' : '1 hour preparation',
+        includes: isOnDemand 
+          ? ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice']
+          : ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice', 'Daily service'],
+        selected: false,
+        persons: 1,
+        inCart: false,
+        bookingType: isOnDemand ? 'ON_DEMAND' : 'REGULAR'
+      },
+      {
+        name: 'Dinner',
+        price: isOnDemand ? 300 : 3500,
+        rating: 4.84,
+        reviews: '2.7M reviews',
+        prepTime: isOnDemand ? '1.5 hrs preparation' : '1 hour preparation',
+        includes: isOnDemand 
+          ? ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice']
+          : ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice', 'Daily service'],
+        selected: false,
+        persons: 1,
+        inCart: false,
+        bookingType: isOnDemand ? 'ON_DEMAND' : 'REGULAR'
+      },
+    ];
+  }, [cookPricing, bookingType?.bookingPreference, getIncludesForPackage]);
 
   useEffect(() => {
+    if (packages.length === 0 && initialPackages.length > 0) {
+      setPackages(initialPackages);
+    }
+  }, [initialPackages, packages.length]);
+
+  useEffect(() => {
+    if (packages.length === 0) return;
+
     const updatedPackages = packages.map(pkg => {
       const cartItem = cart.find((item: any) => 
-        item.type === 'meal' && 
-        item.mealType === pkg.name.toUpperCase()
+        item.type === 'meal' && item.mealType === pkg.name.toUpperCase()
       );
       
       return {
@@ -149,9 +194,9 @@ const DemoCook = ({
         inCart: !!cartItem
       };
     });
-    
+
     setPackages(updatedPackages);
-  }, []);
+  }, [cart]);
 
   const handlePersonChange = (index: number, operation: 'increment' | 'decrement') => {
     setPackages(prev => {
@@ -165,17 +210,20 @@ const DemoCook = ({
       }
       
       if (currentPackage.inCart) {
-        dispatch(updateCartItem({
-          id: currentPackage.name.toUpperCase(),
-          type: 'meal',
-          updates: {
-            persons: currentPackage.persons,
-            price: calculatePriceForPersons(currentPackage.price, currentPackage.persons || 1),
-            description: currentPackage.includes.join(', '),
-            basePrice: currentPackage.price,
-            maxPersons: 15
-          }
-        }));
+        setTimeout(() => {
+          dispatch(updateCartItem({
+            id: currentPackage.name.toUpperCase(),
+            type: 'meal',
+            updates: {
+              persons: currentPackage.persons,
+              price: calculatePriceForPersons(currentPackage.price, currentPackage.persons || 1, currentPackage.bookingType || 'REGULAR'),
+              description: currentPackage.includes.join(', '),
+              basePrice: currentPackage.price,
+              maxPersons: 15,
+              bookingType: currentPackage.bookingType || 'REGULAR'
+            }
+          }));
+        }, 0);
       }
       
       return updated;
@@ -188,23 +236,26 @@ const DemoCook = ({
       const currentPackage = updated[index];
       const newInCartState = !currentPackage.inCart;
 
-      if (newInCartState) {
-        dispatch(addToCart({
-          type: 'meal',
-          id: currentPackage.name.toUpperCase(),
-          mealType: currentPackage.name.toUpperCase(),
-          persons: currentPackage.persons || 1,
-          price: calculatePriceForPersons(currentPackage.price, currentPackage.persons || 1),
-          description: currentPackage.includes.join(', '),
-          basePrice: currentPackage.price,
-          maxPersons: 15
-        }));
-      } else {
-        dispatch(removeFromCart({
-          id: currentPackage.name.toUpperCase(),
-          type: 'meal'
-        }));
-      }
+      setTimeout(() => {
+        if (newInCartState) {
+          dispatch(addToCart({
+            type: 'meal',
+            id: currentPackage.name.toUpperCase(),
+            mealType: currentPackage.name.toUpperCase(),
+            persons: currentPackage.persons || 1,
+            price: calculatePriceForPersons(currentPackage.price, currentPackage.persons || 1, currentPackage.bookingType || 'REGULAR'),
+            description: currentPackage.includes.join(', '),
+            basePrice: currentPackage.price,
+            maxPersons: 15,
+            bookingType: currentPackage.bookingType || 'REGULAR'
+          }));
+        } else {
+          dispatch(removeFromCart({
+            id: currentPackage.name.toUpperCase(),
+            type: 'meal'
+          }));
+        }
+      }, 0);
 
       updated[index] = {
         ...currentPackage,
@@ -225,17 +276,11 @@ const DemoCook = ({
     return 'MONTHLY';
   };
 
-  const handleOpenAgreementDialog = () => {
-    const selectedCount = packages.filter(pkg => pkg.inCart).length;
-    if (selectedCount === 0) {
-      Alert.alert("Please add at least one package to cart");
-      return;
-    }
-    setAgreementDialogOpen(true);
-  };
+ 
 
   const handleProceedToPayment = async () => {
-    setAgreementDialogOpen(false);
+   
+    setShowCartDialog(false); // Close cart dialog
     await handleCheckout();
   };
 
@@ -251,7 +296,7 @@ const DemoCook = ({
       }
 
       const totalAmount = selectedPackages.reduce(
-        (sum, pkg) => sum + calculatePriceForPersons(pkg.price, pkg.persons || 1),
+        (sum, pkg) => sum + calculatePriceForPersons(pkg.price, pkg.persons || 1, pkg.bookingType || 'REGULAR'),
         0
       ) * 100;
 
@@ -267,7 +312,7 @@ const DemoCook = ({
         timeslot: '10:00 AM - 2:00 PM',
         monthlyAmount: totalAmount / 100,
         paymentMode: 'UPI',
-        bookingType: bookingType || 'DEMO',
+        bookingType: bookingType?.bookingPreference ? getBookingTypeFromPreference(bookingType.bookingPreference) : 'DEMO',
         taskStatus: 'COMPLETED',
         serviceType: 'COOK',
         responsibilities: []
@@ -337,7 +382,7 @@ const DemoCook = ({
   const getTotal = () => {
     return packages.reduce((sum, pkg) => {
       if (!pkg.inCart) return sum;
-      return sum + calculatePriceForPersons(pkg.price, pkg.persons || 1);
+      return sum + calculatePriceForPersons(pkg.price, pkg.persons || 1, pkg.bookingType || 'REGULAR');
     }, 0);
   };
 
@@ -428,10 +473,13 @@ const DemoCook = ({
                         <Text style={[styles.ratingValue, { color: '#3399cc' }]}>{pkg.rating}</Text>
                         <Text style={styles.reviewsText}>({pkg.reviews})</Text>
                       </View>
+                      <Text style={styles.bookingTypeText}>
+                        {pkg.bookingType === 'ON_DEMAND' ? 'On Demand' : 'Regular'} • {pkg.bookingType === 'ON_DEMAND' ? 'Per Day' : 'Per Month'}
+                      </Text>
                     </View>
                     <View style={styles.priceContainer}>
                       <Text style={[styles.priceValue, { color: '#3399cc' }]}>
-                        ₹{calculatePriceForPersons(pkg.price, pkg.persons || 1).toFixed(2)}
+                        ₹{calculatePriceForPersons(pkg.price, pkg.persons || 1, pkg.bookingType || 'REGULAR').toFixed(2)}
                       </Text>
                       <Text style={styles.preparationTime}>{pkg.prepTime}</Text>
                     </View>
@@ -529,7 +577,7 @@ const DemoCook = ({
                   styles.checkoutButton,
                   selectedCount === 0 && styles.disabledButton
                 ]}
-                onPress={handleOpenAgreementDialog}
+               onPress={() => setShowCartDialog(true)}
                 disabled={selectedCount === 0}
               >
                 {loading ? (
@@ -543,11 +591,13 @@ const DemoCook = ({
         </View>
       </View>
 
-      <CheckoutWithAgreement
-        open={agreementDialogOpen}
-        onClose={() => setAgreementDialogOpen(false)}
-        onProceed={handleProceedToPayment}
+      {/* Add CartDialog component */}
+      <CartDialog
+        open={showCartDialog}
+        handleClose={() => setShowCartDialog(false)}
+        handleCheckout={handleProceedToPayment}
       />
+    
     </Modal>
   );
 };
@@ -622,6 +672,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 5,
     color: '#333',
+  },
+  bookingTypeText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 3,
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -806,7 +861,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-   backIcon: {
+  backIcon: {
     padding: 5,
     marginRight: 10,
   },
