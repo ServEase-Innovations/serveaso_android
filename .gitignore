@@ -1,11 +1,18 @@
-android/app/build/
-android/build/
+# Node modules
+/node_modules/
+
+# Android
+/android/.gradle/
+/android/app/build/
+/android/build/
+/*.apk
 *.apk
 *.so
-/node_modules
-/android/app/build/android/app/build/
-*.apk
-*.so
-node_modules
-node_modules
+
+# iOS
+/ios/build/
+/ios/Pods/
+
+# Misc
+*.keystore
 android/app/debug.keystore
