@@ -293,7 +293,8 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
   const handleSignOut = async () => {
     try {
       await clearSession({
-        federated: false, // optional, set to true if you want to log out from identity provider too
+        // federated: false, // optional, set to true if you want to log out from identity provider too
+        returnToUrl: 'com.serveaso://logout'
       });
   
       dispatch(remove());
@@ -316,7 +317,7 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
       await authorize(
         {
           scope: 'openid profile email',
-          redirectUrl: 'com.awesomeproject://dev-plavkbiy7v55pbg4.us.auth0.com/android/com.awesomeproject/callback',
+          redirectUrl: 'com.serveaso://dev-plavkbiy7v55pbg4.us.auth0.com/android/com.serveaso/callback',
         }
       );
   

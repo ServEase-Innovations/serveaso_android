@@ -1,18 +1,115 @@
+# -------------------------
+# React Native Common
+# -------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+*.log
+
+# Metro cache
+.expo/
+.expo-shared/
+.cache/
+react-native-packager-cache-*
+react-packager-cache-*
+metro-cache/
+
+# Bundle output
+*.jsbundle
+*.map
+*.pack
+*.pack.gz
+
+# -------------------------
+# Android
+# -------------------------
+/android/.gradle/
+/android/.cxx/
+/android/build/
+/android/app/build/
+/android/app/.cxx/
+/android/local.properties
+
+# Gradle
+.gradle/
+/build/
+
+# NDK / CMake output
+**/obj/
+**/gen/
+.cxx/
+.externalNativeBuild/
+
+# IntelliJ / Android Studio
+*.iml
+.idea/
+*.ipr
+*.iws
+out/
+
+# Keystore files
+*.keystore
+*.jks
+
+# -------------------------
+# iOS
+# -------------------------
+/ios/Pods/
+/ios/build/
+/ios/DerivedData/
+/ios/.xcodeproj/*
+/ios/.xcworkspace/*
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# -------------------------
+# macOS / Windows
+# -------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# -------------------------
+# VSCode
+# -------------------------
+.vscode/
+.history/
+
+# -------------------------
+# Env files
+# -------------------------
+.env
+.env.*
+
+# Android build files
+/android/.gradle/
+/android/build/
+/android/.cxx/
+
+# iOS build files
+/ios/Pods/
+/ios/build/
+
 # Node modules
 /node_modules/
 
-# Android
+
+# Android build files
 /android/.gradle/
-/android/app/build/
 /android/build/
-/*.apk
-*.apk
-*.so
+/android/.cxx/
 
-# iOS
-/ios/build/
+# iOS build files
 /ios/Pods/
+/ios/build/
 
-# Misc
-*.keystore
-android/app/debug.keystore
+# Node modules
+/node_modules/
+
+# Add this to .gitignore
+android/app/.cxx/
