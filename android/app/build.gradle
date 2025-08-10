@@ -123,6 +123,7 @@ dependencies {
     implementation("com.facebook.react:react-android")
     implementation ("com.google.android.gms:play-services-location:21.0.1")
      implementation ("com.google.android.gms:play-services-maps:18.2.0")
+     implementation 'com.razorpay:checkout:1.6.20' 
      
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
