@@ -106,34 +106,47 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
     console.log("User role is:", user?.role);
   }, [user]);
 
+  useEffect(() => {
+    requestLocationPermission();
+  }, []);
+  
   const requestLocationPermission = async () => {
-    if (Platform.OS === "android") {
-      try {
+    try {
+      if (Platform.OS === "android") {
         const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: "Location Permission",
+            message: "We need access to your location",
+            buttonNeutral: "Ask Me Later",
+            buttonNegative: "Cancel",
+            buttonPositive: "OK",
+          }
         );
+  
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
           getCurrentLocation();
         } else {
           Alert.alert("Permission Denied", "Location permission is required.");
         }
-      } catch (err) {
-        console.warn(err);
+      } else {
+        // iOS automatically asks for permission when calling getCurrentPosition
+        getCurrentLocation();
       }
-    } else {
-      getCurrentLocation();
+    } catch (err) {
+      console.warn(err);
     }
   };
-
+  
   const getCurrentLocation = () => {
+  
     Geolocation.getCurrentPosition(
       async (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-
+        const { latitude, longitude } = position.coords;
+  
         try {
           const res = await axios.get(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
             {
               headers: {
                 "User-Agent": "ReactNativeApp",
@@ -141,8 +154,8 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
               },
             }
           );
-
-          if (res.data && res.data.display_name) {
+  
+          if (res.data?.display_name) {
             setLocation(res.data.display_name);
             setAddress(res.data.display_name);
           }
@@ -151,12 +164,18 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
         }
       },
       (error) => {
-        console.error(error);
-        Alert.alert("Error", "Unable to fetch location.");
+        console.error("Location error:", error);
+        Alert.alert("Error", error.message || "Unable to fetch location.");
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      {
+        enableHighAccuracy: false,
+        timeout: 60000,
+        maximumAge: 10000,
+      }
     );
   };
+  
+  
 
   const checkLocationAccuracy = async (): Promise<void> => {
     if (Platform.OS === 'android') {
@@ -207,9 +226,7 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
     }
   };
 
-  useEffect(() => {
-    requestLocationPermission();
-  }, []);
+  
 
   const fetchLocation = () => {
     setLoading(true);
