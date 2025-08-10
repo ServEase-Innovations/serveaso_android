@@ -13,6 +13,7 @@ import {
   Alert,
   Linking,
   TouchableWithoutFeedback,
+  PermissionsAndroid,
 } from 'react-native';
 import axios from 'axios';
 import { keys } from './env';
@@ -105,27 +106,56 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
     console.log("User role is:", user?.role);
   }, [user]);
 
-  const requestLocationPermission = async (): Promise<boolean> => {
-    try {
-      if (Platform.OS === 'android') {
-        const [fineStatus, coarseStatus] = await Promise.all([
-          request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION),
-          request(PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION),
-        ]);
-
-        if (Platform.Version >= 31) {
-          await request(PERMISSIONS.ANDROID.BLUETOOTH_SCAN);
+  const requestLocationPermission = async () => {
+    if (Platform.OS === "android") {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          getCurrentLocation();
+        } else {
+          Alert.alert("Permission Denied", "Location permission is required.");
         }
-
-        return fineStatus === RESULTS.GRANTED || coarseStatus === RESULTS.GRANTED;
-      } else {
-        const iosStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-        return iosStatus === RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
       }
-    } catch (err) {
-      console.warn('Permission request error:', err);
-      return false;
+    } else {
+      getCurrentLocation();
     }
+  };
+
+  const getCurrentLocation = () => {
+    Geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        try {
+          const res = await axios.get(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+            {
+              headers: {
+                "User-Agent": "ReactNativeApp",
+                "Accept-Language": "en",
+              },
+            }
+          );
+
+          if (res.data && res.data.display_name) {
+            setLocation(res.data.display_name);
+            setAddress(res.data.display_name);
+          }
+        } catch (error) {
+          console.error("Error getting address:", error);
+        }
+      },
+      (error) => {
+        console.error(error);
+        Alert.alert("Error", "Unable to fetch location.");
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
   };
 
   const checkLocationAccuracy = async (): Promise<void> => {
@@ -177,6 +207,10 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
     }
   };
 
+  useEffect(() => {
+    requestLocationPermission();
+  }, []);
+
   const fetchLocation = () => {
     setLoading(true);
     setShowGPSButton(false);
@@ -184,6 +218,7 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
     Geolocation.getCurrentPosition(
       position => {
         const { latitude, longitude } = position.coords;
+        Alert.alert('Location fetched successfully', `Lat: ${latitude}, Lng: ${longitude}`);
         setLatitude(latitude);
         setLongitude(longitude);
         getAddressFromCoords(latitude, longitude);
