@@ -33,6 +33,7 @@ import {useAuth0} from 'react-native-auth0';
 import config from '../auth0-configuration';
 import { selectCartItems } from './features/addToSlice';
 import {CartDialog} from './CartDialog';
+import ProfileScreen from './ProfileScreen';
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
@@ -41,36 +42,6 @@ interface ChildComponentProps {
 Geocoder.init(keys.api_key);
 
 const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
-  // const handleClick = (e: any) => {
-  //   if (e === 'sign_out') {
-  //     dispatch(remove());
-  //     sendDataToParent("");
-  //   } else {
-  //     sendDataToParent(e);
-  //   }
-  // };
-//  const handleClick = (e: any) => {
-//     if (e === 'sign_out') {
-//       dispatch(remove());
-//       sendDataToParent("");
-//     } else if (e === 'HOME') {
-//       sendDataToParent("HOME"); // This will trigger the view change in App.tsx
-//     } else {
-//       sendDataToParent(e);
-//     }
-//   };
-const handleClick = (e: any) => {
-  if (e === 'sign_out') {
-    dispatch(remove());
-    sendDataToParent("");
-  } else if (e === 'HOME') {
-    sendDataToParent("HOME");
-  } else {
-    sendDataToParent(e);
-  }
-};
-
-// ...
 
 const handleBookingHistoryClick = () => {
   setMenuVisible(false);
@@ -97,6 +68,7 @@ const handleBookingHistoryClick = () => {
   const [isCheckingLocation, setIsCheckingLocation] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
    const cartItems = useSelector(selectCartItems);
+ const [currentPage, setCurrentPage] = useState('');
 
 const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Error, isLoading: auth0Loading} = useAuth0();
 
@@ -304,7 +276,15 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
     }
   };
   
-
+const handleClick = (e: any) => {
+    setCurrentPage(e);
+    if (e === 'sign_out') {
+      dispatch(remove());
+      sendDataToParent("");
+    } else {
+      sendDataToParent(e);
+    }
+  };
   // const handleLoginClick = () => {
   //   setMenuVisible(false);
   //   handleClick(LOGIN);
@@ -513,16 +493,17 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
                   >
                     <Text style={styles.menuItemText}>Dashboard</Text>
                   </TouchableOpacity>
-
-      </>
-    ) : (
-      <>
-        <TouchableOpacity 
+                   <TouchableOpacity 
           style={styles.menuItem} 
           onPress={handleProfileClick}
         >
           <Text style={styles.menuItemText}>Profile</Text>
         </TouchableOpacity>
+
+      </>
+    ) : (
+      <>
+       
         
       
         

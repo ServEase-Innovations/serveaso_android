@@ -714,6 +714,7 @@ interface Styles {
   disabledInput: ViewStyle;
   dialogOverlay: ViewStyle;
   dialogBox: ViewStyle;
+  iconContainer:ViewStyle;
 }
 
 const styles = StyleSheet.create<Styles>({
@@ -865,7 +866,7 @@ const styles = StyleSheet.create<Styles>({
     marginTop: 8,
   },
   howItWorksSection: {
-    backgroundColor: "#e6f2ff",
+    backgroundColor: "#ffffffff",
     padding: 40,
     paddingVertical: 20,
   },

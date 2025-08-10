@@ -9,8 +9,9 @@ import DetailsView from './src/DetailsView';
 import Footer from './src/Footer';
 import Chatbot from './src/Chatbot';
 import Booking from './src/Bookings';
-import Dashboard from './src/ServiceProvider/Dashboard'; // Import the Dashboard component
-import { BOOKINGS, DASHBOARD } from './src/Constants/pagesConstants'; // Add DASHBOARD to the import
+import Dashboard from './src/ServiceProvider/Dashboard';
+import ProfileScreen from './src/ProfileScreen';
+import { BOOKINGS, DASHBOARD, PROFILE } from './src/Constants/pagesConstants';
 
 const App = () => {
   const [chatbotOpen, setChatbotOpen] = useState(false);
@@ -18,15 +19,7 @@ const App = () => {
   const [selectedBookingType, setSelectedBookingType] = useState('');
 
   const handleViewChange = (view: string) => {
-    if (view === 'HOME') {
-      setCurrentView('HOME');
-    } else if (view === BOOKINGS) {
-      setCurrentView(BOOKINGS);
-    } else if (view === DASHBOARD) { // Add this condition
-      setCurrentView(DASHBOARD);
-    } else {
-      setCurrentView(view);
-    }
+    setCurrentView(view);
   };
 
   const handleBookingType = (type: string) => {
@@ -44,8 +37,10 @@ const App = () => {
         );
       case BOOKINGS:
         return <Booking />;
-      case DASHBOARD: // Add this case
+      case DASHBOARD:
         return <Dashboard />;
+      case PROFILE:
+        return <ProfileScreen />;
       default:
         return (
           <DetailsView 
@@ -60,35 +55,43 @@ const App = () => {
     <Auth0Provider domain={config.domain} clientId={config.clientId}>
       <SafeAreaProvider>
         <StatusBar backgroundColor="#fff" barStyle="dark-content" />
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
-          <View style={styles.container}>
-            {/* Fixed Header */}
-            <View style={styles.header}>
-              <Head sendDataToParent={handleViewChange} />
-            </View>
-
-            {/* Scrollable Content */}
-            <View style={styles.contentContainer}>
-              <SafeAreaView style={styles.body} edges={['bottom']}>
-                <ScrollView 
-                  contentContainerStyle={[
-                    styles.scrollContent,
-                    (currentView === BOOKINGS || currentView === DASHBOARD) && styles.fullScreenScrollContent
-                  ]}
-                  contentInsetAdjustmentBehavior="automatic"
-                >
-                  {renderContent()}
-                  {currentView !== BOOKINGS && currentView !== DASHBOARD && <Footer />}
-                </ScrollView>
-              </SafeAreaView>
-            </View>
-
-            {/* Chatbot - Rendered outside the scroll view */}
-            <Chatbot 
-              open={chatbotOpen} 
-              onClose={() => setChatbotOpen(false)}
-            />
+        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+          {/* Header - Always visible */}
+          <View style={styles.header}>
+            <Head sendDataToParent={handleViewChange} />
           </View>
+
+          {/* Main Content */}
+          <View style={styles.contentContainer}>
+            {currentView === PROFILE ? (
+              // For ProfileScreen, use a separate ScrollView with flex: 1
+              <ScrollView 
+                style={styles.profileScrollView}
+                contentContainerStyle={styles.profileScrollContent}
+              >
+                {renderContent()}
+              </ScrollView>
+            ) : (
+              // For other views, use the existing ScrollView
+              <ScrollView
+                contentContainerStyle={[
+                  styles.scrollContent,
+                  (currentView === BOOKINGS || currentView === DASHBOARD) && 
+                  styles.fullScreenScrollContent
+                ]}
+                contentInsetAdjustmentBehavior="automatic"
+              >
+                {renderContent()}
+                {currentView !== BOOKINGS && currentView !== DASHBOARD && <Footer />}
+              </ScrollView>
+            )}
+          </View>
+
+          {/* Chatbot */}
+          <Chatbot 
+            open={chatbotOpen} 
+            onClose={() => setChatbotOpen(false)}
+          />
         </SafeAreaView>
       </SafeAreaProvider>
     </Auth0Provider>
@@ -102,29 +105,30 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    position: 'relative',
   },
   header: {
     width: '100%',
     backgroundColor: '#fff',
     zIndex: 10,
     paddingTop: 0,
-    height: 45,
+    height: 60, // Increased height to prevent cutting
+    justifyContent: 'center',
   },
   contentContainer: {
     flex: 1,
-  },
-  body: {
-    flex: 1,
-    backgroundColor: '#fff',
   },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 20,
   },
-  fullScreenScrollContent: { // Renamed from bookingScrollContent to be more generic
+  fullScreenScrollContent: {
     paddingBottom: 0,
+  },
+  profileScrollView: {
+    flex: 1,
+  },
+  profileScrollContent: {
+    flexGrow: 1,
   },
 });
 

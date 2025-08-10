@@ -2,7 +2,7 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "C:/service/serveaso_android/android/app/build/intermediates/cxx/Debug/6m5f385u/obj/arm64-v8a/libappmodules.so"
+			"path" : "C:/service/serveaso_android/android/app/build/intermediates/cxx/Debug/6m5f385u/obj/x86/libappmodules.so"
 		}
 	],
 	"backtrace" : 3,
@@ -377,6 +377,10 @@
 		},
 		{
 			"backtrace" : 4,
+			"id" : "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba"
+		},
+		{
+			"backtrace" : 4,
 			"id" : "react_codegen_rnpicker::@e8bb2e9e833f47d0d516"
 		},
 		{
@@ -385,11 +389,7 @@
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_RNImagePickerSpec::@f66ee9a2efecfb28bee4"
+			"id" : "react_codegen_safeareacontext::@7984cd80db47aa7b952a"
 		},
 		{
 			"backtrace" : 4,
@@ -397,7 +397,7 @@
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_safeareacontext::@7984cd80db47aa7b952a"
+			"id" : "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d"
 		},
 		{
 			"backtrace" : 4,
@@ -405,11 +405,11 @@
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65"
+			"id" : "react_codegen_RNImagePickerSpec::@f66ee9a2efecfb28bee4"
 		},
 		{
 			"backtrace" : 4,
-			"id" : "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d"
+			"id" : "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65"
 		}
 	],
 	"id" : "appmodules::@6890427a1f51a3e7e1df",
@@ -418,42 +418,42 @@
 		"commandFragments" : 
 		[
 			{
-				"fragment" : "-Wl,-z,max-page-size=16384 -Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,--no-undefined-version -Wl,--fatal-warnings -Wl,--no-undefined -Qunused-arguments",
+				"fragment" : "-Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,--no-undefined-version -Wl,--fatal-warnings -Wl,--no-undefined -Qunused-arguments",
 				"role" : "flags"
 			},
 			{
 				"backtrace" : 4,
-				"fragment" : "C:\\service\\serveaso_android\\android\\app\\build\\intermediates\\cxx\\Debug\\6m5f385u\\obj\\arm64-v8a\\libreact_codegen_RNCSlider.so",
+				"fragment" : "C:\\service\\serveaso_android\\android\\app\\build\\intermediates\\cxx\\Debug\\6m5f385u\\obj\\x86\\libreact_codegen_RNCSlider.so",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 4,
-				"fragment" : "C:\\service\\serveaso_android\\android\\app\\build\\intermediates\\cxx\\Debug\\6m5f385u\\obj\\arm64-v8a\\libreact_codegen_rnpicker.so",
+				"fragment" : "C:\\service\\serveaso_android\\android\\app\\build\\intermediates\\cxx\\Debug\\6m5f385u\\obj\\x86\\libreact_codegen_rnpicker.so",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 4,
-				"fragment" : "C:\\service\\serveaso_android\\android\\app\\build\\intermediates\\cxx\\Debug\\6m5f385u\\obj\\arm64-v8a\\libreact_codegen_safeareacontext.so",
+				"fragment" : "C:\\service\\serveaso_android\\android\\app\\build\\intermediates\\cxx\\Debug\\6m5f385u\\obj\\x86\\libreact_codegen_safeareacontext.so",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 4,
-				"fragment" : "C:\\service\\serveaso_android\\android\\app\\build\\intermediates\\cxx\\Debug\\6m5f385u\\obj\\arm64-v8a\\libreact_codegen_rnsvg.so",
+				"fragment" : "C:\\service\\serveaso_android\\android\\app\\build\\intermediates\\cxx\\Debug\\6m5f385u\\obj\\x86\\libreact_codegen_rnsvg.so",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 5,
-				"fragment" : "C:\\Users\\91909\\.gradle\\caches\\8.13\\transforms\\72cde7dc85b5006383f56c98fcfedfa5\\transformed\\fbjni-0.7.0\\prefab\\modules\\fbjni\\libs\\android.arm64-v8a\\libfbjni.so",
+				"fragment" : "C:\\Users\\91909\\.gradle\\caches\\8.13\\transforms\\72cde7dc85b5006383f56c98fcfedfa5\\transformed\\fbjni-0.7.0\\prefab\\modules\\fbjni\\libs\\android.x86\\libfbjni.so",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 5,
-				"fragment" : "C:\\Users\\91909\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\jsi\\libs\\android.arm64-v8a\\libjsi.so",
+				"fragment" : "C:\\Users\\91909\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\jsi\\libs\\android.x86\\libjsi.so",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 5,
-				"fragment" : "C:\\Users\\91909\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\reactnative\\libs\\android.arm64-v8a\\libreactnative.so",
+				"fragment" : "C:\\Users\\91909\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\reactnative\\libs\\android.x86\\libreactnative.so",
 				"role" : "libraries"
 			},
 			{
@@ -564,337 +564,337 @@
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/ComponentDescriptors.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/ComponentDescriptors.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/EventEmitters.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/EventEmitters.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/Props.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/Props.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/ShadowNodes.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/ShadowNodes.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/States.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/States.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/rnasyncstorageJSI-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/react/renderer/components/rnasyncstorage/rnasyncstorageJSI-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/rnasyncstorage-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnasyncstorage_autolinked_build/CMakeFiles/react_codegen_rnasyncstorage.dir/rnasyncstorage-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/ComponentDescriptors.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/ComponentDescriptors.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/EventEmitters.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/EventEmitters.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/Props.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/Props.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/ShadowNodes.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/ShadowNodes.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/States.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/States.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/rnclipboardJSI-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/react/renderer/components/rnclipboard/rnclipboardJSI-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/rnclipboard-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/rnclipboard_autolinked_build/CMakeFiles/react_codegen_rnclipboard.dir/rnclipboard-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/RNDateTimePickerCGen-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/RNDateTimePickerCGen-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/ComponentDescriptors.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/ComponentDescriptors.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/EventEmitters.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/EventEmitters.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/Props.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/Props.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/RNDateTimePickerCGenJSI-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/RNDateTimePickerCGenJSI-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/ShadowNodes.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/ShadowNodes.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/States.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNDateTimePickerCGen_autolinked_build/CMakeFiles/react_codegen_RNDateTimePickerCGen.dir/react/renderer/components/RNDateTimePickerCGen/States.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/RNCGeolocationSpec-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/RNCGeolocationSpec-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/ComponentDescriptors.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/ComponentDescriptors.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/EventEmitters.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/EventEmitters.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/Props.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/Props.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/RNCGeolocationSpecJSI-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/RNCGeolocationSpecJSI-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/ShadowNodes.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/ShadowNodes.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/States.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNCGeolocationSpec_autolinked_build/CMakeFiles/react_codegen_RNCGeolocationSpec.dir/react/renderer/components/RNCGeolocationSpec/States.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/RNImagePickerSpec-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/RNImagePickerSpec-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ComponentDescriptors.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ComponentDescriptors.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/EventEmitters.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/EventEmitters.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/Props.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/Props.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/RNImagePickerSpecJSI-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/RNImagePickerSpecJSI-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ShadowNodes.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/ShadowNodes.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/States.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir/react/renderer/components/RNImagePickerSpec/States.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/RNMapsSpecs-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/RNMapsSpecs-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/ComponentDescriptors.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/ComponentDescriptors.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/EventEmitters.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/EventEmitters.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/Props.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/Props.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/RNMapsSpecsJSI-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/RNMapsSpecsJSI-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/ShadowNodes.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/ShadowNodes.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/States.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNMapsSpecs_autolinked_build/CMakeFiles/react_codegen_RNMapsSpecs.dir/react/renderer/components/RNMapsSpecs/States.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/RNPermissionsSpec-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/RNPermissionsSpec-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/ComponentDescriptors.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/ComponentDescriptors.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/EventEmitters.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/EventEmitters.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/Props.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/Props.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/RNPermissionsSpecJSI-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/RNPermissionsSpecJSI-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/ShadowNodes.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/ShadowNodes.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/States.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNPermissionsSpec_autolinked_build/CMakeFiles/react_codegen_RNPermissionsSpec.dir/react/renderer/components/RNPermissionsSpec/States.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/RNVectorIconsSpec-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/RNVectorIconsSpec-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/ComponentDescriptors.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/ComponentDescriptors.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/EventEmitters.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/EventEmitters.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/Props.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/Props.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/RNVectorIconsSpecJSI-generated.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/RNVectorIconsSpecJSI-generated.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/ShadowNodes.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/ShadowNodes.cpp.o",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 4,
 			"isGenerated" : true,
-			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/States.cpp.o",
+			"path" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/x86/RNVectorIconsSpec_autolinked_build/CMakeFiles/react_codegen_RNVectorIconsSpec.dir/react/renderer/components/RNVectorIconsSpec/States.cpp.o",
 			"sourceGroupIndex" : 1
 		}
 	],

@@ -258,91 +258,91 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "appmodules::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-appmodules-Debug-ec7db90fdfb9ba6f5455.json",
+					"jsonFile" : "target-appmodules-Debug-352df7e88ae6354a04c4.json",
 					"name" : "appmodules",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 4,
 					"id" : "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba",
-					"jsonFile" : "target-react_codegen_RNCGeolocationSpec-Debug-e2ea325bce42be6fbcd7.json",
+					"jsonFile" : "target-react_codegen_RNCGeolocationSpec-Debug-3c62b37a4dd6b06aeeb6.json",
 					"name" : "react_codegen_RNCGeolocationSpec",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 5,
 					"id" : "react_codegen_RNCSlider::@4898bc4726ecf1751b6a",
-					"jsonFile" : "target-react_codegen_RNCSlider-Debug-b1ed6a50d72f503e2937.json",
+					"jsonFile" : "target-react_codegen_RNCSlider-Debug-ab1e31664e25b53d556f.json",
 					"name" : "react_codegen_RNCSlider",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 3,
 					"id" : "react_codegen_RNDateTimePickerCGen::@59b70ddc31ba2f8ef1d2",
-					"jsonFile" : "target-react_codegen_RNDateTimePickerCGen-Debug-85b4178f47425638652b.json",
+					"jsonFile" : "target-react_codegen_RNDateTimePickerCGen-Debug-edb1dce8d7b04825d985.json",
 					"name" : "react_codegen_RNDateTimePickerCGen",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 7,
 					"id" : "react_codegen_RNImagePickerSpec::@f66ee9a2efecfb28bee4",
-					"jsonFile" : "target-react_codegen_RNImagePickerSpec-Debug-f813745bd661292e7ebb.json",
+					"jsonFile" : "target-react_codegen_RNImagePickerSpec-Debug-f1f5cd0f076a5588cbaf.json",
 					"name" : "react_codegen_RNImagePickerSpec",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 8,
 					"id" : "react_codegen_RNMapsSpecs::@5748abef1962d24942ec",
-					"jsonFile" : "target-react_codegen_RNMapsSpecs-Debug-951deb4e9894fb2ddf01.json",
+					"jsonFile" : "target-react_codegen_RNMapsSpecs-Debug-afced33bb381b4ecfcb9.json",
 					"name" : "react_codegen_RNMapsSpecs",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 9,
 					"id" : "react_codegen_RNPermissionsSpec::@7ad697819b753921c957",
-					"jsonFile" : "target-react_codegen_RNPermissionsSpec-Debug-93ce34ac66897308e0ec.json",
+					"jsonFile" : "target-react_codegen_RNPermissionsSpec-Debug-24e2a4ee19b3deed3ea4.json",
 					"name" : "react_codegen_RNPermissionsSpec",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 12,
 					"id" : "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d",
-					"jsonFile" : "target-react_codegen_RNVectorIconsSpec-Debug-b578db3e8ec5255c0c37.json",
+					"jsonFile" : "target-react_codegen_RNVectorIconsSpec-Debug-54fc18a59466cda3ccf5.json",
 					"name" : "react_codegen_RNVectorIconsSpec",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 1,
 					"id" : "react_codegen_rnasyncstorage::@1596841e19ec5b9eeffe",
-					"jsonFile" : "target-react_codegen_rnasyncstorage-Debug-bf600730b5e4b87b16a5.json",
+					"jsonFile" : "target-react_codegen_rnasyncstorage-Debug-0f6cfc5b01c3b038144d.json",
 					"name" : "react_codegen_rnasyncstorage",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 2,
 					"id" : "react_codegen_rnclipboard::@6385240493dfcaf22ab7",
-					"jsonFile" : "target-react_codegen_rnclipboard-Debug-023c5e5f98831c92b22a.json",
+					"jsonFile" : "target-react_codegen_rnclipboard-Debug-ce494d0e229c2644f2d5.json",
 					"name" : "react_codegen_rnclipboard",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 6,
 					"id" : "react_codegen_rnpicker::@e8bb2e9e833f47d0d516",
-					"jsonFile" : "target-react_codegen_rnpicker-Debug-77dfc8641f171218a3a2.json",
+					"jsonFile" : "target-react_codegen_rnpicker-Debug-830815ccd0c23c5f77fa.json",
 					"name" : "react_codegen_rnpicker",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 11,
 					"id" : "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65",
-					"jsonFile" : "target-react_codegen_rnsvg-Debug-96f945b9b6c948e6d640.json",
+					"jsonFile" : "target-react_codegen_rnsvg-Debug-d6779fc0efcae3760b73.json",
 					"name" : "react_codegen_rnsvg",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 10,
 					"id" : "react_codegen_safeareacontext::@7984cd80db47aa7b952a",
-					"jsonFile" : "target-react_codegen_safeareacontext-Debug-681af86df8d28e164afa.json",
+					"jsonFile" : "target-react_codegen_safeareacontext-Debug-ae7f5d15a36d5f58391c.json",
 					"name" : "react_codegen_safeareacontext",
 					"projectIndex" : 0
 				}
@@ -352,7 +352,7 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/arm64-v8a",
+		"build" : "C:/service/serveaso_android/android/app/.cxx/Debug/6m5f385u/armeabi-v7a",
 		"source" : "C:/service/serveaso_android/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup"
 	},
 	"version" : 
