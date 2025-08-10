@@ -335,7 +335,7 @@ const DemoCook = ({
       // Replace totalAmount * 100 for amount in paise, not totalPersons
       const response = await axios.post(
         "https://utils-ndt3.onrender.com/create-order",
-        { amount: 100 * 100 }, // amount in paise
+        { amount: totalAmount * 100 }, // amount in paise
         {
           headers: { "Content-Type": "application/json" },
         }
