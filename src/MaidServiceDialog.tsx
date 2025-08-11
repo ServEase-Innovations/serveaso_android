@@ -303,6 +303,8 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
         { headers: { "Content-Type": "application/json" } }
       );
 
+      Alert.alert("getting called ....")
+
       if (response.status === 200 && response.data.success) {
         const orderId = response.data.orderId;
         const amount = totalAmount * 100;

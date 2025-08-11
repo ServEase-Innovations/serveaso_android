@@ -173,7 +173,7 @@ export const CartDialog: React.FC<CartDialogProps> = ({
                 disabled={allCartItems.length === 0}
               >
                 <Text style={styles.checkoutButtonText}>
-                  Proceed to Checkout (₹{grandTotal.toFixed(2)})
+                  Proceed to Checkout 1 (₹{grandTotal.toFixed(2)})
                 </Text>
               </TouchableOpacity>
             </View>

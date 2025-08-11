@@ -389,133 +389,136 @@ console.log('Pricing data from Redux:', pricing);
   };
 
   const handleCheckout = async () => {
-    try {
-      const selectedPackages = Object.entries(packages)
-        .filter(([_, pkg]) => pkg.selected)
-        .map(([name, pkg]) => ({
-          mealType: name.toUpperCase(),
-          persons: pkg.persons,
-          price: pkg.calculatedPrice,
-        }));
 
-      if (selectedPackages.length === 0) {
-        Alert.alert("Please select at least one package");
-        return;
-      }
 
-      const totalAmount = selectedPackages.reduce(
-        (sum, pkg) => sum + pkg.price,
-        0
-      );
-    const customerName = user?.name || "Guest";
-    const customerId = user?.customerid || "guest-id";
-      const response = await axios.post(
-        "https://utils-ndt3.onrender.com/create-order",
-        { amount: totalAmount * 100 },
-        { headers: { "Content-Type": "application/json" } }
-      );
+    Alert.alert("Getting called .... in handleCheckout cook services dialog");
+    // try {
+    //   const selectedPackages = Object.entries(packages)
+    //     .filter(([_, pkg]) => pkg.selected)
+    //     .map(([name, pkg]) => ({
+    //       mealType: name.toUpperCase(),
+    //       persons: pkg.persons,
+    //       price: pkg.calculatedPrice,
+    //     }));
 
-      if (response.status === 200 && response.data.success) {
-        const orderId = response.data.orderId;
-        const amount = totalAmount * 100;
-        const currency = "INR";
+    //   if (selectedPackages.length === 0) {
+    //     Alert.alert("Please select at least one package");
+    //     return;
+    //   }
 
-        if (typeof window.Razorpay === "undefined") {
-          Alert.alert("Razorpay SDK not loaded.");
-          return;
-        }
+    //   const totalAmount = selectedPackages.reduce(
+    //     (sum, pkg) => sum + pkg.price,
+    //     0
+    //   );
+    // const customerName = user?.name || "Guest";
+    // const customerId = user?.customerid || "guest-id";
+    //   const response = await axios.post(
+    //     "https://utils-ndt3.onrender.com/create-order",
+    //     { amount: totalAmount * 100 },
+    //     { headers: { "Content-Type": "application/json" } }
+    //   );
 
-        bookingDetails.serviceProviderId = providerDetails?.serviceproviderId
-          ? Number(providerDetails.serviceproviderId)
-          : null;
-        bookingDetails.serviceProviderName = providerFullName;
-        bookingDetails.customerId = customerId;
-        bookingDetails.customerName = customerName;
-        bookingDetails.address = currentLocation;
-        bookingDetails.startDate =bookingType?.startDate || "",
-        bookingDetails.endDate = bookingType?.endDate || "";
-        bookingDetails.engagements = selectedPackages
-          .map((pkg) => `${pkg.mealType} for ${pkg.persons} persons`)
-          .join(", ");
-        bookingDetails.monthlyAmount = totalAmount;
-        bookingDetails.timeslot = bookingType.timeRange;
-         bookingDetails.bookingType = getBookingTypeFromPreference(bookingType?.bookingPreference);
-        const options = {
-          key: "rzp_test_lTdgjtSRlEwreA",
-          amount,
-          currency,
-          name: "Serveaso",
-          description: "Meal Package Booking",
-          order_id: orderId,
-          handler: async function (razorpayResponse: any) {
-            Alert.alert(
-              `Payment successful! Payment ID: ${razorpayResponse.razorpay_payment_id}`
-            );
+    //   if (response.status === 200 && response.data.success) {
+    //     const orderId = response.data.orderId;
+    //     const amount = totalAmount * 100;
+    //     const currency = "INR";
 
-            try {
-              const bookingResponse = await axiosInstance.post(
-                "/api/serviceproviders/engagement/add",
-                bookingDetails,
-                {
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                }
-              );
+    //     if (typeof window.Razorpay === "undefined") {
+    //       Alert.alert("Razorpay SDK not loaded.");
+    //       return;
+    //     }
 
-              if (bookingResponse.status === 201) {
-                try {
-                  const notifyResponse = await fetch(
-                    "http://localhost:4000/send-notification",
-                    {
-                      method: "POST",
-                      body: JSON.stringify({
-                        title: "Hello from ServEaso!",
-                        body: `Your booking for ${bookingDetails.engagements} has been successfully confirmed!`,
-                        url: "http://localhost:3000",
-                      }),
-                      headers: { "Content-Type": "application/json" },
-                    }
-                  );
+    //     bookingDetails.serviceProviderId = providerDetails?.serviceproviderId
+    //       ? Number(providerDetails.serviceproviderId)
+    //       : null;
+    //     bookingDetails.serviceProviderName = providerFullName;
+    //     bookingDetails.customerId = customerId;
+    //     bookingDetails.customerName = customerName;
+    //     bookingDetails.address = currentLocation;
+    //     bookingDetails.startDate =bookingType?.startDate || "",
+    //     bookingDetails.endDate = bookingType?.endDate || "";
+    //     bookingDetails.engagements = selectedPackages
+    //       .map((pkg) => `${pkg.mealType} for ${pkg.persons} persons`)
+    //       .join(", ");
+    //     bookingDetails.monthlyAmount = totalAmount;
+    //     bookingDetails.timeslot = bookingType.timeRange;
+    //      bookingDetails.bookingType = getBookingTypeFromPreference(bookingType?.bookingPreference);
+    //     const options = {
+    //       key: "rzp_test_lTdgjtSRlEwreA",
+    //       amount,
+    //       currency,
+    //       name: "Serveaso",
+    //       description: "Meal Package Booking",
+    //       order_id: orderId,
+    //       handler: async function (razorpayResponse: any) {
+    //         Alert.alert(
+    //           `Payment successful! Payment ID: ${razorpayResponse.razorpay_payment_id}`
+    //         );
 
-                  if (notifyResponse.ok) {
-                    console.log("Notification triggered!");
-                    Alert.alert("Notification sent!");
-                  } else {
-                    console.error("Notification failed");
-                    Alert.alert("Failed to send notification");
-                  }
-                } catch (error) {
-                  console.error("Error sending notification:", error);
-                  Alert.alert("Error sending notification");
-                }
+    //         try {
+    //           const bookingResponse = await axiosInstance.post(
+    //             "/api/serviceproviders/engagement/add",
+    //             bookingDetails,
+    //             {
+    //               headers: {
+    //                 "Content-Type": "application/json",
+    //               },
+    //             }
+    //           );
 
-                if (sendDataToParent) {
-                  sendDataToParent(BOOKINGS);
-                }
-                handleClose();
-              }
-            } catch (error) {
-              console.error("Error saving booking:", error);
-            }
-          },
-          prefill: {
-            name: customerName || "",
-            email: user?.email || "",
-            contact: user?.mobileNo || "",
-          },
-          theme: {
-            color: "#3399cc",
-          },
-        };
+    //           if (bookingResponse.status === 201) {
+    //             try {
+    //               const notifyResponse = await fetch(
+    //                 "http://localhost:4000/send-notification",
+    //                 {
+    //                   method: "POST",
+    //                   body: JSON.stringify({
+    //                     title: "Hello from ServEaso!",
+    //                     body: `Your booking for ${bookingDetails.engagements} has been successfully confirmed!`,
+    //                     url: "http://localhost:3000",
+    //                   }),
+    //                   headers: { "Content-Type": "application/json" },
+    //                 }
+    //               );
 
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-      }
-    } catch (error) {
-      console.log("error => ", error);
-      Alert.alert("Failed to initiate payment. Please try again.");
-    }
+    //               if (notifyResponse.ok) {
+    //                 console.log("Notification triggered!");
+    //                 Alert.alert("Notification sent!");
+    //               } else {
+    //                 console.error("Notification failed");
+    //                 Alert.alert("Failed to send notification");
+    //               }
+    //             } catch (error) {
+    //               console.error("Error sending notification:", error);
+    //               Alert.alert("Error sending notification");
+    //             }
+
+    //             if (sendDataToParent) {
+    //               sendDataToParent(BOOKINGS);
+    //             }
+    //             handleClose();
+    //           }
+    //         } catch (error) {
+    //           console.error("Error saving booking:", error);
+    //         }
+    //       },
+    //       prefill: {
+    //         name: customerName || "",
+    //         email: user?.email || "",
+    //         contact: user?.mobileNo || "",
+    //       },
+    //       theme: {
+    //         color: "#3399cc",
+    //       },
+    //     };
+
+    //     const rzp = new window.Razorpay(options);
+    //     rzp.open();
+    //   }
+    // } catch (error) {
+    //   console.log("error => ", error);
+    //   Alert.alert("Failed to initiate payment. Please try again.");
+    // }
   };
 
   const renderPackageSections = () => {

@@ -1,4 +1,4 @@
-package com.awesomeproject
+package com.serveaso
 
 import android.content.Intent
 import android.provider.Settings
