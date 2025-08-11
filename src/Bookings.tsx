@@ -1,10 +1,75 @@
+
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { Calendar, Clock, MapPin, Phone, MessageCircle, Star, CheckCircle, XCircle, AlertCircle, History, Edit } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Pressable,
+  ViewStyle,
+  TextStyle,
+  StyleProp
+} from 'react-native';
+import { useAuth0 } from 'react-native-auth0';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axiosInstance from './axiosInstance';
+import dayjs from 'dayjs';
+
+// Keep these imports as they are
 import UserHoliday from './UserHoliday';
 import ModifyBookingDialog from './ModifyBookingDialog';
-import dayjs from 'dayjs';
+
+// Implement Card component
+const Card: React.FC<{ children: React.ReactNode; style?: StyleProp<ViewStyle> }> = ({ children, style }) => {
+  return (
+    <View style={[styles.card, style]}>
+      {children}
+    </View>
+  );
+};
+
+// Implement Button component
+const Button: React.FC<{
+  children: React.ReactNode;
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
+}> = ({ children, onPress, style, disabled = false }) => {
+  return (
+    <Pressable
+      style={[styles.button, style, disabled && styles.disabledButton]}
+      onPress={onPress}
+      disabled={disabled}
+    >
+      {children}
+    </Pressable>
+  );
+};
+
+// Implement Badge component
+const Badge: React.FC<{
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}> = ({ children, style }) => {
+  return (
+    <View style={[styles.badgeBase, style]}>
+      {children}
+    </View>
+  );
+};
+
+// Implement Separator component
+const Separator: React.FC<{ style?: StyleProp<ViewStyle> }> = ({ style }) => {
+  return (
+    <View style={[styles.separatorBase, style]} />
+  );
+};
 
 interface Booking {
   id: number;
@@ -28,60 +93,59 @@ interface Booking {
   experience: string;
   noOfPersons: string;
   mealType: string;
+  modifiedDate: string;
   responsibilities: string;
-  providerRating?: number; // Added optional providerRating property
 }
 
 const getServiceIcon = (type: string) => {
   switch (type) {
     case 'maid':
-      return '🧹';
+      return 'broom';
     case 'cleaning':
-      return '🧹';
+      return 'broom';
     case 'nanny':
-      return '❤️';
+      return 'heart';
     default:
-      return '👩‍🍳';
+      return 'chef-hat';
   }
 };
 
 const getStatusBadge = (status: string) => {
-  console.log("Status:", status);
   switch (status) {
     case 'ACTIVE':
       return (
-        <View style={[styles.badge, styles.activeBadge]}>
-          <AlertCircle size={12} color="#3b82f6" style={styles.badgeIcon} />
-          <Text style={[styles.badgeText, styles.activeText]}>Active</Text>
-        </View>
+        <Badge style={styles.activeBadge}>
+          <Icon name="alert-circle" size={14} color="#3b82f6" />
+          <Text style={styles.activeBadgeText}>Active</Text>
+        </Badge>
       );
     case 'COMPLETED':
       return (
-        <View style={[styles.badge, styles.completedBadge]}>
-          <CheckCircle size={12} color="#10b981" style={styles.badgeIcon} />
-          <Text style={[styles.badgeText, styles.completedText]}>Completed</Text>
-        </View>
+        <Badge style={styles.completedBadge}>
+          <Icon name="check-circle" size={14} color="#10b981" />
+          <Text style={styles.completedBadgeText}>Completed</Text>
+        </Badge>
       );
     case 'CANCELLED':
       return (
-        <View style={[styles.badge, styles.cancelledBadge]}>
-          <XCircle size={12} color="#ef4444" style={styles.badgeIcon} />
-          <Text style={[styles.badgeText, styles.cancelledText]}>Cancelled</Text>
-        </View>
+        <Badge style={styles.cancelledBadge}>
+          <Icon name="close-circle" size={14} color="#ef4444" />
+          <Text style={styles.cancelledBadgeText}>Cancelled</Text>
+        </Badge>
       );
     case 'IN_PROGRESS':
       return (
-        <View style={[styles.badge, styles.inProgressBadge]}>
-          <Clock size={12} color="#64748b" style={styles.badgeIcon} />
-          <Text style={[styles.badgeText, styles.inProgressText]}>In Progress</Text>
-        </View>
+        <Badge style={styles.inProgressBadge}>
+          <Icon name="clock" size={14} color="#6b7280" />
+          <Text style={styles.inProgressBadgeText}>In Progress</Text>
+        </Badge>
       );
     case 'NOT_STARTED':
       return (
-        <View style={[styles.badge, styles.notStartedBadge]}>
-          <Clock size={12} color="#64748b" style={styles.badgeIcon} />
-          <Text style={[styles.badgeText, styles.notStartedText]}>NOT_STARTED</Text>
-        </View>
+        <Badge style={styles.notStartedBadge}>
+          <Icon name="clock" size={14} color="#6b7280" />
+          <Text style={styles.notStartedBadgeText}>NOT_STARTED</Text>
+        </Badge>
       );
     default:
       return null;
@@ -92,27 +156,27 @@ const getBookingTypeBadge = (type: string) => {
   switch (type) {
     case 'ON_DEMAND':
       return (
-        <View style={[styles.typeBadge, styles.onDemandBadge]}>
-          <Text style={[styles.typeBadgeText, styles.onDemandText]}>On Demand</Text>
-        </View>
+        <Badge style={styles.onDemandBadge}>
+          <Text style={styles.onDemandBadgeText}>On Demand</Text>
+        </Badge>
       );
     case 'MONTHLY':
       return (
-        <View style={[styles.typeBadge, styles.monthlyBadge]}>
-          <Text style={[styles.typeBadgeText, styles.monthlyText]}>Monthly</Text>
-        </View>
+        <Badge style={styles.monthlyBadge}>
+          <Text style={styles.monthlyBadgeText}>Monthly</Text>
+        </Badge>
       );
     case 'SHORT_TERM':
       return (
-        <View style={[styles.typeBadge, styles.shortTermBadge]}>
-          <Text style={[styles.typeBadgeText, styles.shortTermText]}>Short Term</Text>
-        </View>
+        <Badge style={styles.shortTermBadge}>
+          <Text style={styles.shortTermBadgeText}>Short Term</Text>
+        </Badge>
       );
     default:
       return (
-        <View style={[styles.typeBadge, styles.defaultBadge]}>
-          <Text style={[styles.typeBadgeText, styles.defaultText]}>{type}</Text>
-        </View>
+        <Badge style={styles.defaultBadge}>
+          <Text style={styles.defaultBadgeText}>{type}</Text>
+        </Badge>
       );
   }
 };
@@ -122,9 +186,9 @@ const getServiceTitle = (type: string) => {
     case 'cook':
       return 'Home Cook';
     case 'maid':
-      return 'Maid';
+      return 'Maid Service';
     case 'nanny':
-      return 'Caregiver';
+      return 'Caregiver Service';
     default:
       return 'Home Service';
   }
@@ -142,11 +206,32 @@ const Booking: React.FC = () => {
   const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
   const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
   const [selectedBookingForLeave, setSelectedBookingForLeave] = useState<Booking | null>(null);
-  // const [customerId] = useState<number>(1); // Fixed customer ID
+  // const { user: auth0User, isAuthenticated } = useAuth0();
+  // const [customerId, setCustomerId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [modifiedBookings, setModifiedBookings] = useState<number[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+const { user: auth0User } = useAuth0();
+  const isAuthenticated = auth0User !== undefined && auth0User !== null;
 
-   const customerId = 1;
+  // Update your state initialization
+  const [customerId, setCustomerId] = useState<number | null>(
+    auth0User?.customerid ? Number(auth0User.customerid) : null
+  );
 
+  // useEffect(() => {
+  //   if (isAuthenticated && auth0User) {
+  //     setCustomerId(auth0User.customerid);
+  //   }
+  // }, [isAuthenticated, auth0User]);
+ // Update your useEffect
+  useEffect(() => {
+    if (auth0User) {
+      setCustomerId(auth0User.customerid ? Number(auth0User.customerid) : null);
+    }
+  }, [auth0User]);
+  
   const generateTimeSlots = async (serviceProviderId: number): Promise<string[]> => {
     try {
       const response = await axiosInstance.get(
@@ -159,10 +244,10 @@ const Booking: React.FC = () => {
       }));
 
       const fullTimeSlots: string[] = Array.from({ length: 15 }, (_, i) =>
-        `${(i + 6).toString().padStart(2, "0")}:00`
+        `${(i + 6).toString().padStart(2, '0')}:00`
       );
 
-      const processedSlots = engagementData.map((entry: any) => {
+      const processedSlots = engagementData.map((entry: { availableTimeSlots: Iterable<unknown> | null | undefined; id: any; }) => {
         const uniqueAvailableTimeSlots = Array.from(new Set(entry.availableTimeSlots)).sort();
         const missingTimeSlots = fullTimeSlots.filter(slot => !uniqueAvailableTimeSlots.includes(slot));
 
@@ -174,7 +259,7 @@ const Booking: React.FC = () => {
       });
 
       const uniqueMissingSlots: string[] = Array.from(
-        new Set(processedSlots.flatMap((slot: any) => slot.missingTimeSlots))
+        new Set(processedSlots.flatMap((slot: { missingTimeSlots: any; }) => slot.missingTimeSlots))
       ).sort() as string[];
 
       setUniqueMissingSlots(uniqueMissingSlots);
@@ -186,64 +271,61 @@ const Booking: React.FC = () => {
     }
   };
 
- useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const page = 0;
-        const size = 100;
+  const mapBookingData = (data: any[]) => {
+    return Array.isArray(data)
+      ? data.map((item) => {
+          return {
+            id: item.id,
+            customerId: item.customerId,
+            serviceProviderId: item.serviceProviderId,
+            name: item.customerName,
+            timeSlot: item.timeslot,
+            date: item.startDate,
+            startDate: item.startDate,
+            endDate: item.endDate,
+            bookingType: item.bookingType,
+            monthlyAmount: item.monthlyAmount,
+            paymentMode: item.paymentMode,
+            address: item.address || 'No address specified',
+            customerName: item.customerName,
+            serviceProviderName: item.serviceProviderName === "undefined undefined" ? "Not Assigned" : item.serviceProviderName,
+            taskStatus: item.taskStatus,
+            engagements: item.engagements,
+            bookingDate: item.bookingDate,
+            serviceType: item.serviceType?.toLowerCase() || 'other',
+            childAge: item.childAge,
+            experience: item.experience,
+            noOfPersons: item.noOfPersons,
+            mealType: item.mealType,
+            modifiedDate: item.modifiedDate,
+            responsibilities: item.responsibilities,
+          };
+        })
+      : [];
+  };
 
-        const response = await axiosInstance.get(
-          `api/serviceproviders/get-sp-booking-history?page=${page}&size=${size}`
-        );
+  useEffect(() => {
+    if (customerId !== null && customerId !== undefined) {
+      setIsLoading(true);
+      axiosInstance
+        .get(`api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`)
+        .then((response) => {
+          const { past = [], current = [], future = [] } = response.data || {};
+          setPastBookings(mapBookingData(past));
+          setCurrentBookings(mapBookingData(current));
+          setFutureBookings(mapBookingData(future));
+        })
+        .catch((error) => {
+          console.error("Error fetching booking details:", error);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
+    }
+  }, [customerId]);
 
-        const { past = [], current = [], future = [] } = response.data || {};
-
-        const mapBookingData = (data: any[]): Booking[] => {
-          if (!Array.isArray(data)) return [];
-          
-          return data
-            .filter((item) => item.customerId === customerId)
-            .map((item) => ({
-              id: item.id,
-              customerId: item.customerId,
-              serviceProviderId: item.serviceProviderId,
-              name: item.customerName,
-              timeSlot: item.timeslot,
-              date: item.startDate,
-              startDate: item.startDate,
-              endDate: item.endDate,
-              bookingType: item.bookingType,
-              monthlyAmount: item.monthlyAmount,
-              paymentMode: item.paymentMode,
-              address: item.address || 'No address specified',
-              customerName: item.customerName,
-              serviceProviderName: item.serviceProviderName === "undefined undefined" 
-                ? "Not Assigned" 
-                : item.serviceProviderName,
-              taskStatus: item.taskStatus,
-              engagements: item.engagements,
-              bookingDate: item.bookingDate,
-              serviceType: item.serviceType?.toLowerCase() || 'other',
-              childAge: item.childAge,
-              experience: item.experience,
-              noOfPersons: item.noOfPersons,
-              mealType: item.mealType,
-              responsibilities: item.responsibilities,
-              providerRating: item.providerRating || 4.5 // Default rating if not provided
-            }));
-        };
-
-        setPastBookings(mapBookingData(past));
-        setCurrentBookings(mapBookingData(current));
-        setFutureBookings(mapBookingData(future));
-      } catch (error) {
-        console.error("Error fetching booking details:", error);
-      }
-    };
-
-    fetchBookings();
-  }, []); 
-  
   const handleModifyBooking = (booking: Booking) => {
     setSelectedBooking(booking);
     setOpenDialog(true);
@@ -259,36 +341,15 @@ const Booking: React.FC = () => {
     const serviceTypeUpperCase = selectedBooking.serviceType.toUpperCase();
 
     let updatePayload: any = {
-      id: selectedBooking.id,
       customerId: customerId,
       startDate: updatedData.startDate,
       endDate: updatedData.endDate,
-      engagements: selectedBooking.engagements,
       timeslot: updatedData.timeSlot,
-      monthlyAmount: selectedBooking.monthlyAmount,
-      paymentMode: selectedBooking.paymentMode,
-      bookingType: selectedBooking.bookingType,
-      bookingDate: selectedBooking.bookingDate,
-      responsibilities: selectedBooking.responsibilities,
-      serviceType: serviceTypeUpperCase,
-      mealType: selectedBooking.mealType,
-      noOfPersons: selectedBooking.noOfPersons,
-      experience: selectedBooking.experience,
-      childAge: selectedBooking.childAge,
-      customerName: selectedBooking.customerName,
-      address: selectedBooking.address,
-      taskStatus: selectedBooking.taskStatus,
-      role: "CUSTOMER",
+      modifiedBy: "CUSTOMER",
     };
 
-    if (selectedBooking.bookingType !== "ON_DEMAND") {
-      updatePayload.serviceProviderId = selectedBooking.serviceProviderId;
-      updatePayload.serviceProviderName = selectedBooking.serviceProviderName;
-    }
-
-    updatePayload = removeNullFields(updatePayload);
-
     try {
+      setIsRefreshing(true);
       const response = await axiosInstance.put(
         `/api/serviceproviders/update/engagement/${selectedBooking.id}`,
         updatePayload
@@ -318,15 +379,30 @@ const Booking: React.FC = () => {
             : b
         )
       );
-
+      setModifiedBookings(prev => [...prev, selectedBooking.id]);
       setOpenDialog(false);
       setOpenSnackbar(true);
+      
+      if (customerId !== null) {
+        await axiosInstance
+          .get(`api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`)
+          .then((response) => {
+            const { past = [], current = [], future = [] } = response.data || {};
+            setPastBookings(mapBookingData(past));
+            setCurrentBookings(mapBookingData(current));
+            setFutureBookings(mapBookingData(future));
+          });
+      }
     } catch (error: any) {
       console.error("Error updating booking:", error);
       if (error.response) {
         console.error("Full error response:", error.response.data);
       }
     }
+  };
+
+  const isBookingModified = (bookingId: number) => {
+    return modifiedBookings.includes(bookingId);
   };
 
   const isModificationAllowed = (startDate: string) => {
@@ -336,44 +412,15 @@ const Booking: React.FC = () => {
     return daysDifference >= 2;
   };
 
-  const removeNullFields = (obj: any) =>
-    Object.fromEntries(
-      Object.entries(obj).filter(([_, v]) => v !== null && v !== undefined)
-    );
-
   const handleCancelBooking = async (booking: Booking) => {
     const updatedStatus = "CANCELLED";
     const serviceTypeUpperCase = booking.serviceType.toUpperCase();
 
     let updatePayload: any = {
-      id: booking.id,
       customerId: customerId,
-      startDate: booking.startDate,
-      endDate: booking.endDate,
-      engagements: booking.engagements,
-      timeslot: booking.timeSlot,
-      monthlyAmount: booking.monthlyAmount,
-      paymentMode: booking.paymentMode,
-      bookingType: booking.bookingType,
-      bookingDate: booking.bookingDate,
-      responsibilities: booking.responsibilities,
-      serviceType: serviceTypeUpperCase,
-      mealType: booking.mealType,
-      noOfPersons: booking.noOfPersons,
-      experience: booking.experience,
-      childAge: booking.childAge,
-      customerName: booking.customerName,
-      address: booking.address,
       taskStatus: updatedStatus,
-      role: "CUSTOMER"
+      modifiedBy: "CUSTOMER"
     };
-
-    if (booking.bookingType !== "ON_DEMAND") {
-      updatePayload.serviceProviderId = booking.serviceProviderId;
-      updatePayload.serviceProviderName = booking.serviceProviderName;
-    }
-
-    updatePayload = removeNullFields(updatePayload);
 
     try {
       const response = await axiosInstance.put(
@@ -436,10 +483,10 @@ const Booking: React.FC = () => {
     if (!term) return bookings;
     
     return bookings.filter(booking => 
-      getServiceTitle(booking.serviceType).toLowerCase().includes(term.toLowerCase()) ||
-      booking.serviceProviderName.toLowerCase().includes(term.toLowerCase()) ||
-      booking.address.toLowerCase().includes(term.toLowerCase()) ||
-      booking.bookingType.toLowerCase().includes(term.toLowerCase())
+      getServiceTitle(booking?.serviceType).toLowerCase().includes(term?.toLowerCase()) ||
+      booking.serviceProviderName?.toLowerCase().includes(term?.toLowerCase()) ||
+      booking.address?.toLowerCase().includes(term?.toLowerCase()) ||
+      booking.bookingType?.toLowerCase().includes(term?.toLowerCase())
     );
   };
 
@@ -473,11 +520,125 @@ const Booking: React.FC = () => {
     });
   };
 
+  const renderBookingItem = ({ item }: { item: Booking }) => (
+    <Card style={styles.bookingCard}>
+      <View style={styles.cardHeader}>
+        <View style={styles.serviceInfo}>
+          <Icon 
+            name={getServiceIcon(item.serviceType)} 
+            size={24} 
+            color={
+              item.serviceType === 'maid' ? '#f97316' : 
+              item.serviceType === 'cleaning' ? '#ec4899' : 
+              item.serviceType === 'nanny' ? '#ef4444' : '#000'
+            } 
+          />
+          <View>
+            <Text style={styles.serviceTitle}>{getServiceTitle(item.serviceType)}</Text>
+            <Text style={styles.bookingId}>Booking #{item.id}</Text>
+          </View>
+        </View>
+        <View style={styles.badgeContainer}>
+          {getBookingTypeBadge(item.bookingType)}
+          {getStatusBadge(item.taskStatus)}
+        </View>
+      </View>
+
+      <View style={styles.cardContent}>
+        <View style={styles.bookingDetails}>
+          <View style={styles.detailRow}>
+            <Icon name="calendar" size={18} color="#6b7280" />
+            <Text style={styles.detailText}>{formatDate(item.date)}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Icon name="clock" size={18} color="#6b7280" />
+            <Text style={styles.detailText}>{item.timeSlot}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Icon name="map-marker" size={18} color="#6b7280" />
+            <Text style={styles.detailText}>{item.address}</Text>
+          </View>
+        </View>
+
+        <View style={styles.providerInfo}>
+          <View>
+            <Text style={styles.providerName}>{item.serviceProviderName}</Text>
+            <View style={styles.ratingContainer}>
+              <Icon name="star" size={16} color="#f59e0b" />
+              <Text style={styles.ratingText}>{4.5}</Text>
+            </View>
+          </View>
+          <Text style={styles.priceText}>₹{item.monthlyAmount}</Text>
+        </View>
+      </View>
+
+      <Separator style={styles.separator} />
+
+      <View style={styles.actionButtons}>
+        {item.taskStatus === 'CANCELLED' ? (
+          <Button style={styles.actionButton} onPress={() => {}}>
+            <Text>Book Again</Text>
+          </Button>
+        ) : (
+          <>
+            {item.address && (
+              <Button style={styles.actionButton} onPress={() => {}}>
+                <Icon name="phone" size={16} color="#000" />
+                <Text>Call Provider</Text>
+              </Button>
+            )}
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="message-text" size={16} color="#000" />
+              <Text>Message</Text>
+            </Button>
+            {item.bookingType !== 'ON_DEMAND' && item.bookingType !== 'SHORT_TERM' && (
+              <Button 
+                style={styles.actionButton}
+                onPress={() => handleApplyLeaveClick(item)}
+              >
+                <Text>Add Vacation</Text>
+              </Button>
+            )}
+            <Button 
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={() => handleCancelBooking(item)}
+            >
+              <Icon name="close-circle" size={16} color="#fff" />
+              <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+            </Button>
+            {item.bookingType === 'MONTHLY' && (
+              <Button
+                style={styles.actionButton}
+                onPress={() => handleModifyBooking(item)}
+                disabled={
+                  new Date(item.modifiedDate).getTime() !==
+                  new Date(item.bookingDate).getTime()
+                }
+              >
+                <Icon name="pencil" size={16} color="#000" />
+                <Text>Modify Booking</Text>
+              </Button>
+            )}
+          </>
+        )}
+      </View>
+    </Card>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={styles.loadingText}>Loading your bookings...</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>My Bookings</Text>
           <Text style={styles.headerSubtitle}>Manage your household service appointments</Text>
         </View>
@@ -485,16 +646,16 @@ const Booking: React.FC = () => {
           <TextInput
             style={styles.searchInput}
             placeholder="Search bookings..."
+            placeholderTextColor="#9ca3af"
             value={searchTerm}
             onChangeText={setSearchTerm}
-            placeholderTextColor="#9ca3afff"
           />
           {searchTerm && (
-            <TouchableOpacity
-              onPress={() => setSearchTerm('')}
+            <TouchableOpacity 
               style={styles.clearSearchButton}
+              onPress={() => setSearchTerm('')}
             >
-              <XCircle size={20} color="#07090dff" />
+              <Icon name="close-circle" size={20} color="#9ca3af" />
             </TouchableOpacity>
           )}
         </View>
@@ -503,223 +664,65 @@ const Booking: React.FC = () => {
       {/* Upcoming Bookings */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <AlertCircle size={24} color="#3b82f6" />
-          <View style={styles.sectionHeaderText}>
+          <Icon name="alert-circle" size={24} color="#3b82f6" />
+          <View style={styles.sectionHeaderContent}>
             <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
             <Text style={styles.sectionSubtitle}>
               {filteredUpcomingBookings.length} {filteredUpcomingBookings.length === 1 ? 'booking' : 'bookings'} scheduled
             </Text>
           </View>
-          <View style={[styles.badge, styles.countBadge]}>
-            <Text style={styles.countText}>{upcomingBookings.length}</Text>
-          </View>
+          <Badge style={styles.sectionBadge}>
+            <Text style={styles.sectionBadgeText}>{upcomingBookings.length}</Text>
+          </Badge>
         </View>
 
-        {upcomingBookings.length > 0 ? (
-          <View style={styles.bookingList}>
-            {filteredUpcomingBookings.map((booking) => (
-              <View key={booking.id} style={styles.bookingCard}>
-                <View style={styles.bookingHeader}>
-                  <View style={styles.bookingTitleContainer}>
-                    <Text style={styles.serviceIcon}>{getServiceIcon(booking.serviceType)}</Text>
-                    <View>
-                      <Text style={styles.bookingTitle}>{getServiceTitle(booking.serviceType)}</Text>
-                      <Text style={styles.bookingId}>Booking #{booking.id}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.bookingHeaderRight}>
-                    <View style={styles.badgeRow}>
-                      {getBookingTypeBadge(booking.bookingType)}
-                      {getStatusBadge(booking.taskStatus)}
-                    </View>
-                    <Text style={styles.bookingDate}>
-                      Booking Date: {new Date(booking.bookingDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.bookingContent}>
-                  <View style={styles.bookingDetails}>
-                    <View style={styles.detailRow}>
-                      <Calendar size={16} color="#6b7280" />
-                      <Text style={styles.detailText}>{formatDate(booking.date)}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Clock size={16} color="#6b7280" />
-                      <Text style={styles.detailText}>{booking.timeSlot}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <MapPin size={16} color="#6b7280" />
-                      <Text style={styles.detailText}>{booking.address}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.providerInfo}>
-                    <View>
-                      <Text style={styles.providerName}>{booking.serviceProviderName}</Text>
-                      <View style={styles.ratingContainer}>
-                        <Star size={16} fill="#f59e0b" color="#f59e0b" />
-                        <Text style={styles.ratingText}>{booking['providerRating'] || 4.5}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.priceText}>₹{booking.monthlyAmount}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.separator} />
-
-                <View style={styles.bookingActions}>
-                  {booking.taskStatus === 'CANCELLED' ? (
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Text style={styles.actionButtonText}>Book Again</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <>
-                      {booking.address && (
-                        <TouchableOpacity style={styles.actionButton}>
-                          <Phone size={16} color="#3b82f6" style={styles.actionIcon} />
-                          <Text style={styles.actionButtonText}>Call Provider</Text>
-                        </TouchableOpacity>
-                      )}
-                      <TouchableOpacity style={styles.actionButton}>
-                        <MessageCircle size={16} color="#3b82f6" style={styles.actionIcon} />
-                        <Text style={styles.actionButtonText}>Message</Text>
-                      </TouchableOpacity>
-                      {booking.bookingType !== 'ON_DEMAND' && booking.bookingType !== 'SHORT_TERM' && (
-                        <TouchableOpacity 
-                          style={styles.actionButton}
-                          onPress={() => handleApplyLeaveClick(booking)}
-                        >
-                          <Text style={styles.actionButtonText}>Add Vaccation</Text>
-                        </TouchableOpacity>
-                      )}
-                      <TouchableOpacity 
-                        style={[styles.actionButton, styles.cancelButton]}
-                        onPress={() => handleCancelBooking(booking)}
-                      >
-                        <XCircle size={16} color="#ef4444" style={styles.actionIcon} />
-                        <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel Booking</Text>
-                      </TouchableOpacity>
-                      {isModificationAllowed(booking.startDate) && booking.bookingType === 'MONTHLY' && (
-                        <TouchableOpacity 
-                          style={styles.actionButton}
-                          onPress={() => handleModifyBooking(booking)}
-                        >
-                          <Edit size={16} color="#3b82f6" style={styles.actionIcon} />
-                          <Text style={styles.actionButtonText}>Modify Booking</Text>
-                        </TouchableOpacity>
-                      )}
-                    </>
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
+        {filteredUpcomingBookings.length > 0 ? (
+          <FlatList
+            data={filteredUpcomingBookings}
+            renderItem={renderBookingItem}
+            keyExtractor={(item) => item.id.toString()}
+            scrollEnabled={false}
+          />
         ) : (
-          <View style={styles.emptyState}>
-            <Calendar size={48} color="#9ca3af" />
+          <Card style={styles.emptyStateCard}>
+            <Icon name="calendar" size={48} color="#9ca3af" />
             <Text style={styles.emptyStateTitle}>No Upcoming Bookings</Text>
             <Text style={styles.emptyStateText}>Ready to book your next service?</Text>
-            <TouchableOpacity style={styles.bookServiceButton}>
-              <Text style={styles.bookServiceButtonText}>Book a Service</Text>
-            </TouchableOpacity>
-          </View>
+            <Button style={styles.emptyStateButton}>
+              <Text>Book a Service</Text>
+            </Button>
+          </Card>
         )}
       </View>
 
       {/* Past Bookings */}
       <View style={styles.section}>
-        <View style={[styles.sectionHeader, styles.pastSectionHeader]}>
-          <History size={24} color="#9ca3af" />
-          <View style={styles.sectionHeaderText}>
+        <View style={styles.sectionHeader}>
+          <Icon name="history" size={24} color="#6b7280" />
+          <View style={styles.sectionHeaderContent}>
             <Text style={styles.sectionTitle}>Past Bookings</Text>
             <Text style={styles.sectionSubtitle}>
               {filteredPastBookings.length} {filteredPastBookings.length === 1 ? 'booking' : 'bookings'} in history
             </Text>
           </View>
-          <View style={[styles.badge, styles.pastCountBadge]}>
-            <Text style={styles.countText}>{pastBookings.length}</Text>
-          </View>
+          <Badge style={[styles.sectionBadge, styles.pastBadge]}>
+            <Text style={styles.sectionBadgeText}>{pastBookings.length}</Text>
+          </Badge>
         </View>
 
-        {pastBookings.length > 0 ? (
-          <View style={styles.bookingList}>
-            {filteredPastBookings.map((booking) => (
-              <View key={booking.id} style={styles.bookingCard}>
-                <View style={styles.bookingHeader}>
-                  <View style={styles.bookingTitleContainer}>
-                    <Text style={styles.serviceIcon}>{getServiceIcon(booking.serviceType)}</Text>
-                    <View>
-                      <Text style={styles.bookingTitle}>{getServiceTitle(booking.serviceType)}</Text>
-                      <Text style={styles.bookingId}>Booking #{booking.id}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.badgeRow}>
-                    {getBookingTypeBadge(booking.bookingType)}
-                    {getStatusBadge(booking.taskStatus)}
-                  </View>
-                </View>
-
-                <View style={styles.bookingContent}>
-                  <View style={styles.bookingDetails}>
-                    <View style={styles.detailRow}>
-                      <Calendar size={16} color="#6b7280" />
-                      <Text style={styles.detailText}>{formatDate(booking.date)}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Clock size={16} color="#6b7280" />
-                      <Text style={styles.detailText}>{booking.startDate} ({booking.endDate})</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <MapPin size={16} color="#6b7280" />
-                      <Text style={styles.detailText}>{booking.address}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.providerInfo}>
-                    <View>
-                      <Text style={styles.providerName}>{booking.serviceProviderName}</Text>
-                      <View style={styles.ratingContainer}>
-                        <Star size={16} fill="#f59e0b" color="#f59e0b" />
-                        <Text style={styles.ratingText}>{booking['providerRating'] || 4.5}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.priceText}>₹{booking.monthlyAmount}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.separator} />
-
-                <View style={styles.bookingActions}>
-                  {booking.taskStatus === 'completed' && (
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Star size={16} color="#3b82f6" style={styles.actionIcon} />
-                      <Text style={styles.actionButtonText}>Rate Service</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity style={styles.actionButton}>
-                    <Text style={styles.actionButtonText}>Book Again</Text>
-                  </TouchableOpacity>
-                  {booking.taskStatus === 'completed' && (
-                    <TouchableOpacity style={styles.actionButton}>
-                      <MessageCircle size={16} color="#3b82f6" style={styles.actionIcon} />
-                      <Text style={styles.actionButtonText}>Leave Review</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
+        {filteredPastBookings.length > 0 ? (
+          <FlatList
+            data={filteredPastBookings}
+            renderItem={renderBookingItem}
+            keyExtractor={(item) => item.id.toString()}
+            scrollEnabled={false}
+          />
         ) : (
-          <View style={styles.emptyState}>
-            <Clock size={48} color="#9ca3af" />
+          <Card style={styles.emptyStateCard}>
+            <Icon name="clock" size={48} color="#9ca3af" />
             <Text style={styles.emptyStateTitle}>No Past Bookings</Text>
             <Text style={styles.emptyStateText}>Your completed and cancelled bookings will appear here.</Text>
-          </View>
+          </Card>
         )}
       </View>
 
@@ -741,341 +744,360 @@ const Booking: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  // Base components styles
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    marginBottom: 16,
+  },
+  button: {
+    backgroundColor: '#3b82f6',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  badgeBase: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  separatorBase: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 8,
+  },
+
+  // Other styles from previous implementation
   container: {
-    paddingTop:15,
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f9fafb',
   },
   header: {
-    backgroundColor: '#3b82f6',
-    padding: 20,
-    paddingBottom: 30,
+    padding: 16,
+    backgroundColor: 'rgba(23, 43, 77, 0.8)',
+  },
+  headerContent: {
+    marginBottom: 16,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
+    color: '#fff',
   },
   headerSubtitle: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
   },
   searchContainer: {
-    marginTop: 20,
     position: 'relative',
   },
   searchInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    color: '#fff',
     borderRadius: 8,
-    padding: 12,
-    paddingLeft: 15,
-    color: 'black',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   clearSearchButton: {
     position: 'absolute',
-    right: 10,
-    top: 10,
+    right: 12,
+    top: 12,
   },
   section: {
-    marginTop: -15,
-    padding: 20,
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    padding: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    padding: 10,
-    borderRadius: 10,
+    marginBottom: 16,
+    padding: 12,
     backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    borderRadius: 8,
     borderLeftWidth: 4,
     borderLeftColor: '#3b82f6',
   },
   pastSectionHeader: {
     backgroundColor: 'rgba(156, 163, 175, 0.05)',
-    borderLeftColor: '#9ca3af',
+    borderLeftColor: 'rgba(156, 163, 175, 0.3)',
   },
-  sectionHeaderText: {
+  sectionHeaderContent: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#111827',
   },
   sectionSubtitle: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#6b7280',
+    marginTop: 2,
   },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  badgeIcon: {
-    marginRight: 4,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  activeBadge: {
+  sectionBadge: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderColor: 'rgba(59, 130, 246, 0.2)',
   },
-  activeText: {
-    color: '#3b82f6',
-  },
-  completedBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  completedText: {
-    color: '#10b981',
-  },
-  cancelledBadge: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-  },
-  cancelledText: {
-    color: '#ef4444',
-  },
-  inProgressBadge: {
-    backgroundColor: 'rgba(100, 116, 139, 0.5)',
-    borderColor: '#64748b',
-  },
-  inProgressText: {
-    color: '#1e293b',
-  },
-  notStartedBadge: {
-    backgroundColor: 'rgba(100, 116, 139, 0.5)',
-    borderColor: '#64748b',
-  },
-  notStartedText: {
-    color: '#1e293b',
-  },
-  typeBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 4,
-    borderWidth: 1,
-    marginRight: 5,
-  },
-  typeBadgeText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  onDemandBadge: {
-    backgroundColor: 'rgba(168, 85, 247, 0.1)',
-    borderColor: 'rgba(168, 85, 247, 0.2)',
-  },
-  onDemandText: {
-    color: '#a855f7',
-  },
-  monthlyBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-  },
-  monthlyText: {
-    color: '#3b82f6',
-  },
-  shortTermBadge: {
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-    borderColor: 'rgba(34, 197, 94, 0.2)',
-  },
-  shortTermText: {
-    color: '#22c55e',
-  },
-  defaultBadge: {
+  pastBadge: {
     backgroundColor: 'rgba(156, 163, 175, 0.1)',
-    borderColor: 'rgba(156, 163, 175, 0.2)',
+    borderColor: 'rgba(156, 163, 175, 0.3)',
   },
-  defaultText: {
+  sectionBadgeText: {
+    color: '#3b82f6',
+  },
+  pastBadgeText: {
     color: '#6b7280',
   },
-  countBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-  },
-  pastCountBadge: {
-    backgroundColor: 'rgba(156, 163, 175, 0.1)',
-    borderColor: 'rgba(156, 163, 175, 0.2)',
-  },
-  countText: {
-    color: '#3b82f6',
-    fontWeight: '600',
-  },
-  bookingList: {
-    gap: 16,
-  },
   bookingCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
-  bookingHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    padding: 16,
+    paddingBottom: 0,
   },
-  bookingTitleContainer: {
+  serviceInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  serviceIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  bookingTitle: {
+  serviceTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1e293b',
+    marginLeft: 12,
   },
   bookingId: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#6b7280',
+    marginLeft: 12,
   },
-  bookingHeaderRight: {
-    alignItems: 'flex-end',
-  },
-  badgeRow: {
+  badgeContainer: {
     flexDirection: 'row',
-    gap: 5,
-    marginBottom: 4,
+    gap: 8,
   },
-  bookingDate: {
-    fontSize: 10,
-    color: '#94a3b8',
-  },
-  bookingContent: {
+  cardContent: {
+    padding: 16,
     flexDirection: 'row',
-    gap: 20,
   },
   bookingDetails: {
     flex: 1,
-    gap: 8,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: 8,
   },
   detailText: {
-    fontSize: 14,
-    color: '#334155',
+    marginLeft: 8,
+    color: '#4b5563',
   },
   providerInfo: {
-    width: 120,
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
   },
   providerName: {
-    fontSize: 14,
     fontWeight: '500',
-    color: '#1e293b',
-    textAlign: 'right',
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    marginTop: 2,
+    marginTop: 4,
   },
   ratingText: {
+    marginLeft: 4,
     fontSize: 12,
-    color: '#64748b',
+    color: '#6b7280',
   },
   priceText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#3b82f6',
+    marginTop: 8,
   },
   separator: {
-    height: 1,
-    backgroundColor: '#e2e8f0',
-    marginVertical: 16,
+    marginHorizontal: 16,
   },
-  bookingActions: {
+  actionButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    padding: 16,
     gap: 8,
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    minWidth: 100,
     flex: 1,
-  },
-  actionButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#3b82f6',
-  },
-  actionIcon: {
-    marginRight: 6,
+    minWidth: '45%',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   cancelButton: {
-    borderColor: '#fee2e2',
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
   },
   cancelButtonText: {
-    color: '#ef4444',
+    color: '#fff',
   },
-  emptyState: {
+  emptyStateCard: {
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
+    padding: 32,
   },
-  
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1e293b',
     marginTop: 16,
   },
   emptyStateText: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
+    color: '#6b7280',
     marginTop: 4,
-    marginBottom: 16,
+    textAlign: 'center',
   },
-  bookServiceButton: {
-    backgroundColor: '#3b82f6',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 6,
+  emptyStateButton: {
+    marginTop: 16,
   },
-  bookServiceButtonText: {
-    color: 'white',
-    fontWeight: '500',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#4b5563',
+  },
+  // Badge styles
+  activeBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  activeBadgeText: {
+    color: '#3b82f6',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  completedBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  completedBadgeText: {
+    color: '#10b981',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  cancelledBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  cancelledBadgeText: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  inProgressBadge: {
+    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+    borderColor: 'rgba(107, 114, 128, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  inProgressBadgeText: {
+    color: '#6b7280',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  notStartedBadge: {
+    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+    borderColor: 'rgba(107, 114, 128, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  notStartedBadgeText: {
+    color: '#6b7280',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  onDemandBadge: {
+    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+    borderColor: 'rgba(168, 85, 247, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  onDemandBadgeText: {
+    color: '#8b5cf6',
+    fontSize: 12,
+  },
+  monthlyBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  monthlyBadgeText: {
+    color: '#3b82f6',
+    fontSize: 12,
+  },
+  shortTermBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  shortTermBadgeText: {
+    color: '#10b981',
+    fontSize: 12,
+  },
+  defaultBadge: {
+    backgroundColor: 'rgba(156, 163, 175, 0.1)',
+    borderColor: 'rgba(156, 163, 175, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  defaultBadgeText: {
+    color: '#6b7280',
+    fontSize: 12,
   },
 });
 

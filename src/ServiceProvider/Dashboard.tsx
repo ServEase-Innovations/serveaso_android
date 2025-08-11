@@ -6,7 +6,7 @@ import FeatherIcon from 'react-native-vector-icons/Feather';
 import { DashboardMetricCard } from './DashboardMetricCard';
 import { BookingCard } from './BookingCard';
 import { PaymentHistory } from './PaymentHistory';
-
+import { useAuth0 } from 'react-native-auth0';
 
 // Mock data
 const metrics = [
@@ -115,10 +115,23 @@ const paymentHistory = [
   }
 ];
 
-export default function Dashboard() {
+interface DashboardProps {
+  onProfilePress: () => void;
+}
+
+export default function Dashboard({ onProfilePress }: DashboardProps) {
+  const { clearSession } = useAuth0();
+
   const handleContactClient = (booking: any) => {
-    // Implement toast functionality here
     console.log(`Call ${booking.clientName} at ${booking.contact}`);
+  };
+
+  const onLogout = async () => {
+    try {
+      await clearSession();
+    } catch (e) {
+      console.log('Log out cancelled');
+    }
   };
 
   return (
@@ -128,15 +141,19 @@ export default function Dashboard() {
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             <View style={styles.logoContainer}>
-              <MaterialIcon name="home" size={24} color="#3b82f6" />
+              <MaterialIcon name="home" size={24} color="#ffffff" />
               <Text style={styles.logoText}>ServEase Provider</Text>
             </View>
           </View>
+           
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.notificationButton}>
-              <Icon name="bell" size={20} color="#6b7280" />
+              <Icon name="bell" size={20} color="#ffffff" />
             </TouchableOpacity>
-            <View style={styles.profileContainer}>
+            <TouchableOpacity 
+              style={styles.profileContainer} 
+              onPress={onProfilePress}
+            >
               <View style={styles.profileText}>
                 <Text style={styles.profileName}>Maya Patel</Text>
                 <Text style={styles.profileRole}>Cleaning Specialist</Text>
@@ -144,7 +161,7 @@ export default function Dashboard() {
               <View style={styles.profileAvatar}>
                 <Text style={styles.avatarText}>MP</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -247,9 +264,13 @@ export default function Dashboard() {
 
         {/* Charts and Payment History */}
         <View style={styles.bottomSection}>
-          
           <PaymentHistory payments={paymentHistory} />
         </View>
+
+        {/* Sign Out Button */}
+        <TouchableOpacity style={styles.signOutButton} onPress={onLogout}>
+          <Text style={styles.signOutButtonText}>Sign Out</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -257,40 +278,35 @@ export default function Dashboard() {
 
 const styles = StyleSheet.create({
   container: {
-     paddingTop:15,
+    paddingTop: 15,
     flex: 1,
     backgroundColor: '#f9fafb',
   },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(23, 43, 77, 0.8)',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 1,
   },
-
   logoText: {
     fontSize: 20,
     fontWeight: 'bold',
     marginLeft: 8,
-    color: '#111827',
+    color: '#ffffff', // Changed to white
   },
   headerRight: {
     flexDirection: 'row',
@@ -310,11 +326,11 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontWeight: '600',
-    color: '#111827',
+    color: '#ffffff', // Changed to white
   },
   profileRole: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#e5e7eb', // Changed to light gray for better visibility on dark background
   },
   profileAvatar: {
     width: 40,
@@ -433,6 +449,7 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 12,
     fontWeight: '500',
+    color: '#ffffff',
   },
   activeBadge: {
     backgroundColor: '#10b981',
@@ -444,5 +461,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  signOutButton: {
+    backgroundColor: '#ef4444',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 40,
+  },
+  signOutButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });

@@ -378,10 +378,10 @@ const handleClick = (e: any) => {
   onPress={() => handleClick('HOME')}
 >
   <Image
-    source={require('../assets/images/logo.png')}
+    source={require('../assets/images/ServEaso.png')}
     style={styles.logo}
   />
-  <Text style={styles.logoText}>ServEaso</Text>
+  {/* <Text style={styles.logoText}>ServEaso</Text> */}
 </TouchableOpacity>
 
         <View style={styles.actionsContainer}>
@@ -534,6 +534,19 @@ const handleClick = (e: any) => {
           <Text style={styles.menuItemText}>Contact Us</Text>
         </TouchableOpacity>
 
+        
+      </>
+    ) : (
+      <>
+        
+        {loggedInUser?.role === 'admin' && (
+          <TouchableOpacity 
+            style={styles.menuItem} 
+            onPress={handleDashboardClick}
+          >
+            <Text style={styles.menuItemText}>Dashboard</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity 
           style={styles.menuItem} 
           onPress={handleBookingHistoryClick}
@@ -550,25 +563,9 @@ const handleClick = (e: any) => {
           style={styles.menuItem} 
           onPress={handleProfileClick}
         >
-          <Text style={styles.menuItemText}>Profile</Text>
+          <Text style={styles.menuItemText}>User Profile</Text>
         </TouchableOpacity>
 
-      </>
-    ) : (
-      <>
-       
-        
-      
-        
-        {loggedInUser?.role === 'admin' && (
-          <TouchableOpacity 
-            style={styles.menuItem} 
-            onPress={handleDashboardClick}
-          >
-            <Text style={styles.menuItemText}>Dashboard</Text>
-          </TouchableOpacity>
-        )}
-        
         <TouchableOpacity 
           style={styles.menuItem} 
           onPress={handleSignOut}
@@ -661,7 +658,7 @@ type Styles = {
   headerContainer: ViewStyle;
   logoContainer: ViewStyle;
   logo: ImageStyle;
-  logoText: TextStyle;
+
   actionsContainer: ViewStyle;
   locationInput: ViewStyle;
   locationIcon: TextStyle;
@@ -731,16 +728,12 @@ const styles = StyleSheet.create<Styles>({
   padding: 8, // Add some padding to make it easier to tap
 },
   logo: {
-    height: 40,
-    width: 40,
+    
+    height: 80,
+    width: 80,
     resizeMode: 'contain',
   },
-  logoText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#3b82f6',
-    marginLeft: 8,
-  },
+
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',

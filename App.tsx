@@ -17,6 +17,7 @@ const App = () => {
   const [chatbotOpen, setChatbotOpen] = useState(false);
   const [currentView, setCurrentView] = useState('HOME');
   const [selectedBookingType, setSelectedBookingType] = useState('');
+  const [showProfileFromDashboard, setShowProfileFromDashboard] = useState(false);
 
   const handleViewChange = (view: string) => {
     setCurrentView(view);
@@ -24,6 +25,14 @@ const App = () => {
 
   const handleBookingType = (type: string) => {
     setSelectedBookingType(type);
+  };
+
+  const handleDashboardProfilePress = () => {
+    setShowProfileFromDashboard(true);
+  };
+
+  const handleBackToDashboard = () => {
+    setShowProfileFromDashboard(false);
   };
 
   const renderContent = () => {
@@ -38,9 +47,15 @@ const App = () => {
       case BOOKINGS:
         return <Booking />;
       case DASHBOARD:
-        return <Dashboard />;
+        return showProfileFromDashboard ? (
+          <ProfileScreen onBackPress={handleBackToDashboard} />
+        ) : (
+          <Dashboard onProfilePress={handleDashboardProfilePress} />
+        );
       case PROFILE:
-        return <ProfileScreen />;
+        return <ProfileScreen onBackPress={function (): void {
+          throw new Error('Function not implemented.');
+        } } />;
       default:
         return (
           <DetailsView 
@@ -55,16 +70,15 @@ const App = () => {
     <Auth0Provider domain={config.domain} clientId={config.clientId}>
       <SafeAreaProvider>
         <StatusBar backgroundColor="#fff" barStyle="dark-content" />
-        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-          {/* Header - Always visible */}
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          {/* Fixed Header */}
           <View style={styles.header}>
             <Head sendDataToParent={handleViewChange} />
           </View>
 
-          {/* Main Content */}
+          {/* Scrollable Content Below Header */}
           <View style={styles.contentContainer}>
-            {currentView === PROFILE ? (
-              // For ProfileScreen, use a separate ScrollView with flex: 1
+            {currentView === PROFILE || (currentView === DASHBOARD && showProfileFromDashboard) ? (
               <ScrollView 
                 style={styles.profileScrollView}
                 contentContainerStyle={styles.profileScrollContent}
@@ -72,8 +86,8 @@ const App = () => {
                 {renderContent()}
               </ScrollView>
             ) : (
-              // For other views, use the existing ScrollView
               <ScrollView
+                style={styles.mainScrollView}
                 contentContainerStyle={[
                   styles.scrollContent,
                   (currentView === BOOKINGS || currentView === DASHBOARD) && 
@@ -103,18 +117,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  container: {
-    flex: 1,
-  },
   header: {
     width: '100%',
     backgroundColor: '#fff',
     zIndex: 10,
     paddingTop: 0,
-    height: 60, // Increased height to prevent cutting
     justifyContent: 'center',
   },
   contentContainer: {
+    flex: 1,
+    marginTop: 50, // This pushes the content below the fixed header
+  },
+  mainScrollView: {
     flex: 1,
   },
   scrollContent: {

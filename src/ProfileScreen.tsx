@@ -13,8 +13,13 @@ import {
   Platform,
   Keyboard,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-const ProfileScreen = () => {
+interface ProfileScreenProps {
+  onBackPress: () => void;
+}
+
+const ProfileScreen = ({ onBackPress }: ProfileScreenProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     username: 'lucky.jesse',
@@ -64,9 +69,16 @@ const ProfileScreen = () => {
           <View style={styles.headerContainer}>
             <View style={styles.headerGradient}>
               <View style={styles.headerContent}>
+                 <TouchableOpacity 
+                  style={styles.backButton}
+                  onPress={onBackPress}
+                >
+                  <Icon name="arrow-left" size={20} color="#fff" />
+                </TouchableOpacity>
                 <View style={styles.headerProfileSection}>
                   <Image
-                    source={{ uri: 'https://demos.creative-tim.com/argon-dashboard/assets-old/img/theme/team-4.jpg' }}
+           
+           source={{ uri: 'https://demos.creative-tim.com/argon-dashboard/assets-old/img/theme/team-4.jpg' }}
                     style={styles.headerProfileImage}
                   />
                   <View style={styles.headerTextContainer}>
@@ -258,7 +270,13 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingTop: 40,
   },
- 
+ backButton: {
+    position: 'absolute',
+    left: 20,
+    top: 40,
+    zIndex: 1,
+    padding: 10,
+  },
   headerProfileSection: {
     flexDirection: 'row',
     alignItems: 'center',
