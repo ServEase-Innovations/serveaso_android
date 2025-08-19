@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Modal,
   Platform,
-  Dimensions,
   ActivityIndicator,
   Alert,
   Linking,
@@ -22,7 +21,7 @@ import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import { useSelector, useDispatch } from 'react-redux';
-import { remove } from './features/userSlice';
+import { add, remove } from './features/userSlice';
 import { ADMIN, BOOKINGS, CHECKOUT, DASHBOARD, LOGIN, PROFILE } from './Constants/pagesConstants';
 import { ViewStyle, TextStyle, ImageStyle } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
@@ -30,11 +29,9 @@ import Geocoder from 'react-native-geocoding';
 import MapView, { Marker } from 'react-native-maps';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { NativeModules } from 'react-native';
-import {useAuth0} from 'react-native-auth0';
-import config from '../auth0-configuration';
+import { useAuth0 } from 'react-native-auth0';
 import { selectCartItems } from './features/addToSlice';
-import {CartDialog} from './CartDialog';
-import ProfileScreen from './ProfileScreen';
+import { CartDialog } from './CartDialog';
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
@@ -43,23 +40,30 @@ interface ChildComponentProps {
 Geocoder.init(keys.api_key);
 
 const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
+  const {
+    authorize,
+    clearSession,
+    user: auth0User,
+    getCredentials,
+    error: auth0Error,
+    isLoading: auth0Loading,
+  } = useAuth0();
 
-const handleBookingHistoryClick = () => {
-  setMenuVisible(false);
-  handleClick(BOOKINGS);
-};
-
-  const cart = useSelector((state: any) => state.cart?.value);
-  const user = useSelector((state: any) => state.user?.value);
   const dispatch = useDispatch();
-
+  const cart = useSelector((state: any) => state.cart?.value);
+  const dropdownRef = useRef<View>(null);
+  const [dropDownOpen, setDropDownOpen] = useState(false);
   const [location, setLocation] = useState("");
+  const [locationAs, setLocationAs] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [loggedInUser, setLoggedInUser] = useState<any>();
   const [inputValue, setInputValue] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [dataFromMap, setDataFromMap] = useState("");
+  const [suggestions, setSuggestions] = useState([
+    { name: "Detect Location", index: 1 },
+    { name: "Add Address", index: 2 },
+  ]);
+  const [dataFromMap, setDataFromMap] = useState<any>([]);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [address, setAddress] = useState('');
@@ -68,20 +72,261 @@ const handleBookingHistoryClick = () => {
   const [showGPSButton, setShowGPSButton] = useState(false);
   const [isCheckingLocation, setIsCheckingLocation] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
-   const cartItems = useSelector(selectCartItems);
- const [currentPage, setCurrentPage] = useState('');
-
-const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Error, isLoading: auth0Loading} = useAuth0();
-
-  useEffect(() => {
-    setLoggedInUser(user);
-    console.log("User role is:", user?.role);
-  }, [user]);
+  const [OpenSaveOptionForSave, setOpenSaveOptionForSave] = useState(false);
+  const [showInput, setShowInput] = useState(false);
+  const cartItems = useSelector(selectCartItems);
+  const [currentPage, setCurrentPage] = useState('');
+  const [userPreference, setUserPreference] = useState<any>([]);
 
   useEffect(() => {
-    requestLocationPermission();
-  }, []);
-  
+    const run = async () => {
+      // Step 1: Get location first
+      await getLocation();
+
+      // Step 2: Auth checks
+      if (!auth0User || auth0Loading || !auth0User?.email) return;
+
+      try {
+        // Step 3: Get token
+        const token = await getCredentials();
+        console.log("Access Token:", token?.accessToken);
+        console.log("User authenticated:", auth0User);
+
+        const email = auth0User.email ?? "";
+
+        // Step 4: Check email (this must finish before moving on)
+        const response = await axios.get(
+          `https://utils-ndt3.onrender.com/customer/check-email?email=${encodeURIComponent(email)}`
+        );
+        console.log("Email check response:", response.data);
+
+        // Step 5: Conditional next steps
+        if (!response.data.user_role) {
+          await createUser(auth0User);
+        } else if (response.data.user_role === "SERVICE_PROVIDER") {
+          auth0User.role = "SERVICE_PROVIDER";
+          auth0User.serviceProviderId = response.data.id;
+        } else {
+          await getCustomerPreferences(Number(response.data.id));
+        }
+
+        console.log("Post-login steps complete ✅");
+      } catch (error) {
+        console.error("Error during post-login API call:", error);
+      }
+    };
+
+    run();
+  }, [auth0User, auth0Loading, getCredentials]);
+
+  const createUser = async (user: any) => {
+    try {
+      const userData = {
+        firstName: user.given_name || user.name?.split(' ')[0] || 'User',
+        lastName: user.family_name || user.name?.split(' ')[1] || '',
+        emailId: user.email,
+        password: "password"
+      };
+
+      console.log("Creating user with data:", userData);
+
+      const response = await axios.post(
+        "https://servease-be-5x7f.onrender.com/api/customer/add-customer-new",
+        userData
+      );
+
+      console.log("User creation response:", response.data);
+
+      if (response.data && response.data.id) {
+        const customerId = Number(response.data.id);
+        user.customerid = customerId;
+        await getCustomerPreferences(customerId);
+      } else {
+        console.warn("Unexpected response format:", response.data);
+      }
+    } catch (error) {
+      console.error("Error creating user:", error);
+    }
+  };
+
+  const getCustomerPreferences = async (customerId: number) => {
+    try {
+      const response = await axios.get(`https://utils-ndt3.onrender.com/user-settings/${customerId}`);
+      console.log("Response from user settings API:", response.data);
+
+      if (response.status === 200) {
+        console.log("Customer preferences fetched successfully:", response.data);
+
+        setUserPreference(response.data);
+        if (auth0User) {
+          auth0User.customerid = customerId;
+        }
+
+        console.log("Updated user object with customerId:", auth0User);
+        const baseSuggestions = [
+          { name: "Detect Location", index: 1 },
+          { name: "Add Address", index: 2 },
+        ];
+        const savedLocationSuggestions = response.data[0].savedLocations.map((loc: any, i: number) => ({
+          name: loc.name,
+          index: i + 3,
+        }));
+
+        setSuggestions([...baseSuggestions, ...savedLocationSuggestions]);
+      }
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        createUserPreferences(customerId);
+      } else {
+        console.error("Unexpected error fetching user settings:", error);
+      }
+    }
+  };
+
+  const createUserPreferences = async (customerId: number) => {
+    if (auth0User) {
+      auth0User.customerid = customerId;
+    }
+    try {
+      const payload: any = {
+        customerId,
+        savedLocations: [],
+      };
+
+      console.log("Creating user preferences with payload:", payload);
+
+      const response = await axios.post("https://utils-ndt3.onrender.com/user-settings", payload);
+
+      if (response.status === 200 || response.status === 201) {
+        setUserPreference(payload);
+      } else {
+        console.warn("Unexpected response:", response);
+      }
+    } catch (error) {
+      console.error("Error saving user settings:", error);
+    }
+  };
+
+  const getLocation = async () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position: { coords: { latitude: any; longitude: any; }; }) => {
+          const { latitude, longitude } = position.coords;
+          try {
+            const response = await axios.get(
+              `https://maps.googleapis.com/maps/api/geocode/json`,
+              {
+                params: {
+                  latlng: `${latitude},${longitude}`,
+                  key: keys.api_key,
+                },
+              }
+            );
+            const address = response.data.results[0]?.formatted_address;
+            setLocation(address || "Location not found");
+            console.log("Location fetched: ", address);
+          } catch (error) {
+            console.log("Failed to fetch location: ", error);
+          }
+        },
+        (error: any) => {
+          console.log("Geolocation error: ", error.message);
+          setError(error.message);
+        }
+      );
+    } else {
+      console.log("Geolocation is not supported by this browser.");
+    }
+  };
+
+  const handleChange = (newValue: any) => {
+    if (newValue === "Add Address") {
+      setOpen(true);
+    } else if (newValue === "Detect Location") {
+      getLocation();
+    } else {
+      console.log("Selected location:", newValue);
+      console.log("user preference ", userPreference);
+
+      const loc = userPreference?.savedLocations?.find(
+        (location: any) => location.name === newValue
+      );
+
+      if (loc?.location?.formatted_address) {
+        console.log("Location from user preference: ", loc.location.formatted_address);
+        setLocation(loc.location.formatted_address);
+        dispatch(add(loc));
+      } else {
+        console.warn("No matching location found for:", newValue);
+      }
+    }
+  };
+
+    const handleClick = (e: any) => {
+    setCurrentPage(e);
+    if (e === 'sign_out') {
+      dispatch(remove());
+      sendDataToParent(""); // This will trigger navigation to HomePage
+    } else {
+      sendDataToParent(e);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await clearSession({
+        returnToUrl: 'com.serveaso://logout'
+      });
+
+      dispatch(remove());
+      setMenuVisible(false);
+      handleClick('sign_out');
+    } catch (e) {
+      console.log('Log out error:', e);
+    }
+  };
+
+  const handleLoginClick = async () => {
+    setMenuVisible(false);
+    try {
+      await authorize({
+        scope: 'openid profile email',
+        redirectUrl: 'com.serveaso://dev-plavkbiy7v55pbg4.us.auth0.com/android/com.serveaso/callback',
+      });
+
+      const credentials = await getCredentials();
+
+      if (credentials?.accessToken) {
+        Alert.alert('Login Successful');
+      }
+    } catch (e) {
+      console.log('Login error:', e);
+    }
+  };
+
+  const handleBookingHistoryClick = () => {
+    setMenuVisible(false);
+    handleClick(BOOKINGS);
+  };
+
+  const handleProfileClick = () => {
+    setMenuVisible(false);
+    handleClick(PROFILE);
+  };
+
+  const handleDashboardClick = () => {
+    setMenuVisible(false);
+    handleClick(DASHBOARD);
+  };
+
+  const handleMenuPress = () => {
+    setMenuVisible(!menuVisible);
+  };
+
+  const handleOverlayPress = () => {
+    setMenuVisible(false);
+  };
+
   const requestLocationPermission = async () => {
     try {
       if (Platform.OS === "android") {
@@ -95,27 +340,25 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
             buttonPositive: "OK",
           }
         );
-  
+
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
           getCurrentLocation();
         } else {
           Alert.alert("Permission Denied", "Location permission is required.");
         }
       } else {
-        // iOS automatically asks for permission when calling getCurrentPosition
         getCurrentLocation();
       }
     } catch (err) {
       console.warn(err);
     }
   };
-  
+
   const getCurrentLocation = () => {
-  
     Geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-  
+
         try {
           const res = await axios.get(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
@@ -126,7 +369,7 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
               },
             }
           );
-  
+
           if (res.data?.display_name) {
             setLocation(res.data.display_name);
             setAddress(res.data.display_name);
@@ -146,223 +389,82 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
       }
     );
   };
-  
-  
-
-  const checkLocationAccuracy = async (): Promise<void> => {
-    if (Platform.OS === 'android') {
-      try {
-        const locationMode = await NativeModules.LocationSettings.getLocationMode();
-        
-        if (locationMode !== 'high_accuracy') {
-          Alert.alert(
-            'High Accuracy Recommended',
-            'For best results, please enable high accuracy location mode in your device settings.',
-            [
-              {
-                text: 'Open Settings',
-                onPress: () => NativeModules.LocationSettings.openLocationSettings(),
-              },
-              { text: 'Continue Anyway', onPress: () => {} },
-            ]
-          );
-        }
-      } catch (err) {
-        console.warn('Error checking location accuracy:', err);
-      }
-    }
-  };
-
-  const checkLocationServices = async (): Promise<boolean> => {
-    try {
-      if (Platform.OS === 'android') {
-        return await NativeModules.LocationSettings.checkLocationServices();
-      }
-      return true;
-    } catch (err) {
-      console.warn('Error checking location services:', err);
-      return false;
-    }
-  };
-
-  const getAddressFromCoords = async (lat: number, lon: number) => {
-    try {
-      const res = await Geocoder.from(lat, lon);
-      const addressComponent = res.results?.[0]?.formatted_address;
-      if (addressComponent) {
-        setAddress(addressComponent);
-        setLocation(addressComponent);
-      }
-    } catch (error) {
-      console.warn('Geocoder error:', error);
-    }
-  };
-
-  
-
-  const fetchLocation = () => {
-    setLoading(true);
-    setShowGPSButton(false);
-    
-    Geolocation.getCurrentPosition(
-      position => {
-        const { latitude, longitude } = position.coords;
-        Alert.alert('Location fetched successfully', `Lat: ${latitude}, Lng: ${longitude}`);
-        setLatitude(latitude);
-        setLongitude(longitude);
-        getAddressFromCoords(latitude, longitude);
-        setLoading(false);
-      },
-      error => {
-        console.warn('Location fetch error:', error);
-        setLoading(false);
-        setShowGPSButton(true);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
-  };
-
-  const fetchLocationWithChecks = async () => {
-    setIsCheckingLocation(true);
-    setLoading(true);
-    
-    try {
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        Alert.alert(
-          'Permission Required',
-          'Location access is required for this feature. Please enable it in settings.',
-          [
-            {
-              text: 'Open Settings',
-              onPress: () => Linking.openSettings(),
-            },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
-        return;
-      }
-
-      const servicesEnabled = await checkLocationServices();
-      if (!servicesEnabled) {
-        Alert.alert(
-          'Location Services Disabled',
-          'Please enable location services to continue.',
-          [
-            {
-              text: 'Enable',
-              onPress: () => Linking.openSettings(),
-            },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
-        setShowGPSButton(true);
-        return;
-      }
-
-      await checkLocationAccuracy();
-      fetchLocation();
-    } catch (error) {
-      console.warn('Location fetch error:', error);
-      setShowGPSButton(true);
-    } finally {
-      setIsCheckingLocation(false);
-      setLoading(false);
-    }
-  };
-
-  const handleLocationRefresh = async () => {
-    await fetchLocationWithChecks();
-  };
-
-  const handleOpenSettings = async () => {
-    await Linking.openSettings();
-    handleLocationRefresh();
-  };
 
   const handleLocationSave = () => {
     if (address) {
       setLocation(address);
     }
     setOpen(false);
+    setOpenSaveOptionForSave(true);
   };
 
-  const handleMenuPress = () => {
-    setMenuVisible(!menuVisible);
+  const locationHandleSave = () => {
+    console.log("Location saved as:", locationAs);
+    console.log("user preference ", userPreference);
+    updateUserSetting();
   };
 
-  const handleOverlayPress = () => {
-    setMenuVisible(false);
-  };
-
-  const handleProfileClick = () => {
-    setMenuVisible(false);
-    handleClick(PROFILE);
-  };
-
-  const handleDashboardClick = () => {
-    setMenuVisible(false);
-    handleClick(DASHBOARD);
-  };
-
-  // const handleBookingHistoryClick = () => {
-  //   setMenuVisible(false);
-  //   handleClick(BOOKINGS);
-  // };
-
-  // const handleSignOut = () => {
-  //   setMenuVisible(false);
-  //   handleClick('sign_out');
-  // };
-  const handleSignOut = async () => {
-    try {
-      await clearSession({
-        // federated: false, // optional, set to true if you want to log out from identity provider too
-        returnToUrl: 'com.serveaso://logout'
-      });
-  
-      dispatch(remove());
-      setMenuVisible(false);
-      handleClick('sign_out');
-    } catch (e) {
-      console.log('Log out error:', e);
+  const updateUserSetting = async () => {
+    if (!auth0User || !locationAs || !dataFromMap) {
+      console.error("Missing required data to update user setting.");
+      return;
     }
-  };
-  
-const handleClick = (e: any) => {
-    setCurrentPage(e);
-    if (e === 'sign_out') {
-      dispatch(remove());
-      sendDataToParent("");
-    } else {
-      sendDataToParent(e);
-    }
-  };
-  // const handleLoginClick = () => {
-  //   setMenuVisible(false);
-  //   handleClick(LOGIN);
-  // };
-  // Modify the handleLoginClick function to use Auth0
-  const handleLoginClick = async () => {
-    setMenuVisible(false);
+
+    const newLocation = {
+      name: locationAs,
+      location: dataFromMap[0],
+    };
+
+    const existingLocations =
+      Array.isArray(userPreference?.savedLocations) ? userPreference.savedLocations : [];
+
+    const updatedLocations = [...existingLocations, newLocation];
+
+    const payload = {
+      customerId: auth0User.customerid,
+      savedLocations: updatedLocations,
+    };
+
     try {
-      await authorize(
-        {
-          scope: 'openid profile email',
-          redirectUrl: 'com.serveaso://dev-plavkbiy7v55pbg4.us.auth0.com/android/com.serveaso/callback',
-        }
+      const response = await axios.put(
+        `https://utils-ndt3.onrender.com/user-settings/${auth0User.customerid}`,
+        payload
       );
-  
-      const credentials = await getCredentials();
-  
-      if (credentials?.accessToken) {
-        Alert.alert('Login Successful');
-        // Optional: dispatch(setUser(auth0User));
+
+      if (response.status === 200 || response.status === 201) {
+        setUserPreference({ customerId: auth0User.customerid, savedLocations: updatedLocations });
+        setOpenSaveOptionForSave(false);
+        setLocationAs("");
+
+        const baseSuggestions = [
+          { name: "Detect Location", index: 1 },
+          { name: "Add Address", index: 2 },
+        ];
+        const savedLocationSuggestions = updatedLocations.map((loc, i) => ({
+          name: loc.name,
+          index: i + 3,
+        }));
+
+        setSuggestions([...baseSuggestions, ...savedLocationSuggestions]);
+      } else {
+        console.warn("Unexpected response while updating user settings:", response);
       }
-    } catch (e) {
-      console.log('Login error:', e);
+    } catch (error) {
+      console.error("Error updating user settings:", error);
     }
   };
+
+  const handleUserPreference = (preference?: string) => {
+    if (!preference) {
+      setShowInput(true);
+      setLocationAs(locationAs);
+    } else {
+      setShowInput(false);
+      setLocationAs(preference);
+    }
+  };
+
+  const [showDropdown, setShowDropdown] = useState(false);
 
   return (
     <View style={{ position: 'relative' }}>
@@ -374,20 +476,19 @@ const handleClick = (e: any) => {
 
       <View style={styles.headerContainer}>
         <TouchableOpacity 
-  style={styles.logoContainer} 
-  onPress={() => handleClick('HOME')}
->
-  <Image
-    source={require('../assets/images/ServEaso.png')}
-    style={styles.logo}
-  />
-  {/* <Text style={styles.logoText}>ServEaso</Text> */}
-</TouchableOpacity>
+          style={styles.logoContainer} 
+          onPress={() => handleClick("")} // This sends empty string to parent
+        >
+          <Image
+            source={require('../assets/images/ServEaso.png')}
+            style={styles.logo}
+          />
+        </TouchableOpacity>
 
         <View style={styles.actionsContainer}>
-          <TouchableOpacity 
-            style={styles.locationContainer} 
-            onPress={() => setOpen(true)}
+          <TouchableOpacity
+            style={styles.locationContainer}
+            onPress={() => setShowDropdown(!showDropdown)}
           >
             <MaterialIcon name="location-on" size={16} color="#3b82f6" style={styles.locationIcon} />
             <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
@@ -395,20 +496,40 @@ const handleClick = (e: any) => {
             </Text>
           </TouchableOpacity>
 
+          {showDropdown && (
+            <View style={styles.dropdownContainer}>
+              {suggestions.map((suggestion, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    handleChange(suggestion.name);
+                    setShowDropdown(false);
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>{suggestion.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           <View style={styles.iconsContainer}>
-          <TouchableOpacity 
-  style={styles.iconButton} 
-  onPress={() => setIsCartOpen(true)}
->
-  <View style={styles.cartBadge}>
-    <Text style={styles.badgeText}>{cartItems?.length || 0}</Text>
-  </View>
-  <FeatherIcon name="shopping-cart" size={20} color="#000" />
-</TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => setIsCartOpen(true)}
+            >
+              <View style={styles.cartBadge}>
+                <Text style={styles.badgeText}>{cartItems?.length || 0}</Text>
+              </View>
+              <FeatherIcon name="shopping-cart" size={20} color="#000" />
+            </TouchableOpacity>
 
             <TouchableOpacity style={styles.iconButton} onPress={handleMenuPress}>
-              {loggedInUser ? (
-                <FeatherIcon name="user" size={20} color="#000" />
+              {auth0User ? (
+                <Image
+                  source={{ uri: auth0User.picture }}
+                  style={styles.userAvatar}
+                />
               ) : (
                 <FeatherIcon name="user" size={20} color="#000" />
               )}
@@ -422,7 +543,7 @@ const handleClick = (e: any) => {
           animationType="slide"
           transparent={false}
           onRequestClose={() => setOpen(false)}
-          onShow={fetchLocationWithChecks}
+          onShow={requestLocationPermission}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
@@ -447,9 +568,9 @@ const handleClick = (e: any) => {
                 <MaterialIcon name="location-off" size={50} color="red" />
                 <Text style={styles.statusText}>Location services are disabled</Text>
                 <View style={styles.buttonContainer}>
-                  <TouchableOpacity 
-                    style={[styles.button, styles.primaryButton]} 
-                    onPress={handleOpenSettings}
+                  <TouchableOpacity
+                    style={[styles.button, styles.primaryButton]}
+                    onPress={() => Linking.openSettings()}
                   >
                     <Text style={styles.buttonText}>Enable Location Services</Text>
                   </TouchableOpacity>
@@ -486,14 +607,14 @@ const handleClick = (e: any) => {
                 </View>
 
                 <View style={styles.buttonGroup}>
-                  <TouchableOpacity 
-                    style={[styles.button, styles.secondaryButton]} 
-                    onPress={fetchLocationWithChecks}
+                  <TouchableOpacity
+                    style={[styles.button, styles.secondaryButton]}
+                    onPress={requestLocationPermission}
                   >
                     <Text style={styles.secondaryButtonText}>Refresh</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.button, styles.primaryButton]} 
+                  <TouchableOpacity
+                    style={[styles.button, styles.primaryButton]}
                     onPress={handleLocationSave}
                   >
                     <Text style={styles.buttonText}>Confirm Location</Text>
@@ -504,90 +625,85 @@ const handleClick = (e: any) => {
           </View>
         </Modal>
 
+        {/* Save Location Modal */}
+        <Modal
+          visible={OpenSaveOptionForSave}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setOpenSaveOptionForSave(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Save As</Text>
+              <TouchableOpacity onPress={() => setOpenSaveOptionForSave(false)}>
+                <Icon name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalContent}>
+              <Text style={styles.saveAsText}>Save As:</Text>
+              <View style={styles.saveOptionsContainer}>
+                <TouchableOpacity
+                  style={styles.saveOptionButton}
+                  onPress={() => handleUserPreference("Home")}
+                >
+                  <Icon name="home" size={20} color="#3b82f6" />
+                  <Text style={styles.saveOptionText}>Home</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveOptionButton}
+                  onPress={() => handleUserPreference("Office")}
+                >
+                  <Icon name="briefcase" size={20} color="#3b82f6" />
+                  <Text style={styles.saveOptionText}>Office</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveOptionButton}
+                  onPress={() => handleUserPreference()}
+                >
+                  <Icon name="map-marker" size={20} color="#3b82f6" />
+                  <Text style={styles.saveOptionText}>Others</Text>
+                </TouchableOpacity>
+              </View>
 
-{menuVisible && (
-  <View style={styles.menuDropdown}>
-    {!auth0User && !loggedInUser ? (
-      <>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={handleLoginClick}
-        >
-          <Text style={styles.menuItemText}>Login / Signup</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={() => {
-            setMenuVisible(false);
-            Alert.alert('Terms & Conditions clicked');
-          }}
-        >
-          <Text style={styles.menuItemText}>Terms & Conditions</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={() => {
-            setMenuVisible(false);
-            Alert.alert('Contact Us clicked');
-          }}
-        >
-          <Text style={styles.menuItemText}>Contact Us</Text>
-        </TouchableOpacity>
+              {showInput && (
+                <TextInput
+                  style={styles.locationNameInput}
+                  placeholder="Enter Location Name"
+                  value={locationAs}
+                  onChangeText={setLocationAs}
+                />
+              )}
 
-        
-      </>
-    ) : (
-      <>
-        
-        {loggedInUser?.role === 'admin' && (
-          <TouchableOpacity 
-            style={styles.menuItem} 
-            onPress={handleDashboardClick}
-          >
-            <Text style={styles.menuItemText}>Dashboard</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={handleBookingHistoryClick}
-        >
-          <Text style={styles.menuItemText}>Booking History</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-                    style={styles.menuItem} 
-                    onPress={handleDashboardClick}
-                  >
-                    <Text style={styles.menuItemText}>Dashboard</Text>
-                  </TouchableOpacity>
-                   <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={handleProfileClick}
-        >
-          <Text style={styles.menuItemText}>User Profile</Text>
-        </TouchableOpacity>
+              <View style={styles.buttonGroup}>
+                <TouchableOpacity
+                  style={[styles.button, styles.secondaryButton]}
+                  onPress={() => setOpenSaveOptionForSave(false)}
+                >
+                  <Text style={styles.secondaryButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryButton]}
+                  onPress={locationHandleSave}
+                >
+                  <Text style={styles.buttonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={handleSignOut}
-        >
-          <Text style={styles.menuItemText}>Sign Out</Text>
-        </TouchableOpacity>
-      </>
-    )}
-  </View>
-)}
-        {/* {menuVisible && (
-          <View style={styles.menuDropdown}>
-            {!loggedInUser ? (
+        {menuVisible && (
+          <View style={styles.menuDropdown} ref={dropdownRef}>
+            {!auth0User ? (
               <>
-                <TouchableOpacity 
-                  style={styles.menuItem} 
+                <TouchableOpacity
+                  style={styles.menuItem}
                   onPress={handleLoginClick}
                 >
                   <Text style={styles.menuItemText}>Login / Signup</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.menuItem} 
+                <TouchableOpacity
+                  style={styles.menuItem}
                   onPress={() => {
                     setMenuVisible(false);
                     Alert.alert('Terms & Conditions clicked');
@@ -595,8 +711,8 @@ const handleClick = (e: any) => {
                 >
                   <Text style={styles.menuItemText}>Terms & Conditions</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.menuItem} 
+                <TouchableOpacity
+                  style={styles.menuItem}
                   onPress={() => {
                     setMenuVisible(false);
                     Alert.alert('Contact Us clicked');
@@ -607,31 +723,35 @@ const handleClick = (e: any) => {
               </>
             ) : (
               <>
-                <TouchableOpacity 
-                  style={styles.menuItem} 
-                  onPress={handleProfileClick}
-                >
-                  <Text style={styles.menuItemText}>Profile</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.menuItem} 
-                  onPress={handleBookingHistoryClick}
-                >
-                  <Text style={styles.menuItemText}>Booking History</Text>
-                </TouchableOpacity>
-                
-                {loggedInUser?.role === 'admin' && (
-                  <TouchableOpacity 
-                    style={styles.menuItem} 
+                {auth0User?.role === 'admin' && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
                     onPress={handleDashboardClick}
                   >
                     <Text style={styles.menuItemText}>Dashboard</Text>
                   </TouchableOpacity>
                 )}
-                
-                <TouchableOpacity 
-                  style={styles.menuItem} 
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleBookingHistoryClick}
+                >
+                  <Text style={styles.menuItemText}>Booking History</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleDashboardClick}
+                >
+                  <Text style={styles.menuItemText}>Dashboard</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleProfileClick}
+                >
+                  <Text style={styles.menuItemText}>User Profile</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuItem}
                   onPress={handleSignOut}
                 >
                   <Text style={styles.menuItemText}>Sign Out</Text>
@@ -639,70 +759,22 @@ const handleClick = (e: any) => {
               </>
             )}
           </View>
-        )} */}
+        )}
       </View>
-          <CartDialog 
-      open={isCartOpen}
-      handleClose={() => setIsCartOpen(false)}
-      handleCheckout={() => {
-        setIsCartOpen(false);
-        handleClick(CHECKOUT);
-      }}
-    />
 
+      <CartDialog
+        open={isCartOpen}
+        handleClose={() => setIsCartOpen(false)}
+        handleCheckout={() => {
+          setIsCartOpen(false);
+          handleClick(CHECKOUT);
+        }}
+      />
     </View>
   );
 };
 
-type Styles = {
-  headerContainer: ViewStyle;
-  logoContainer: ViewStyle;
-  logo: ImageStyle;
-
-  actionsContainer: ViewStyle;
-  locationInput: ViewStyle;
-  locationIcon: TextStyle;
-  locationTextInput: TextStyle;
-  iconButton: ViewStyle;
-  blueIconButton: ViewStyle;
-  cartBadge: ViewStyle;
-  badgeText: TextStyle;
-  modalContainer: ViewStyle;
-  modalHeader: ViewStyle;
-  modalTitle: TextStyle;
-  map: ViewStyle;
-  modalActions: ViewStyle;
-  cancelButton: ViewStyle;
-  saveButton: ViewStyle;
-  buttonText: TextStyle;
-  statusContainer: ViewStyle;
-  statusText: TextStyle;
-  buttonRow: ViewStyle;
-  infoBox: ViewStyle;
-  text: TextStyle;
-  overlay: ViewStyle;
-  menuDropdown: ViewStyle;
-  menuItem: ViewStyle;
-  menuItemText: TextStyle;
-  locationContainer: ViewStyle;
-  iconsContainer: ViewStyle;
-  modalContent: ViewStyle;
-  mapContainer: ViewStyle;
-  locationInfoContainer: ViewStyle;
-  locationInfo: ViewStyle;
-  coordinatesContainer: ViewStyle;
-  coordinateText: TextStyle;
-  addressText: TextStyle;
-  buttonGroup: ViewStyle;
-  buttonContainer: ViewStyle;
-  button: ViewStyle;
-  primaryButton: ViewStyle;
-  secondaryButton: ViewStyle;
-  secondaryButtonText: TextStyle;
-  locationText:TextStyle;
-};
-
-const styles = StyleSheet.create<Styles>({
+const styles = StyleSheet.create({
   headerContainer: {
     position: 'absolute',
     top: 0,
@@ -722,52 +794,46 @@ const styles = StyleSheet.create<Styles>({
     height: 70,
     elevation: 3,
   },
- logoContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  padding: 8, // Add some padding to make it easier to tap
-},
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
   logo: {
-    
     height: 80,
     width: 80,
     resizeMode: 'contain',
   },
-
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+    position: 'relative',
   },
-  locationInput: {
+  locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 20,
     paddingVertical: 8,
-    backgroundColor: '#f3f4f6',
-    borderColor: '#f3f4f6',
+    paddingHorizontal: 12,
+    maxWidth: 150,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#334155',
+    marginLeft: 6,
+    fontWeight: '500',
   },
   locationIcon: {
-    marginRight: 8,
+    marginRight: 6,
   },
-  locationTextInput: {
-    backgroundColor: 'transparent',
-    fontSize: 14,
-    minWidth: 120,
-    padding: 0,
-    margin: 0,
-    includeFontPadding: false,
-  },
-  blueIconButton: {
-    backgroundColor: '#3b82f6',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
+  iconsContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
+    gap: 12,
   },
   iconButton: {
     padding: 8,
@@ -792,6 +858,34 @@ const styles = StyleSheet.create<Styles>({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  userAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  dropdownContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 100,
+    width: 200,
+  },
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: '#333',
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: 'white',
@@ -808,120 +902,6 @@ const styles = StyleSheet.create<Styles>({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  map: {
-    width: '100%',
-    height: 300,
-    marginBottom: 10,
-    borderRadius: 10,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  cancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-    backgroundColor: '#3b82f6',
-  },
-  buttonText: {
-    color: '#fff',
-  },
-  statusContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusText: {
-    marginTop: 15,
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#333',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 10,
-    marginTop: 10,
-  },
-  infoBox: {
-    width: '100%',
-    padding: 10,
-    backgroundColor: '#f0f8ff',
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  text: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-  },
-  menuDropdown: {
-    position: 'absolute',
-    top: 70,
-    right: 10,
-    backgroundColor: 'black',
-    borderRadius: 8,
-    paddingVertical: 8,
-    zIndex: 1000,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    minWidth: 160,
-  },
-  menuItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-  },
-  menuItemText: {
-    color: 'white',
-    fontSize: 16,
-  },
-   locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    maxWidth: 150,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#334155',
-    marginLeft: 6,
-    fontWeight: '500',
-  },
-  iconsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-   
   modalContent: {
     flex: 1,
     padding: 16,
@@ -931,6 +911,10 @@ const styles = StyleSheet.create<Styles>({
     overflow: 'hidden',
     marginBottom: 16,
     height: '50%',
+  },
+  map: {
+    width: '100%',
+    height: '100%',
   },
   locationInfoContainer: {
     backgroundColor: '#f8fafc',
@@ -981,11 +965,87 @@ const styles = StyleSheet.create<Styles>({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '500',
+  },
   secondaryButtonText: {
     color: '#334155',
     fontWeight: '500',
   },
- 
+  statusContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusText: {
+    marginTop: 15,
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#333',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+  },
+  menuDropdown: {
+    position: 'absolute',
+    top: 70,
+    right: 10,
+    backgroundColor: 'black',
+    borderRadius: 8,
+    paddingVertical: 8,
+    zIndex: 1000,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    minWidth: 160,
+  },
+  menuItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+  },
+  menuItemText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  saveAsText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 16,
+  },
+  saveOptionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  saveOptionButton: {
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  saveOptionText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#334155',
+  },
+  locationNameInput: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    fontSize: 16,
+  },
 });
 
 export default Head;

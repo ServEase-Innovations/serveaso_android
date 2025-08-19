@@ -20,7 +20,13 @@ const App = () => {
   const [showProfileFromDashboard, setShowProfileFromDashboard] = useState(false);
 
   const handleViewChange = (view: string) => {
-    setCurrentView(view);
+    // Empty string means HomePage
+    if (view === '') {
+      setCurrentView('HOME');
+      setShowProfileFromDashboard(false);
+    } else {
+      setCurrentView(view);
+    }
   };
 
   const handleBookingType = (type: string) => {

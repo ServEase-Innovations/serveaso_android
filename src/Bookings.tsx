@@ -226,6 +226,7 @@ const { user: auth0User } = useAuth0();
   //   }
   // }, [isAuthenticated, auth0User]);
  // Update your useEffect
+
   useEffect(() => {
     if (auth0User) {
       setCustomerId(auth0User.customerid ? Number(auth0User.customerid) : null);

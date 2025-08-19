@@ -364,7 +364,7 @@ const DemoCook = ({
           const bookingDetails: BookingDetails = {
         serviceProviderId: providerDetails?.serviceproviderId || 1,
         serviceProviderName: `${providerDetails?.firstName || ''} ${providerDetails?.lastName || ''}`.trim(),
-        customerId: user?.customerid || 1,
+        customerId: user?.customerid || 19,
         customerName: user?.name || "Demo User",
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
@@ -469,22 +469,22 @@ const DemoCook = ({
       );
 
       if (bookingResponse.status === 201) {
-        try {
-          await fetch(
-            "http://localhost:4000/send-notification",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                title: "Hello from ServEaso!",
-                body: `Your booking for ${bookingDetails.engagements} has been confirmed!`,
-                url: "http://localhost:3000",
-              }),
-              headers: { "Content-Type": "application/json" },
-            }
-          );
-        } catch (error) {
-          console.error("Notification error:", error);
-        }
+        // try {
+        //   await fetch(
+        //     "http://localhost:4000/send-notification",
+        //     {
+        //       method: "POST",
+        //       body: JSON.stringify({
+        //         title: "Hello from ServEaso!",
+        //         body: `Your booking for ${bookingDetails.engagements} has been confirmed!`,
+        //         url: "http://localhost:3000",
+        //       }),
+        //       headers: { "Content-Type": "application/json" },
+        //     }
+        //   );
+        // } catch (error) {
+        //   console.error("Notification error:", error);
+        // }
 
         const selectedPackages = packages.filter(pkg => pkg.inCart);
         selectedPackages.forEach(pkg => {
