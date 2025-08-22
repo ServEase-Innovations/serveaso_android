@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import axios from 'axios';
+import RazorpayCheckout from 'react-native-razorpay';
 import { addToCart, removeFromCart, selectCartItems } from './features/addToSlice';
 import { isNannyCartItem } from './types/cartSlice';
 import { EnhancedProviderDetails } from './types/ProviderDetailsType';
@@ -21,7 +22,7 @@ import { BookingDetails } from './types/engagementRequest';
 import axiosInstance from './axiosInstance';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Dimensions } from 'react-native';
-
+import { useAuth0 } from 'react-native-auth0';
 
 interface NannyServicesDialogProps {
   open: boolean;
@@ -50,9 +51,10 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
-// Get screen dimensions
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
+  const { user } = useAuth0();
+  
+  // Get screen dimensions
+  const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
   const bookingType = useSelector((state: any) => state.bookingType?.value);
   const allCartItems = useSelector(selectCartItems);
@@ -246,6 +248,131 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
   const handleApplyVoucher = () => {
     Alert.alert('Voucher Applied', 'Your voucher has been applied successfully');
+  };
+
+  const handleCheckout = async () => {
+    try {
+      setLoading(true);
+      
+      const selectedPackages = Object.keys(cartItems)
+        .filter(key => cartItems[key])
+        .map(key => {
+          const type = key.startsWith('baby') ? 'baby' : 'elderly';
+          const packageType = key.replace(type, '').charAt(0).toLowerCase() + 
+                            key.replace(type, '').slice(1);
+          return {
+            type,
+            packageType,
+            price: getPackagePrice(type, packageType),
+            description: getPackageDescription(type, packageType)
+          };
+        });
+
+      if (selectedPackages.length === 0) {
+        Alert.alert("Please add at least one package to cart");
+        setLoading(false);
+        return;
+      }
+
+      const totalAmount = selectedPackages.reduce((sum, pkg) => sum + pkg.price, 0);
+      
+      // Create Razorpay order
+      const response = await axios.post(
+        "https://utils-ndt3.onrender.com/create-order",
+        { amount: totalAmount * 100 }, // amount in paise
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    
+      if (response.status === 200) {
+        const { id: orderId, currency, amount } = response.data;
+    
+        const options = {
+          key: "rzp_test_lTdgjtSRlEwreA", // Your Razorpay key
+          amount: amount,
+          currency: currency,
+          name: "Serveaso",
+          description: "Nanny Services Booking",
+          order_id: orderId,
+          prefill: {
+            name: user?.name || "",
+            email: user?.email || "",
+            contact: user?.mobileNo || "",
+          },
+          theme: { color: "#3399cc" },
+        };
+    
+        RazorpayCheckout.open(options)
+          .then((razorpayResponse) => {
+            // Handle successful payment
+            const bookingDetails: BookingDetails = {
+              serviceProviderId: providerDetails?.serviceproviderId || 1,
+              serviceProviderName: providerFullName,
+              customerId: user?.customerid || 19, // Default to 19 if not available
+              customerName: user?.name || "Demo User",
+              startDate: new Date().toISOString().split('T')[0],
+              endDate: '',
+              engagements: selectedPackages.map(p => `${p.type} ${p.packageType}`).join(', '),
+              address: 'Demo Address',
+              timeslot: '10:00 AM - 2:00 PM',
+              monthlyAmount: totalAmount,
+              paymentMode: 'UPI',
+              bookingType: bookingType?.bookingPreference || 'DEMO',
+              taskStatus: 'COMPLETED',
+              serviceType: 'NANNY',
+              responsibilities: []
+            };
+            
+            handleSuccessfulPayment(razorpayResponse, bookingDetails);
+          })
+          .catch((error) => {
+            Alert.alert("Payment Failed", error.description || "Unknown error");
+            console.error("Razorpay payment error:", error);
+            setLoading(false);
+          });
+      }
+    } catch (error) {
+      console.error("Error while creating Razorpay order:", error);
+      Alert.alert("Error", "Failed to initiate payment. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  const handleSuccessfulPayment = async (razorpayResponse: any, bookingDetails: BookingDetails) => {
+    try {
+      const bookingResponse = await axiosInstance.post(
+        "/api/serviceproviders/engagement/add",
+        bookingDetails,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (bookingResponse.status === 201) {
+        // Clear cart items after successful booking
+        Object.keys(cartItems).forEach(key => {
+          if (cartItems[key]) {
+            const type = key.startsWith('baby') ? 'baby' : 'elderly';
+            const packageType = key.replace(type, '').charAt(0).toLowerCase() + 
+                              key.replace(type, '').slice(1);
+            const id = `${type}_${packageType}_${providerDetails?.serviceproviderId || 'default'}`;
+            
+            dispatch(removeFromCart({ id, type: 'nanny' }));
+          }
+        });
+
+        Alert.alert('Success', 'Booking confirmed successfully!');
+        handleClose();
+      }
+    } catch (error) {
+      console.error("Booking error:", error);
+      Alert.alert("Error", "Failed to save booking details");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderBabyPackage = (packageType: 'day' | 'night' | 'fullTime') => {
@@ -544,11 +671,8 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
                   styles.checkoutButton,
                   getSelectedPackagesCount() === 0 && styles.disabledButton
                 ]}
-                onPress={() => {
-                  handleClose();
-                  Alert.alert('Checkout', `Total amount: ₹${calculateTotal().toLocaleString()}`);
-                }}
-                disabled={getSelectedPackagesCount() === 0}
+                onPress={handleCheckout}
+                disabled={getSelectedPackagesCount() === 0 || loading}
               >
                 {loading ? (
                   <ActivityIndicator size="small" color="white" />

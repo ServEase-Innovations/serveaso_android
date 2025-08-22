@@ -480,7 +480,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
           onPress={() => handleClick("")} // This sends empty string to parent
         >
           <Image
-            source={require('../assets/images/ServEaso.png')}
+            source={require('../assets/images/serveaso2.png')}
             style={styles.logo}
           />
         </TouchableOpacity>
@@ -781,7 +781,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
-    backgroundColor: 'white',
+    backgroundColor: '#d6f0ff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -797,11 +797,11 @@ const styles = StyleSheet.create({
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
+    // padding: 8,
   },
   logo: {
     height: 80,
-    width: 80,
+    width: 170,
     resizeMode: 'contain',
   },
   actionsContainer: {
