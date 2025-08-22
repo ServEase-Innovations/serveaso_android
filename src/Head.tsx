@@ -81,10 +81,13 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   useEffect(() => {
     const run = async () => {
       // Step 1: Get location first
-      await getLocation();
+      await requestLocationPermission();
 
       // Step 2: Auth checks
-      if (!auth0User || auth0Loading || !auth0User?.email) return;
+      if (!auth0User || auth0Loading || !auth0User?.email) {
+        console.log("Auth0 user not available yet");
+        return;
+      }
 
       try {
         // Step 3: Get token
@@ -116,7 +119,9 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
       }
     };
 
-    run();
+    run().catch(error => {
+      console.error("Error in run function:", error);
+    });
   }, [auth0User, auth0Loading, getCredentials]);
 
   const createUser = async (user: any) => {
@@ -207,43 +212,208 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     }
   };
 
-  const getLocation = async () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position: { coords: { latitude: any; longitude: any; }; }) => {
-          const { latitude, longitude } = position.coords;
-          try {
-            const response = await axios.get(
-              `https://maps.googleapis.com/maps/api/geocode/json`,
-              {
-                params: {
-                  latlng: `${latitude},${longitude}`,
-                  key: keys.api_key,
-                },
-              }
-            );
-            const address = response.data.results[0]?.formatted_address;
-            setLocation(address || "Location not found");
-            console.log("Location fetched: ", address);
-          } catch (error) {
-            console.log("Failed to fetch location: ", error);
+  const requestLocationPermission = async (): Promise<boolean> => {
+    try {
+      if (Platform.OS === "android") {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: "Location Permission",
+            message: "We need access to your location",
+            buttonNeutral: "Ask Me Later",
+            buttonNegative: "Cancel",
+            buttonPositive: "OK",
           }
-        },
-        (error: any) => {
-          console.log("Geolocation error: ", error.message);
-          setError(error.message);
+        );
+
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          getCurrentLocation();
+          return true;
+        } else {
+          Alert.alert("Permission Denied", "Location permission is required.");
+          return false;
         }
-      );
-    } else {
-      console.log("Geolocation is not supported by this browser.");
+      } else {
+        getCurrentLocation();
+        return true;
+      }
+    } catch (err) {
+      console.warn(err);
+      return false;
     }
+  };
+
+  const getCurrentLocation = () => {
+    Geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setLatitude(latitude);
+        setLongitude(longitude);
+
+        try {
+          const res = await axios.get(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+            {
+              headers: {
+                "User-Agent": "ReactNativeApp",
+                "Accept-Language": "en",
+              },
+            }
+          );
+
+          if (res.data?.display_name) {
+            setLocation(res.data.display_name);
+            setAddress(res.data.display_name);
+          }
+        } catch (error) {
+          console.error("Error getting address:", error);
+        }
+      },
+      (error) => {
+        console.error("Location error:", error);
+        Alert.alert("Error", error.message || "Unable to fetch location.");
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 60000,
+        maximumAge: 10000,
+      }
+    );
+  };
+
+  const checkLocationAccuracy = async (): Promise<void> => {
+    if (Platform.OS === 'android') {
+      try {
+        const locationMode = await NativeModules.LocationSettings.getLocationMode();
+        
+        if (locationMode !== 'high_accuracy') {
+          Alert.alert(
+            'High Accuracy Recommended',
+            'For best results, please enable high accuracy location mode in your device settings.',
+            [
+              {
+                text: 'Open Settings',
+                onPress: () => NativeModules.LocationSettings.openLocationSettings(),
+              },
+              { text: 'Continue Anyway', onPress: () => {} },
+            ]
+          );
+        }
+      } catch (err) {
+        console.warn('Error checking location accuracy:', err);
+      }
+    }
+  };
+
+  const checkLocationServices = async (): Promise<boolean> => {
+    try {
+      if (Platform.OS === 'android') {
+        return await NativeModules.LocationSettings.checkLocationServices();
+      }
+      return true;
+    } catch (err) {
+      console.warn('Error checking location services:', err);
+      return false;
+    }
+  };
+
+  const getAddressFromCoords = async (lat: number, lon: number) => {
+    try {
+      const res = await Geocoder.from(lat, lon);
+      const addressComponent = res.results?.[0]?.formatted_address;
+      if (addressComponent) {
+        setAddress(addressComponent);
+        setLocation(addressComponent);
+      }
+    } catch (error) {
+      console.warn('Geocoder error:', error);
+    }
+  };
+
+  const fetchLocation = () => {
+    setLoading(true);
+    setShowGPSButton(false);
+    
+    Geolocation.getCurrentPosition(
+      position => {
+        const { latitude, longitude } = position.coords;
+        setLatitude(latitude);
+        setLongitude(longitude);
+        getAddressFromCoords(latitude, longitude);
+        setLoading(false);
+      },
+      error => {
+        console.warn('Location fetch error:', error);
+        setLoading(false);
+        setShowGPSButton(true);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+  };
+
+  const fetchLocationWithChecks = async () => {
+    setIsCheckingLocation(true);
+    setLoading(true);
+    
+    try {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        Alert.alert(
+          'Permission Required',
+          'Location access is required for this feature. Please enable it in settings.',
+          [
+            {
+              text: 'Open Settings',
+              onPress: () => Linking.openSettings(),
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+        return;
+      }
+
+      const servicesEnabled = await checkLocationServices();
+      if (!servicesEnabled) {
+        Alert.alert(
+          'Location Services Disabled',
+          'Please enable location services to continue.',
+          [
+            {
+              text: 'Enable',
+              onPress: () => Linking.openSettings(),
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+        setShowGPSButton(true);
+        return;
+      }
+
+      await checkLocationAccuracy();
+      fetchLocation();
+    } catch (error) {
+      console.warn('Location fetch error:', error);
+      setShowGPSButton(true);
+    } finally {
+      setIsCheckingLocation(false);
+      setLoading(false);
+    }
+  };
+
+  const handleLocationRefresh = async () => {
+    await fetchLocationWithChecks();
+  };
+
+  const handleOpenSettings = async () => {
+    await Linking.openSettings();
+    handleLocationRefresh();
   };
 
   const handleChange = (newValue: any) => {
     if (newValue === "Add Address") {
       setOpen(true);
     } else if (newValue === "Detect Location") {
-      getLocation();
+      fetchLocationWithChecks();
     } else {
       console.log("Selected location:", newValue);
       console.log("user preference ", userPreference);
@@ -262,7 +432,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     }
   };
 
-    const handleClick = (e: any) => {
+  const handleClick = (e: any) => {
     setCurrentPage(e);
     if (e === 'sign_out') {
       dispatch(remove());
@@ -325,69 +495,6 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
 
   const handleOverlayPress = () => {
     setMenuVisible(false);
-  };
-
-  const requestLocationPermission = async () => {
-    try {
-      if (Platform.OS === "android") {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: "Location Permission",
-            message: "We need access to your location",
-            buttonNeutral: "Ask Me Later",
-            buttonNegative: "Cancel",
-            buttonPositive: "OK",
-          }
-        );
-
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          getCurrentLocation();
-        } else {
-          Alert.alert("Permission Denied", "Location permission is required.");
-        }
-      } else {
-        getCurrentLocation();
-      }
-    } catch (err) {
-      console.warn(err);
-    }
-  };
-
-  const getCurrentLocation = () => {
-    Geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-
-        try {
-          const res = await axios.get(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            {
-              headers: {
-                "User-Agent": "ReactNativeApp",
-                "Accept-Language": "en",
-              },
-            }
-          );
-
-          if (res.data?.display_name) {
-            setLocation(res.data.display_name);
-            setAddress(res.data.display_name);
-          }
-        } catch (error) {
-          console.error("Error getting address:", error);
-        }
-      },
-      (error) => {
-        console.error("Location error:", error);
-        Alert.alert("Error", error.message || "Unable to fetch location.");
-      },
-      {
-        enableHighAccuracy: false,
-        timeout: 60000,
-        maximumAge: 10000,
-      }
-    );
   };
 
   const handleLocationSave = () => {
@@ -475,8 +582,8 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
       )}
 
       <View style={styles.headerContainer}>
+        
         <TouchableOpacity 
-          style={styles.logoContainer} 
           onPress={() => handleClick("")} // This sends empty string to parent
         >
           <Image
@@ -484,8 +591,8 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
             style={styles.logo}
           />
         </TouchableOpacity>
-
-        <View style={styles.actionsContainer}>
+        
+        <View style={styles.rightActionsContainer}>
           <TouchableOpacity
             style={styles.locationContainer}
             onPress={() => setShowDropdown(!showDropdown)}
@@ -543,7 +650,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
           animationType="slide"
           transparent={false}
           onRequestClose={() => setOpen(false)}
-          onShow={requestLocationPermission}
+          onShow={fetchLocationWithChecks}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
@@ -570,7 +677,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
                 <View style={styles.buttonContainer}>
                   <TouchableOpacity
                     style={[styles.button, styles.primaryButton]}
-                    onPress={() => Linking.openSettings()}
+                    onPress={handleOpenSettings}
                   >
                     <Text style={styles.buttonText}>Enable Location Services</Text>
                   </TouchableOpacity>
@@ -609,7 +716,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
                 <View style={styles.buttonGroup}>
                   <TouchableOpacity
                     style={[styles.button, styles.secondaryButton]}
-                    onPress={requestLocationPermission}
+                    onPress={fetchLocationWithChecks}
                   >
                     <Text style={styles.secondaryButtonText}>Refresh</Text>
                   </TouchableOpacity>
@@ -775,7 +882,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
 };
 
 const styles = StyleSheet.create({
-  headerContainer: {
+      headerContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -786,25 +893,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     height: 70,
     elevation: 3,
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    // padding: 8,
   },
   logo: {
     height: 80,
     width: 170,
     resizeMode: 'contain',
   },
-  actionsContainer: {
+  rightActionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
@@ -862,6 +961,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
+    
   },
   dropdownContainer: {
     position: 'absolute',
