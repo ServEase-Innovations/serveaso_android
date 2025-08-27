@@ -77,6 +77,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   const cartItems = useSelector(selectCartItems);
   const [currentPage, setCurrentPage] = useState('');
   const [userPreference, setUserPreference] = useState<any>([]);
+  const [locationWatchId, setLocationWatchId] = useState<number | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -244,8 +245,20 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   };
 
   const getCurrentLocation = () => {
-    Geolocation.getCurrentPosition(
+    // Clear any existing watch
+    if (locationWatchId !== null) {
+      Geolocation.clearWatch(locationWatchId);
+    }
+
+    // Use watchPosition instead of getCurrentPosition for better timeout handling
+    const watchId = Geolocation.watchPosition(
       async (position) => {
+        // Clear the watch once we get a position
+        if (locationWatchId !== null) {
+          Geolocation.clearWatch(locationWatchId);
+          setLocationWatchId(null);
+        }
+
         const { latitude, longitude } = position.coords;
         setLatitude(latitude);
         setLongitude(longitude);
@@ -271,14 +284,60 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
       },
       (error) => {
         console.error("Location error:", error);
-        Alert.alert("Error", error.message || "Unable to fetch location.");
+        
+        // Clear the watch on error
+        if (locationWatchId !== null) {
+          Geolocation.clearWatch(locationWatchId);
+          setLocationWatchId(null);
+        }
+        
+        let errorMessage = "Unable to fetch location.";
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location permission denied. Please enable location services in settings.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information is unavailable. Please check your network connection and try again.";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out. Please ensure you have a clear view of the sky and try again.";
+            break;
+        }
+        
+        Alert.alert("Location Error", errorMessage);
       },
       {
-        enableHighAccuracy: false,
-        timeout: 60000,
+        enableHighAccuracy: true,
+        timeout: 30000, // Increased timeout to 30 seconds
         maximumAge: 10000,
+        distanceFilter: 10, // Only update if moved at least 10 meters
       }
     );
+    
+    setLocationWatchId(watchId);
+    
+    // Set a timeout to clear the watch if it takes too long
+    setTimeout(() => {
+      if (locationWatchId !== null) {
+        Geolocation.clearWatch(locationWatchId);
+        setLocationWatchId(null);
+        Alert.alert(
+          "Location Timeout", 
+          "Getting your location is taking longer than expected. Please ensure you have a clear view of the sky and try again.",
+          [
+            {
+              text: "Try Again",
+              onPress: () => getCurrentLocation()
+            },
+            {
+              text: "Cancel",
+              style: "cancel"
+            }
+          ]
+        );
+      }
+    }, 35000); // 35 second timeout
   };
 
   const checkLocationAccuracy = async (): Promise<void> => {
@@ -334,21 +393,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     setLoading(true);
     setShowGPSButton(false);
     
-    Geolocation.getCurrentPosition(
-      position => {
-        const { latitude, longitude } = position.coords;
-        setLatitude(latitude);
-        setLongitude(longitude);
-        getAddressFromCoords(latitude, longitude);
-        setLoading(false);
-      },
-      error => {
-        console.warn('Location fetch error:', error);
-        setLoading(false);
-        setShowGPSButton(true);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
+    getCurrentLocation();
   };
 
   const fetchLocationWithChecks = async () => {
@@ -573,6 +618,15 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
 
   const [showDropdown, setShowDropdown] = useState(false);
 
+  // Clean up location watch on component unmount
+  useEffect(() => {
+    return () => {
+      if (locationWatchId !== null) {
+        Geolocation.clearWatch(locationWatchId);
+      }
+    };
+  }, [locationWatchId]);
+
   return (
     <View style={{ position: 'relative' }}>
       {menuVisible && (
@@ -587,7 +641,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
           onPress={() => handleClick("")} // This sends empty string to parent
         >
           <Image
-            source={require('../assets/images/serveaso2.png')}
+            source={require('../assets/images/Final1.png')}
             style={styles.logo}
           />
         </TouchableOpacity>
@@ -628,7 +682,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
               <View style={styles.cartBadge}>
                 <Text style={styles.badgeText}>{cartItems?.length || 0}</Text>
               </View>
-              <FeatherIcon name="shopping-cart" size={20} color="#000" />
+              <FeatherIcon name="shopping-cart" size={20} color="#fff" />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.iconButton} onPress={handleMenuPress}>
@@ -638,7 +692,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
                   style={styles.userAvatar}
                 />
               ) : (
-                <FeatherIcon name="user" size={20} color="#000" />
+                <FeatherIcon name="user" size={20} color="#fff" />
               )}
             </TouchableOpacity>
           </View>
@@ -888,7 +942,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
-    backgroundColor: '#d6f0ff',
+    backgroundColor: '#0d3888',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -900,7 +954,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     height: 80,
-    width: 170,
+    width: 120,
     resizeMode: 'contain',
   },
   rightActionsContainer: {
@@ -908,6 +962,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     position: 'relative',
+    paddingLeft:35,
   },
   locationContainer: {
     flexDirection: 'row',

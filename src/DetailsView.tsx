@@ -3,17 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   ActivityIndicator,
   PermissionsAndroid,
   Platform,
+  Alert,
 } from "react-native";
 import Geolocation from '@react-native-community/geolocation';
 import axiosInstance from "./axiosInstance";
 import ProviderDetails from "./ProviderDetails";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { add } from "./features/detailsDataSlice";
+import { usePricingFilterService } from './utils/PricingFilter';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 interface DetailsProps {
   sendDataToParent: (data: string) => void;
@@ -34,10 +36,20 @@ export const NewDetails: React.FC<DetailsProps> = ({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedProviderType, setSelectedProviderType] = useState("");
   const [searchData, setSearchData] = useState<any>();
-  const [serviceProviderData, setServiceProviderData] = useState<any>();
+  const [serviceProviderData, setServiceProviderData] = useState<any[]>([]);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  const { getBookingType, getPricingData, getFilteredPricing } = usePricingFilterService();
+  const bookingType = getBookingType();
+  console.log("Details:", bookingType);
 
   const dispatch = useDispatch();
+
+  // Get location from Redux store if available
+  const location = useSelector((state: any) => {
+    return state?.geoLocation?.value;
+  });
 
   const requestLocationPermission = async () => {
     if (Platform.OS === 'android') {
@@ -46,7 +58,7 @@ export const NewDetails: React.FC<DetailsProps> = ({
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           {
             title: "Location Permission",
-            message: "This app needs access to your location",
+            message: "This app needs access to your location to find service providers near you",
             buttonNeutral: "Ask Me Later",
             buttonNegative: "Cancel",
             buttonPositive: "OK"
@@ -80,62 +92,190 @@ export const NewDetails: React.FC<DetailsProps> = ({
   };
 
   const performSearch = async () => {
-    const housekeepingRole = selected?.toUpperCase() || "cook";
-
     try {
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        setLocationError("Location permission denied");
-        return;
+      setLoading(true);
+      setApiError(null);
+      setLocationError(null);
+      
+      let latitude = 0;
+      let longitude = 0;
+
+      // Use location from Redux if available, otherwise get current location
+      if (location) {
+        const latLng = location.location?.geometry?.location;
+        console.log("Location from Redux:", JSON.stringify(latLng));
+        latitude = latLng?.lat || 0;
+        longitude = latLng?.lng || 0;
+      } else {
+        const hasPermission = await requestLocationPermission();
+        if (!hasPermission) {
+          setLocationError("Location permission denied. Please enable location services to find providers near you.");
+          setLoading(false);
+          return;
+        }
+        
+        const coords = await getCurrentLocation();
+        latitude = coords.latitude;
+        longitude = coords.longitude;
       }
 
-      const { latitude, longitude } = await getCurrentLocation();
-      console.log("Latitude:", latitude, "Longitude:", longitude);
+      console.log("Using coordinates - Latitude:", latitude, "Longitude:", longitude);
 
-      const response = await axiosInstance.get(
-        "/api/serviceproviders/search?startDate=2025-04-01&endDate=2025-04-30&timeslot=16:37-16:37&housekeepingRole=COOK&latitude=22.94739666666667&longitude=88.65848666666668"
-      );
+      // Build query parameters with housekeeping role and booking details
+      const queryParams = new URLSearchParams({
+        startDate: bookingType?.startDate || '2025-04-01',
+        endDate: bookingType?.endDate || '2025-04-30',
+        timeslot: bookingType?.timeRange || '16:37-16:37',
+        housekeepingRole: bookingType?.housekeepingRole || selected?.toUpperCase() || "COOK",
+        latitude: latitude.toString(),
+        longitude: longitude.toString()
+      });
+
+      // Try the main API endpoint first
+      let response;
+      try {
+        response = await axiosInstance.get(
+          `/api/serviceproviders/search?${queryParams.toString()}`
+        );
+        console.log("Response from main API:", response.data);
+      } catch (mainError: any) {
+        console.warn("Main API failed, trying fallback:", mainError.message);
+        
+        // Fallback to a different endpoint or mock data
+        try {
+          // Try a different endpoint format
+          response = await axiosInstance.get(
+            `/serviceproviders/search?${queryParams.toString()}`
+          );
+        } catch (fallbackError: any) {
+          console.error("Fallback API also failed:", fallbackError.message);
+          
+          // If both fail, use mock data for demonstration
+          if (fallbackError.response?.status === 500) {
+            setApiError("Server is temporarily unavailable. Showing sample providers.");
+            
+            // Mock data as fallback
+            const mockProviders = [
+              {
+                id: 1,
+                name: "Sample Provider 1",
+                rating: 4.5,
+                services: ["Cleaning", "Cooking"],
+                distance: "2.5 km away",
+                price: "$25/hour",
+                image: "https://via.placeholder.com/150"
+              },
+              {
+                id: 2,
+                name: "Sample Provider 2", 
+                rating: 4.2,
+                services: ["Baby Sitting", "Elder Care"],
+                distance: "3.1 km away",
+                price: "$30/hour",
+                image: "https://via.placeholder.com/150"
+              }
+            ];
+            
+            setServiceProviderData(mockProviders);
+            dispatch(add(mockProviders));
+            return;
+          }
+          
+          throw fallbackError; // Re-throw if it's not a 500 error
+        }
+      }
       
-      console.log("Response:", response.data);
       if (response.data.length === 0) {
-        setLoading(true);
+        setServiceProviderData([]);
       } else {
-        setLoading(false);
         setServiceProviderData(response.data);
+        dispatch(add(response.data));
       }
     } catch (error: any) {
       console.error('Error:', error.message || error);
-      setLocationError(error.message || "Failed to get location");
+      
+      if (error.response?.status === 500) {
+        setApiError("Server error. Please try again later.");
+      } else if (error.response?.status === 404) {
+        setApiError("Service not found. Please check your connection.");
+      } else {
+        setLocationError(error.message || "Failed to get location or fetch providers");
+      }
+      
+      Alert.alert(
+        "Error", 
+        "Unable to fetch service providers. Please check your connection and try again.",
+        [
+          {
+            text: "Try Again",
+            onPress: retrySearch
+          },
+          {
+            text: "OK",
+            style: "cancel"
+          }
+        ]
+      );
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const retrySearch = () => {
+    setLocationError(null);
+    setApiError(null);
+    performSearch();
   };
 
   useEffect(() => {
     performSearch();
-  }, []);
+  }, [selected, location]);
+
+  const handleSelectedProvider = (provider: any) => {
+    if (selectedProvider) {
+      selectedProvider(provider);
+    }
+  };
 
   return (
     <View style={styles.mainContainer}>
       {loading ? (
-        <ActivityIndicator size="large" color="#0000ff" />
-      ) : locationError ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{locationError}</Text>
+        <View style={styles.centeredContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.placeholderText}>Searching providers near you...</Text>
+        </View>
+      ) : locationError || apiError ? (
+        <View style={styles.centeredContainer}>
+          <Icon name="error-outline" size={80} color="#FF3B30" />
+          <Text style={styles.errorText}>{locationError || apiError}</Text>
+          <Text style={styles.retryText} onPress={retrySearch}>
+            Tap to try again
+          </Text>
         </View>
       ) : Array.isArray(serviceProviderData) && serviceProviderData.length > 0 ? (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {apiError && (
+            <View style={styles.apiWarning}>
+              <Icon name="warning" size={20} color="#FFA500" />
+              <Text style={styles.apiWarningText}>{apiError}</Text>
+            </View>
+          )}
           {serviceProviderData.map((provider, index) => (
             <View key={index} style={styles.providerContainer}>
-              <ProviderDetails {...provider} />
+              <ProviderDetails 
+                {...provider} 
+                onSelect={() => handleSelectedProvider(provider)}
+              />
             </View>
           ))}
         </ScrollView>
       ) : (
-        <View style={styles.noDataContainer}>
-          <Image
-            source={require("../assets/images/search.gif")}
-            style={styles.noDataImage}
-          />
-          <Text style={styles.noDataText}>Search providers near you</Text>
+        <View style={styles.centeredContainer}>
+          <Icon name="search-off" size={80} color="#8E8E93" />
+          <Text style={styles.placeholderText}>No providers found near you</Text>
+          <Text style={styles.retryText} onPress={retrySearch}>
+            Tap to search again
+          </Text>
         </View>
       )}
     </View>
@@ -145,7 +285,8 @@ export const NewDetails: React.FC<DetailsProps> = ({
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 16,
+    backgroundColor: '#fff',
   },
   scrollContainer: {
     paddingVertical: 10,
@@ -153,30 +294,50 @@ const styles = StyleSheet.create({
   providerContainer: {
     paddingTop: 10,
     marginBottom: 10,
+    paddingHorizontal: 16,
   },
-  noDataContainer: {
+  centeredContainer: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  noDataImage: {
-    width: 100,
-    height: 100,
-  },
-  noDataText: {
-    marginTop: 10,
-    fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
-  errorText: {
-    color: "red",
+  placeholderText: {
     fontSize: 16,
-    textAlign: "center",
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    textAlign: 'center',
+    marginTop: 16,
+    marginHorizontal: 20,
+  },
+  retryText: {
+    fontSize: 16,
+    color: '#007AFF',
+    textAlign: 'center',
+    marginTop: 8,
+    padding: 10,
+  },
+  apiWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3CD',
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FFEAA7',
+  },
+  apiWarningText: {
+    marginLeft: 8,
+    color: '#856404',
+    fontSize: 14,
+    flex: 1,
   },
 });
 

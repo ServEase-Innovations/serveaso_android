@@ -13,6 +13,7 @@ import {
   ViewStyle,
   ImageStyle,
   Animated,
+  Dimensions
 } from "react-native";
 import { useDispatch } from "react-redux";
 import { add } from "./features/bookingTypeSlice";
@@ -32,7 +33,9 @@ import NannyServicesDialog from "./NannyServiceDialog";
 const cookImage = require("../assets/images/CookAi.png");
 const maidImage = require("../assets/images/MaidAi.png");
 const nannyImage = require("../assets/images/NannyAi.png");
-const heroImage = require("../assets/images/maid-hero.png");
+const heroImage1 = require("../assets/images/CookLand.png"); // Replace with your actual image paths
+const heroImage2 = require("../assets/images/MaidLand.png");
+const heroImage3 = require("../assets/images/NannyLand.png");
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
@@ -65,135 +68,167 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [showNannyServicesDialog, setShowNannyServicesDialog] = useState(false);
   const [showCookDialog, setShowCookDialog] = useState(false);
   const [hoveredService, setHoveredService] = useState<string | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-const HowItWorksSection = () => {
-  const slides = [
-    {
-      icon: "✋",
-      title: "Choose your service",
-      desc: "Select from a variety of tasks that suit your needs.",
-      color: "#FF9E9E", // Light red
-      iconColor: "#FF5C5C",
-    },
-    {
-      icon: "📅",
-      title: "Schedule in minutes",
-      desc: "Book a time that works for you, quickly and easily.",
-      color: "#9ED2FF", // Light blue
-      iconColor: "#5C9EFF",
-    },
-    {
-      icon: "🏠",
-      title: "Relax, we'll handle the rest",
-      desc: "Our verified professionals ensure your peace of mind.",
-      color: "#9EFFB2", // Light green
-      iconColor: "#5CFF7A",
-    },
-  ];
+  // Carousel images array
+  const carouselImages = [heroImage1, heroImage2, heroImage3];
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const [currentSlide, setCurrentSlide] = useState(0);
-
+  // Auto-rotate carousel every 3 seconds
   useEffect(() => {
-    const timer = setInterval(() => {
-      // Slide out animation
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: -50,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setCurrentSlide((prev) => (prev + 1) % slides.length);
-        // Reset animation values for next slide
-        slideAnim.setValue(50);
-        // Slide in animation
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => 
+        prevIndex === carouselImages.length - 1 ? 0 : prevIndex + 1
+      );
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const HowItWorksSection = () => {
+    const slides = [
+      {
+        icon: "✋",
+        title: "Choose your service",
+        desc: "Select from a variety of tasks that suit your needs.",
+        color: "#FF9E9E", // Light red
+        iconColor: "#FF5C5C",
+      },
+      {
+        icon: "📅",
+        title: "Schedule in minutes",
+        desc: "Book a time that works for you, quickly and easily.",
+        color: "#9ED2FF", // Light blue
+        iconColor: "#5C9EFF",
+      },
+      {
+        icon: "🏠",
+        title: "Relax, we'll handle the rest",
+        desc: "Our verified professionals ensure your peace of mind.",
+        color: "#9EFFB2", // Light green
+        iconColor: "#5CFF7A",
+      },
+    ];
+
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(0)).current;
+    const [currentSlide, setCurrentSlide] = useState(0);
+
+    useEffect(() => {
+      let timer: NodeJS.Timeout;
+      
+      const animateSlide = () => {
+        // Slide out animation
         Animated.parallel([
           Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 500,
+            toValue: 0,
+            duration: 300,
             useNativeDriver: true,
           }),
           Animated.timing(slideAnim, {
-            toValue: 0,
-            duration: 500,
+            toValue: -50,
+            duration: 300,
             useNativeDriver: true,
           }),
-        ]).start();
-      });
-    }, 3000);
+        ]).start(() => {
+          // Update slide index without triggering state update during animation
+          const nextSlide = (currentSlide + 1) % slides.length;
+          
+          // Reset animation values for next slide
+          slideAnim.setValue(50);
+          
+          // Set the new slide index
+          setCurrentSlide(nextSlide);
+          
+          // Slide in animation
+          Animated.parallel([
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+              toValue: 0,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        });
+      };
 
-    return () => clearInterval(timer);
-  }, []);
+      // Start the animation cycle after initial render
+      timer = setTimeout(() => {
+        timer = setInterval(animateSlide, 3000);
+      }, 100);
 
-  useEffect(() => {
-    fadeAnim.setValue(0);
-    slideAnim.setValue(50);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [currentSlide]);
+      return () => {
+        if (timer) clearTimeout(timer);
+        if (timer) clearInterval(timer as unknown as number);
+      };
+    }, [currentSlide]); // Add currentSlide as dependency
 
-  return (
-    <View style={styles.howItWorksSection}>
-      <Text style={styles.sectionTitle}>How It Works</Text>
-      <View style={styles.slideshowContainer}>
-        <Animated.View
-          style={[
-            styles.slide,
-            {
-              backgroundColor: slides[currentSlide].color,
-              opacity: fadeAnim,
-              transform: [{ translateX: slideAnim }],
-              shadowColor: slides[currentSlide].iconColor,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 10,
-              elevation: 10,
-            },
-          ]}
-        >
-          <View style={styles.iconContainer}>
-            <Text style={[styles.stepIcon, { color: slides[currentSlide].iconColor }]}>
-              {slides[currentSlide].icon}
-            </Text>
-          </View>
-          <Text style={styles.stepTitle}>{slides[currentSlide].title}</Text>
-          <Text style={styles.stepDesc}>{slides[currentSlide].desc}</Text>
-        </Animated.View>
-      </View>
-      <View style={styles.dotsContainer}>
-        {slides.map((_, index) => (
+    // Initialize animation when slide changes
+    useEffect(() => {
+      fadeAnim.setValue(0);
+      slideAnim.setValue(50);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, [currentSlide]);
+
+    return (
+      <View style={styles.howItWorksSection}>
+        <Text style={styles.sectionTitle}>How It Works</Text>
+        <View style={styles.slideshowContainer}>
           <Animated.View
-            key={index}
             style={[
-              styles.dot,
-              index === currentSlide && [
-                styles.activeDot,
-                { backgroundColor: slides[index].iconColor },
-              ],
+              styles.slide,
+              {
+                backgroundColor: slides[currentSlide].color,
+                opacity: fadeAnim,
+                transform: [{ translateX: slideAnim }],
+                shadowColor: slides[currentSlide].iconColor,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 10,
+                elevation: 10,
+              },
             ]}
-          />
-        ))}
+          >
+            <View style={styles.iconContainer}>
+              <Text style={[styles.stepIcon, { color: slides[currentSlide].iconColor }]}>
+                {slides[currentSlide].icon}
+              </Text>
+            </View>
+            <Text style={styles.stepTitle}>{slides[currentSlide].title}</Text>
+            <Text style={styles.stepDesc}>{slides[currentSlide].desc}</Text>
+          </Animated.View>
+        </View>
+        <View style={styles.dotsContainer}>
+          {slides.map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.dot,
+                index === currentSlide && [
+                  styles.activeDot,
+                  { backgroundColor: slides[index].iconColor },
+                ],
+              ]}
+            />
+          ))}
+        </View>
       </View>
-    </View>
-  );
-};
+    );
+  };
 
   const handleWorkButtonClick = () => {
     setShowRegistration(true);
@@ -341,6 +376,7 @@ const HowItWorksSection = () => {
 
   return (
     <ScrollView style={styles.container}>
+      
       {/* Hero Section */}
       <View style={styles.heroSection}>
         <View style={styles.heroTextContainer}>
@@ -348,7 +384,7 @@ const HowItWorksSection = () => {
             Book trusted household help in minutes
           </Text>
           <Text style={styles.heroSubtitle}>
-           ServEaso delivers instant, regular and short term access to safe, affordable, and trained maids, cooks, and caregivers.
+           ServEaso delivers instant, regular and short term access to safe, affordable, and trained maids, cooks, and caregivers.
           </Text>
           <View style={styles.serviceIconsContainer}>
             {/* Cook Service */}
@@ -437,8 +473,25 @@ const HowItWorksSection = () => {
             </Modal>
           </View>
         </View>
-        <View style={styles.heroImageContainer}>
-          <Image source={heroImage} style={styles.heroImage} />
+        
+        {/* Carousel Section */}
+        <View style={styles.carouselContainer}>
+          <Image 
+            source={carouselImages[currentImageIndex]} 
+            style={styles.carouselImage}
+            resizeMode="cover"
+          />
+          <View style={styles.carouselIndicators}>
+            {carouselImages.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.carouselIndicator,
+                  index === currentImageIndex && styles.carouselIndicatorActive
+                ]}
+              />
+            ))}
+          </View>
         </View>
       </View>
 
@@ -669,8 +722,11 @@ interface Styles {
   buttonContainer: ViewStyle;
   outlineButton: ViewStyle;
   outlineButtonText: TextStyle;
-  heroImageContainer: ViewStyle;
-  heroImage: ImageStyle;
+  carouselContainer: ViewStyle;
+  carouselImage: ImageStyle;
+  carouselIndicators: ViewStyle;
+  carouselIndicator: ViewStyle;
+  carouselIndicatorActive: ViewStyle;
   servicesSection: ViewStyle;
   sectionTitle: TextStyle;
   servicesGrid: ViewStyle;
@@ -717,6 +773,8 @@ interface Styles {
   iconContainer:ViewStyle;
 }
 
+const { width } = Dimensions.get('window');
+
 const styles = StyleSheet.create<Styles>({
   container: {
     flex: 1,
@@ -736,11 +794,13 @@ const styles = StyleSheet.create<Styles>({
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 8,
+    textAlign: "center",
   },
   heroSubtitle: {
     fontSize: 14,
     color: "#666",
     marginBottom: 16,
+    textAlign: "center",
   },
   serviceIconsContainer: {
     flexDirection: "row",
@@ -799,6 +859,7 @@ const styles = StyleSheet.create<Styles>({
     justifyContent: "center",
     gap: 12,
     paddingTop: 8,
+    marginBottom: 20,
   },
   outlineButton: {
     borderWidth: 1,
@@ -810,25 +871,46 @@ const styles = StyleSheet.create<Styles>({
   outlineButtonText: {
     fontSize: 14,
   },
-  heroImageContainer: {
-    alignItems: "center",
-    marginTop: 16,
+  carouselContainer: {
+    height: 270,
+    position: 'relative',
+    marginTop: 10,
+    
   },
-  heroImage: {
-    width: "80%",
-    maxWidth: 400,
-    height: 450,
+  carouselImage: {
+    width: '100%',
+    height: '100%',
     borderRadius: 12,
+  },
+  carouselIndicators: {
+    position: 'absolute',
+    bottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  carouselIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    marginHorizontal: 4,
+  },
+  carouselIndicatorActive: {
+    backgroundColor: '#fff',
+    width: 12,
   },
   servicesSection: {
     padding: 16,
     paddingTop: 40,
+     backgroundColor: '#ffffff',
   },
   sectionTitle: {
     fontSize: 24,
     fontWeight: "600",
     textAlign: "center",
     marginBottom: 24,
+    backgroundColor: '#ffffff',
   },
   servicesGrid: {
     flexDirection: "column",
