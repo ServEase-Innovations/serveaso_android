@@ -22,7 +22,7 @@ import FeatherIcon from 'react-native-vector-icons/Feather';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import { useSelector, useDispatch } from 'react-redux';
 import { add, remove } from './features/userSlice';
-import { ADMIN, BOOKINGS, CHECKOUT, DASHBOARD, LOGIN, PROFILE } from './Constants/pagesConstants';
+import { ADMIN, BOOKINGS, CHECKOUT, DASHBOARD, LOGIN, PROFILE, WALLET } from './Constants/pagesConstants';
 import { ViewStyle, TextStyle, ImageStyle } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import Geocoder from 'react-native-geocoding';
@@ -32,6 +32,8 @@ import { NativeModules } from 'react-native';
 import { useAuth0 } from 'react-native-auth0';
 import { selectCartItems } from './features/addToSlice';
 import { CartDialog } from './CartDialog';
+import LinearGradient from 'react-native-linear-gradient';
+import WalletDialog from './WalletDialog';
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
@@ -78,6 +80,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   const [currentPage, setCurrentPage] = useState('');
   const [userPreference, setUserPreference] = useState<any>([]);
   const [locationWatchId, setLocationWatchId] = useState<number | null>(null);
+const [isWalletOpen, setIsWalletOpen] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -340,6 +343,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     }, 35000); // 35 second timeout
   };
 
+
   const checkLocationAccuracy = async (): Promise<void> => {
     if (Platform.OS === 'android') {
       try {
@@ -534,6 +538,11 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     handleClick(DASHBOARD);
   };
 
+  const handleWalletClick = () => {
+     setMenuVisible(false);
+  setIsWalletOpen(true);
+  };
+
   const handleMenuPress = () => {
     setMenuVisible(!menuVisible);
   };
@@ -635,8 +644,12 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
         </TouchableWithoutFeedback>
       )}
 
-      <View style={styles.headerContainer}>
-        
+      <LinearGradient
+        colors={['#0a2a66', '#004aad']}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 0}}
+        style={styles.headerContainer}
+      >
         <TouchableOpacity 
           onPress={() => handleClick("")} // This sends empty string to parent
         >
@@ -861,6 +874,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
                   style={styles.menuItem}
                   onPress={handleLoginClick}
                 >
+                  <Icon name="sign-in" size={18} color="#fff" style={styles.menuIcon} />
                   <Text style={styles.menuItemText}>Login / Signup</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -870,6 +884,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
                     Alert.alert('Terms & Conditions clicked');
                   }}
                 >
+                  <Icon name="file-text" size={18} color="#fff" style={styles.menuIcon} />
                   <Text style={styles.menuItemText}>Terms & Conditions</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -879,6 +894,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
                     Alert.alert('Contact Us clicked');
                   }}
                 >
+                  <Icon name="phone" size={18} color="#fff" style={styles.menuIcon} />
                   <Text style={styles.menuItemText}>Contact Us</Text>
                 </TouchableOpacity>
               </>
@@ -889,6 +905,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
                     style={styles.menuItem}
                     onPress={handleDashboardClick}
                   >
+                    <Icon name="dashboard" size={18} color="#fff" style={styles.menuIcon} />
                     <Text style={styles.menuItemText}>Dashboard</Text>
                   </TouchableOpacity>
                 )}
@@ -896,32 +913,43 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
                   style={styles.menuItem}
                   onPress={handleBookingHistoryClick}
                 >
-                  <Text style={styles.menuItemText}>Booking History</Text>
+                  <Icon name="history" size={18} color="#fff" style={styles.menuIcon} />
+                  <Text style={styles.menuItemText}>My Bookings</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleDashboardClick}
                 >
+                  <Icon name="dashboard" size={18} color="#fff" style={styles.menuIcon} />
                   <Text style={styles.menuItemText}>Dashboard</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleProfileClick}
                 >
-                  <Text style={styles.menuItemText}>User Profile</Text>
+                  <Icon name="user" size={18} color="#fff" style={styles.menuIcon} />
+                  <Text style={styles.menuItemText}>Profile</Text>
                 </TouchableOpacity>
-
+             // In the menu section, replace the wallet menu item with:
+<TouchableOpacity
+  style={styles.menuItem}
+  onPress={handleWalletClick}
+>
+  <MaterialIcon name="account-balance-wallet" size={18} color="#fff" style={styles.menuIcon} />
+  <Text style={styles.menuItemText}>Wallet</Text>
+</TouchableOpacity>
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleSignOut}
                 >
+                  <Icon name="sign-out" size={18} color="#fff" style={styles.menuIcon} />
                   <Text style={styles.menuItemText}>Sign Out</Text>
                 </TouchableOpacity>
               </>
             )}
           </View>
         )}
-      </View>
+      </LinearGradient>
 
       <CartDialog
         open={isCartOpen}
@@ -931,12 +959,16 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
           handleClick(CHECKOUT);
         }}
       />
+     <WalletDialog
+  open={isWalletOpen}
+  onClose={() => setIsWalletOpen(false)}
+/> 
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-      headerContainer: {
+  headerContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -1016,7 +1048,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    
   },
   dropdownContainer: {
     position: 'absolute',
@@ -1160,11 +1191,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    minWidth: 160,
+    minWidth: 200,
   },
   menuItem: {
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
     paddingHorizontal: 15,
+  },
+  menuIcon: {
+    marginRight: 12,
+    width: 20,
   },
   menuItemText: {
     color: 'white',

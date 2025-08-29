@@ -1,439 +1,385 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   Image,
   TextInput,
-  StyleSheet,
   ScrollView,
+  StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-  Keyboard,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+} from "react-native";
+import { useAuth0 } from "react-native-auth0";
+import LinearGradient from 'react-native-linear-gradient';
 
-interface ProfileScreenProps {
-  onBackPress: () => void;
-}
+const { width } = Dimensions.get('window');
 
-const ProfileScreen = ({ onBackPress }: ProfileScreenProps) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    username: 'lucky.jesse',
-    email: 'jesse@example.com',
-    firstName: 'Lucky',
-    lastName: 'Jesse',
-    contactNumber: '+1 (555) 123-4567',
-    altContactNumber: '+1 (555) 987-6543',
-    address: 'Bld Mihail Kogalniceanu, nr. 8 Bl 1, Sc 1, Ap 09',
-    city: 'New York',
-    country: 'United States',
-    postalCode: '',
-  });
+const ProfileScreen = () => {
+  const { user: auth0User, isLoading } = useAuth0();
 
-  const handleInputChange = (name:any, value:any) => {
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
+  const [userName, setUserName] = useState<string | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [firstName, setFirstName] = useState<string>("");
+  const [lastName, setLastName] = useState<string>("");
 
-  const handleSubmit = () => {
-    Keyboard.dismiss();
-    setIsEditing(false);
-    console.log('Form submitted:', formData);
-  };
+  useEffect(() => {
+    if (auth0User) {
+      const name = auth0User.name || null;
+      const email = auth0User.email || "";
 
-  const toggleEdit = () => {
-    setIsEditing(!isEditing);
-  };
+      if (name) {
+        const nameParts = name.split(" ");
+        setFirstName(nameParts[0] || "");
+        setLastName(nameParts.slice(1).join(" ") || "");
+      }
+
+      const id =
+        auth0User.serviceProviderId ||
+        auth0User["https://yourdomain.com/serviceProviderId"] ||
+        auth0User.customerid ||
+        null;
+
+      setUserName(name);
+      setUserId(id ? Number(id) : null);
+
+      console.log("User data:", auth0User);
+      console.log("Name:", name);
+      console.log("Email:", email);
+      console.log("ID:", id);
+    }
+  }, [auth0User]);
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+    <ScrollView style={styles.container}>
+      {/* Header with Linear Gradient */}
+      <LinearGradient
+        colors={['rgba(139, 187, 221, 0.8)', 'rgba(213, 229, 233, 0.8)']}
+        start={{x: 1, y: 0}}
+        end={{x: 0, y: 0}}
+        style={styles.header}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled={true}
-        >
-          {/* Header with Background Image */}
-          <View style={styles.headerContainer}>
-            <View style={styles.headerGradient}>
-              <View style={styles.headerContent}>
-                 <TouchableOpacity 
-                  style={styles.backButton}
-                  onPress={onBackPress}
-                >
-                  <Icon name="arrow-left" size={20} color="#fff" />
-                </TouchableOpacity>
-                <View style={styles.headerProfileSection}>
-                  <Image
-           
-           source={{ uri: 'https://demos.creative-tim.com/argon-dashboard/assets-old/img/theme/team-4.jpg' }}
-                    style={styles.headerProfileImage}
-                  />
-                  <View style={styles.headerTextContainer}>
-                    <Text style={styles.headerTitle}>Hello {formData.firstName}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity 
-                  style={[styles.editButton, isEditing && styles.editButtonActive]}
-                  onPress={toggleEdit}
-                >
-                  <Text style={styles.editButtonText}>
-                    {isEditing ? 'Cancel' : 'Edit profile'}
-                  </Text>
-                </TouchableOpacity>
+        <View style={styles.headerContent}>
+          {/* Profile Left Section */}
+          <View style={styles.profileSection}>
+            <Image
+              source={{
+                uri: auth0User?.picture || "https://via.placeholder.com/80",
+              }}
+              style={styles.profileImage}
+            />
+            <Text style={styles.greeting}>
+              Hello, {userName || "User"}
+            </Text>
+          </View>
+
+          {/* Edit Profile Button */}
+          <TouchableOpacity style={styles.editButton}>
+            <Text style={styles.editButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+
+      {/* Main Content */}
+      <View style={styles.mainContent}>
+        <View style={styles.formContainer}>
+          {/* Form Header */}
+          <View style={styles.formHeader}>
+            <Text style={styles.formTitle}>My account</Text>
+          </View>
+
+          {/* User Info Section */}
+          <View>
+            <Text style={styles.sectionTitle}>User Information</Text>
+
+            <View style={styles.inputRow}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Username</Text>
+                <TextInput
+                  style={styles.input}
+                  value={auth0User?.nickname || userName || "User"}
+                  editable={false}
+                />
+              </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Email address</Text>
+                <TextInput
+                  style={styles.input}
+                  value={auth0User?.email || "No email available"}
+                  editable={false}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputRow}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>First name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={firstName}
+                  editable={false}
+                />
+              </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Last name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={lastName}
+                  editable={false}
+                />
+              </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>User ID</Text>
+                <TextInput
+                  style={styles.input}
+                  value={
+                    auth0User?.serviceProviderId ||
+                    auth0User?.customerid ||
+                    "N/A"
+                  }
+                  editable={false}
+                />
               </View>
             </View>
           </View>
 
-          {/* Main Content */}
-          <View style={styles.mainContent}>
-            <View style={styles.contentRow}>
-              <View style={styles.accountFormFullWidth}>
-                <View style={styles.accountForm}>
-                  <View style={styles.formHeader}>
-                    <Text style={styles.formTitle}>My account</Text>
-                  </View>
-                <View style={styles.formBody}>
-                    <Text style={styles.sectionTitle}>USER INFORMATION</Text>
-                    <View style={styles.formRow}>
-                      <View style={styles.formGroup}>
-                        <Text style={styles.inputLabel}>Username</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.username}
-                          editable={false}
-                        />
-                      </View>
-                      <View style={styles.formGroup}>
-                        <Text style={styles.inputLabel}>Email address</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.email}
-                          keyboardType="email-address"
-                          editable={false}
-                        />
-                      </View>
-                    </View>
-                    <View style={styles.formRow}>
-                      <View style={styles.formGroup}>
-                        <Text style={styles.inputLabel}>First name</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.firstName}
-                          editable={isEditing}
-                          onChangeText={(text) => handleInputChange('firstName', text)}
-                        />
-                      </View>
-                      <View style={styles.formGroup}>
-                        <Text style={styles.inputLabel}>Last name</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.lastName}
-                          editable={isEditing}
-                          onChangeText={(text) => handleInputChange('lastName', text)}
-                        />
-                      </View>
-                    </View>
-                    <View style={styles.divider} />
-                    
-                    <Text style={styles.sectionTitle}>CONTACT INFORMATION</Text>
-                    <View style={styles.formRow}>
-                      <View style={styles.formGroup}>
-                        <Text style={styles.inputLabel}>Contact Number</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.contactNumber}
-                          keyboardType="phone-pad"
-                          editable={false}
-                        />
-                      </View>
-                      <View style={styles.formGroup}>
-                        <Text style={styles.inputLabel}>Alternative Contact Number</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.altContactNumber}
-                          keyboardType="phone-pad"
-                          editable={false}
-                        />
-                      </View>
-                    </View>
-                    <View style={styles.formRow}>
-                      <View style={[styles.formGroup, styles.fullWidth]}>
-                        <Text style={styles.inputLabel}>Address</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.address}
-                          editable={isEditing}
-                          onChangeText={(text) => handleInputChange('address', text)}
-                        />
-                      </View>
-                    </View>
-                    <View style={styles.formRow}>
-                      <View style={styles.formGroup}>
-                        <Text style={styles.inputLabel}>City</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.city}
-                          editable={isEditing}
-                          onChangeText={(text) => handleInputChange('city', text)}
-                        />
-                      </View>
-                      <View style={styles.formGroup}>
-                        <Text style={styles.inputLabel}>Country</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.country}
-                          editable={isEditing}
-                          onChangeText={(text) => handleInputChange('country', text)}
-                        />
-                      </View>
-                      <View style={styles.formGroup}>
-                        <Text style={styles.inputLabel}>Postal code</Text>
-                        <TextInput
-                          style={styles.input}
-                          value={formData.postalCode}
-                          placeholder="Postal code"
-                          keyboardType="numeric"
-                          editable={isEditing}
-                          onChangeText={(text) => handleInputChange('postalCode', text)}
-                        />
-                      </View>
-                    </View>
-                    <View style={styles.formActionsBottom}>
-                      <View style={styles.submitButtonContainer}>
-                        <TouchableOpacity 
-                          style={[styles.submitButton, !isEditing && styles.submitButtonDisabled]}
-                          onPress={handleSubmit}
-                          disabled={!isEditing}
-                        >
-                          <Text style={styles.submitButtonText}>Submit</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </View>
+          <View style={styles.divider} />
+
+          {/* Contact Info Section */}
+          <Text style={styles.sectionTitle}>Contact Information</Text>
+
+          <View style={styles.inputRow}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Contact Number</Text>
+              <TextInput
+                style={styles.input}
+                value="+1 (555) 123-4567"
+                keyboardType="phone-pad"
+              />
+            </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Alternative Contact Number</Text>
+              <TextInput
+                style={styles.input}
+                value="+1 (555) 987-6543"
+                keyboardType="phone-pad"
+              />
             </View>
           </View>
 
-          {/* Footer */}
-          <View style={styles.footer}></View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Address</Text>
+            <TextInput
+              style={styles.input}
+              value="Bld Mihail Kogalniceanu, nr. 8 Bl 1, Sc 1, Ap 09"
+              editable={false}
+            />
+          </View>
+
+          <View style={styles.inputRow}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>City</Text>
+              <TextInput
+                style={styles.input}
+                value="New York"
+                editable={false}
+              />
+            </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Country</Text>
+              <TextInput
+                style={styles.input}
+                value="United States"
+                editable={false}
+              />
+            </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Postal Code</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Postal code"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+
+          {/* Submit Button */}
+          <View style={styles.submitContainer}>
+            <TouchableOpacity style={styles.submitButton}>
+              <Text style={styles.submitButtonText}>Submit</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* Footer */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>© 2025 MyApp. All rights reserved.</Text>
+      </View>
+    </ScrollView>
   );
 };
 
-const windowWidth = Dimensions.get('window').width;
-
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
-  keyboardAvoidingView: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingBottom: 20,
-  },
-  // Header styles
-  headerContainer: {
-    height: 200,
-  },
-  headerGradient: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(23, 43, 77, 0.8)',
+  header: {
+    paddingTop: 60,
+    paddingBottom: 30,
   },
   headerContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 40,
+    width: '100%',
   },
- backButton: {
-    position: 'absolute',
-    left: 20,
-    top: 40,
-    zIndex: 1,
-    padding: 10,
-  },
-  headerProfileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  profileSection: {
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
-  headerTextContainer: {
-    marginLeft: 20,
-  },
-  headerProfileImage: {
-    width: 90, // Increased size
-    height: 90, // Increased size
-    borderRadius: 45,
+  profileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  
     borderWidth: 3,
-    borderColor: 'white',
+    borderColor: "#0a2a66",
+    marginRight: 15,
   },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 26, // Slightly larger
-    fontWeight: '600',
+  greeting: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#0a2a66",
+    flexShrink: 1,
   },
   editButton: {
-    backgroundColor: '#11cdef',
+    backgroundColor: "rgba(29, 101, 183, 0.2)",
     paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 4,
-    shadowColor: '#11cdef',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.11,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  editButtonActive: {
-    backgroundColor: '#fb6340', // Different color when editing
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(14, 61, 122, 0.5)",
   },
   editButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+    color: "#0a2a66",
+    fontWeight: "600",
   },
-  // Main content styles
   mainContent: {
-    paddingVertical: 20,
-    width: '100%',
+    alignItems: "center",
+    padding: 16,
+    marginTop: -20,
   },
-  contentRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  accountFormFullWidth: {
-    width: '95%',
-  },
-  accountForm: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#8898aa',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+  formContainer: {
+    width: width - 32,
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
-    paddingVertical: 20,
-    paddingHorizontal: 15,
-    width: '100%',
   },
   formHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    borderBottomColor: "#e0e0e0",
+    paddingBottom: 12,
+    marginBottom: 16,
   },
   formTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#32325d',
-  },
-  formBody: {
-    padding: 20,
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2d3748",
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#8898aa',
-    textTransform: 'uppercase',
-    marginBottom: 15,
-    letterSpacing: 0.5,
+    fontWeight: "600",
+    color: "#718096",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 16,
   },
-  formRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 15,
-    marginBottom: 15,
+  inputRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-  formGroup: {
-    flex: 1,
-    minWidth: windowWidth > 400 ? 200 : '100%',
-    marginBottom: 15,
-  },
-  fullWidth: {
-    flex: 1,
-    width: '100%',
+  inputContainer: {
+    width: width > 500 ? "48%" : "100%",
+    marginBottom: 16,
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#525f7f',
+    fontWeight: "600",
+    color: "#4a5568",
     marginBottom: 8,
   },
   input: {
-    fontSize: 14,
-    height: 40,
-    paddingHorizontal: 12,
+    width: "100%",
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#cad1d7',
-    borderRadius: 4,
-    backgroundColor: '#fff',
-    width: '100%',
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    fontSize: 16,
+    backgroundColor: "#f7fafc",
   },
   divider: {
     height: 1,
-    backgroundColor: '#e9ecef',
-    width: '100%',
+    backgroundColor: "#e2e8f0",
     marginVertical: 20,
   },
-  formActionsBottom: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    width: '100%',
-    marginTop: 30,
-  },
-  submitButtonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    width: '100%',
-    maxWidth: 200,
+  submitContainer: {
+    alignItems: "center",
+    marginTop: 16,
   },
   submitButton: {
-    backgroundColor: '#5e72e4',
-    padding: 12,
-    borderRadius: 4,
-    width: '100%',
-    alignItems: 'center',
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: "#0a2a66",
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.23,
+    shadowRadius: 2.62,
+    elevation: 4,
   },
   submitButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
   },
   footer: {
-    padding: 20,
-    backgroundColor: '#f7fafc',
+    backgroundColor: "#f5f5f5",
+    padding: 16,
+    alignItems: "center",
+    marginTop: 20,
+  },
+  footerText: {
+    color: "#718096",
+    fontSize: 12,
   },
 });
 

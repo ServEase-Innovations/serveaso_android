@@ -1,15 +1,16 @@
-/* eslint-disable */
 import React, { useState, useEffect } from 'react';
-import dayjs, { Dayjs } from 'dayjs';
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
   StyleSheet,
-  TextInput,
-  Platform,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
+import dayjs from 'dayjs';
+import axiosInstance from './axiosInstance';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface Booking {
@@ -18,6 +19,10 @@ interface Booking {
   startDate: string;
   endDate: string;
   timeSlot: string;
+  serviceType: string;
+  customerId?: number;
+  modifiedDate: string;
+  bookingDate: string;
 }
 
 interface ModifyBookingDialogProps {
@@ -30,6 +35,7 @@ interface ModifyBookingDialogProps {
     endDate: string;
     timeSlot: string;
   }) => void;
+  customerId: number | null;
 }
 
 const ModifyBookingDialog: React.FC<ModifyBookingDialogProps> = ({
@@ -38,27 +44,28 @@ const ModifyBookingDialog: React.FC<ModifyBookingDialogProps> = ({
   booking,
   timeSlots,
   onSave,
+  customerId,
 }) => {
   const today = dayjs();
   const maxDate90Days = dayjs().add(90, 'day');
 
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [startDate, setStartDate] = useState<Date | null>(
+    booking ? new Date(booking.startDate) : null
+  );
+  const [endDate, setEndDate] = useState<Date | null>(
+    booking ? new Date(booking.endDate) : null
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
 
-  useEffect(() => {
-    if (booking) {
-      setStartDate(new Date(booking.startDate));
-      setEndDate(new Date(booking.endDate));
-      setSelectedTimeSlot(booking.timeSlot || '');
-    }
-  }, [booking]);
+  const [selectedSection, setSelectedSection] = useState<
+    'OPTIONS' | 'BOOKING_DATE' | 'BOOKING_TIME' | 'VACATION'
+  >('OPTIONS');
 
-  const shouldDisableStartDate = (date: Date) => {
-    return dayjs(date).isBefore(today, 'day');
-  };
+  const shouldDisableStartDate = (date: Date) => dayjs(date).isBefore(today, 'day');
 
   const shouldDisableEndDate = (date: Date) => {
     if (!startDate) return true;
@@ -67,235 +74,462 @@ const ModifyBookingDialog: React.FC<ModifyBookingDialogProps> = ({
     return dayjs(date).isBefore(min, 'day') || dayjs(date).isAfter(max, 'day');
   };
 
-  const resetForm = () => {
-    if (booking) {
-      setStartDate(new Date(booking.startDate));
-      setEndDate(new Date(booking.endDate));
-      setSelectedTimeSlot(booking.timeSlot || '');
-    } else {
-      setStartDate(null);
-      setEndDate(null);
-      setSelectedTimeSlot('');
-    }
-    setShowStartDatePicker(false);
-    setShowEndDatePicker(false);
+  // Extract the actual booked time from the booking
+  const getBookedTime = () => {
+    if (!booking) return new Date();
+    
+    // Parse the time slot from the booking
+    const [time, period] = booking.timeSlot.split(' ');
+    const [hoursStr, minutesStr] = time.split(':');
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+    
+    // Convert to 24-hour format
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    
+    // Create a Date object with the booked time
+    const bookedDate = new Date(booking.startDate);
+    bookedDate.setHours(hours, minutes, 0, 0);
+    return bookedDate;
   };
 
-  const handleStartDateChange = (event: any, selectedDate?: Date) => {
-    setShowStartDatePicker(Platform.OS === 'ios');
+  // --- Checks for modification eligibility ---
+  const isModificationTimeAllowed = (startDate: string, timeSlot: string) => {
+    const now = dayjs();
+    const [time, period] = timeSlot.split(' ');
+    const [hoursStr, minutesStr] = time.split(':');
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    const bookingDateTime = dayjs(startDate).set('hour', hours).set('minute', minutes).set('second', 0);
+    return now.isBefore(bookingDateTime.subtract(30, 'minute'));
+  };
+
+  const isBookingAlreadyModified = (booking: Booking | null): boolean => {
+    if (!booking) return false;
+    return new Date(booking.modifiedDate).getTime() !== new Date(booking.bookingDate).getTime();
+  };
+
+  const getModificationStatusMessage = (booking: Booking | null): string => {
+    if (!booking) return "";
+    if (isBookingAlreadyModified(booking)) return "This booking has already been modified and cannot be modified again.";
+    if (!isModificationTimeAllowed(booking.startDate, booking.timeSlot)) return "Modification is only allowed at least 30 minutes before the scheduled time.";
+    return "";
+  };
+
+  const isModificationDisabled = (booking: Booking | null): boolean => {
+    if (!booking) return true;
+    return !isModificationTimeAllowed(booking.startDate, booking.timeSlot) || isBookingAlreadyModified(booking);
+  };
+
+  const handleSubmit = async () => {
+    if (!startDate || !booking) return;
+    if (isModificationDisabled(booking)) {
+      setError(getModificationStatusMessage(booking));
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+
+    const timePortion = dayjs(startDate).format("HH:mm");
+    let finalEndDate = startDate;
+    if (booking.bookingType === "MONTHLY") {
+      finalEndDate = new Date(dayjs(startDate).add(1, "month").toDate());
+    } else if (booking.bookingType === "SHORT_TERM") {
+      finalEndDate = endDate || new Date(dayjs(startDate).add(1, "day").toDate());
+    }
+
+    try {
+      const updatePayload: any = {
+        customerId: customerId,
+        startDate: dayjs(startDate).format("YYYY-MM-DD"),
+        endDate: dayjs(finalEndDate).format("YYYY-MM-DD"),
+        timeslot: timePortion,
+        modifiedBy: "CUSTOMER",
+      };
+      await axiosInstance.put(`/api/serviceproviders/update/engagement/${booking.id}`, updatePayload);
+      onSave({
+        startDate: dayjs(startDate).format("YYYY-MM-DD"),
+        endDate: dayjs(finalEndDate).format("YYYY-MM-DD"),
+        timeSlot: timePortion,
+      });
+    } catch (error: any) {
+      console.error("Error updating booking:", error);
+      setError("Failed to update booking. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open && booking) {
+      const bookedTime = getBookedTime();
+      setStartDate(bookedTime);
+      setEndDate(new Date(booking.endDate));
+      setError(null);
+      setSelectedSection("OPTIONS");
+    }
+  }, [open, booking]);
+
+  if (!open || !booking) return null;
+
+  const modificationDisabled = isModificationDisabled(booking);
+  const statusMessage = getModificationStatusMessage(booking);
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    setShowTimePicker(false);
+    
     if (selectedDate) {
-      setStartDate(selectedDate);
-      
-      if (selectedDate && booking?.bookingType === 'MONTHLY') {
-        const newEndDate = dayjs(selectedDate).add(1, 'month').toDate();
-        setEndDate(newEndDate);
-      } else if (selectedDate && booking?.bookingType === 'SHORT_TERM') {
-        const newEndDate = dayjs(selectedDate).add(1, 'day').toDate();
-        setEndDate(newEndDate);
+      if (pickerMode === 'date') {
+        // Keep the time portion when changing date
+        const currentTime = startDate ? startDate : new Date();
+        const newDate = new Date(selectedDate);
+        newDate.setHours(currentTime.getHours(), currentTime.getMinutes(), 0, 0);
+        setStartDate(newDate);
+      } else {
+        // Keep the date portion when changing time
+        const currentDate = startDate ? startDate : new Date();
+        const newTime = new Date(selectedDate);
+        currentDate.setHours(newTime.getHours(), newTime.getMinutes(), 0, 0);
+        setStartDate(new Date(currentDate));
       }
     }
   };
 
-  const handleEndDateChange = (event: any, selectedDate?: Date) => {
-    setShowEndDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setEndDate(selectedDate);
+  const openDatePicker = (mode: 'date' | 'time') => {
+    setPickerMode(mode);
+    if (mode === 'date') {
+      setShowDatePicker(true);
+    } else {
+      setShowTimePicker(true);
     }
   };
 
-  const handleSubmit = () => {
-    if (!startDate) return;
-
-    const timePortion = dayjs(startDate).format('HH:mm');
-    
-    let finalEndDate = startDate;
-    if (booking?.bookingType === 'MONTHLY') {
-      finalEndDate = dayjs(startDate).add(1, 'month').toDate();
-    } else if (booking?.bookingType === 'SHORT_TERM') {
-      finalEndDate = endDate || dayjs(startDate).add(1, 'day').toDate();
-    }
-
-    onSave({
-      startDate: dayjs(startDate).format('YYYY-MM-DD'),
-      endDate: dayjs(finalEndDate).format('YYYY-MM-DD'),
-      timeSlot: timePortion,
-    });
-    onClose();
+  const CustomButton = ({ 
+    title, 
+    onPress, 
+    disabled = false, 
+    variant = 'contained' 
+  }: { 
+    title: string; 
+    onPress: () => void; 
+    disabled?: boolean;
+    variant?: 'contained' | 'outlined';
+  }) => {
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={disabled}
+        style={[
+          styles.button,
+          variant === 'contained' ? styles.containedButton : styles.outlinedButton,
+          disabled && styles.disabledButton
+        ]}
+      >
+        <Text style={[
+          styles.buttonText,
+          variant === 'contained' ? styles.containedButtonText : styles.outlinedButtonText,
+          disabled && styles.disabledButtonText
+        ]}>
+          {title}
+        </Text>
+      </TouchableOpacity>
+    );
   };
-
-  const handleClose = () => {
-    resetForm();
-    onClose();
-  };
-
-  if (!open || !booking) return null;
 
   return (
     <Modal
       visible={open}
       transparent={true}
       animationType="fade"
-      onRequestClose={handleClose}
+      onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Modify Booking</Text>
-            {booking && (
-              <View style={styles.bookingInfo}>
-                <Text style={styles.infoText}>
-                  Current booking period: {dayjs(booking.startDate).format('DD/MM/YYYY')} to {dayjs(booking.endDate).format('DD/MM/YYYY')}
-                </Text>
-                <Text style={styles.infoText}>
-                  Booking Type: {booking.bookingType}
-                </Text>
+      <TouchableOpacity 
+        style={styles.backdrop} 
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View style={styles.dialogContainer}>
+          <View style={styles.dialog}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Modify Options</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Text style={styles.closeIcon}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            {/* Options */}
+            {selectedSection === "OPTIONS" && (
+              <View style={styles.optionsContainer}>
+                <CustomButton 
+                  title="Modify Vacation" 
+                  onPress={() => setSelectedSection("VACATION")}
+                  variant="outlined"
+                />
+
+                {booking.bookingType === "MONTHLY" && (
+                  <>
+                    <CustomButton 
+                      title="Reschedule Date" 
+                      onPress={() => setSelectedSection("BOOKING_DATE")} 
+                      disabled={modificationDisabled}
+                    />
+                    <CustomButton 
+                      title="Reschedule Time" 
+                      onPress={() => setSelectedSection("BOOKING_TIME")} 
+                      disabled={modificationDisabled}
+                    />
+                  </>
+                )}
+
+                {modificationDisabled && (
+                  <Text style={styles.statusMessage}>{statusMessage}</Text>
+                )}
+              </View>
+            )}
+
+            {/* Reschedule Date */}
+            {selectedSection === "BOOKING_DATE" && (
+              <View style={styles.sectionContainer}>
+                <View style={styles.pickerContainer}>
+                  <Text style={styles.label}>Select New Date</Text>
+                  <TouchableOpacity 
+                    style={styles.dateDisplay}
+                    onPress={() => openDatePicker('date')}
+                  >
+                    <Text>{startDate ? dayjs(startDate).format('MMMM D, YYYY') : 'Select date'}</Text>
+                  </TouchableOpacity>
+                  
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={startDate || new Date()}
+                      mode="date"
+                      display="default"
+                      onChange={handleDateChange}
+                      minimumDate={new Date()}
+                      maximumDate={maxDate90Days.toDate()}
+                    />
+                  )}
+                </View>
+                
+                <View style={styles.buttonRow}>
+                  <CustomButton 
+                    title="Back" 
+                    onPress={() => setSelectedSection("OPTIONS")}
+                    variant="outlined"
+                  />
+                  <CustomButton 
+                    title="Save Date" 
+                    onPress={handleSubmit}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Reschedule Time */}
+            {selectedSection === "BOOKING_TIME" && (
+              <View style={styles.sectionContainer}>
+                <View style={styles.pickerContainer}>
+                  <Text style={styles.label}>
+                    Current Booked Time: <Text style={styles.bold}>{booking.timeSlot}</Text>
+                  </Text>
+                  
+                  <Text style={styles.label}>Select New Time</Text>
+                  <TouchableOpacity 
+                    style={styles.dateDisplay}
+                    onPress={() => openDatePicker('time')}
+                  >
+                    <Text>{startDate ? dayjs(startDate).format('h:mm A') : 'Select time'}</Text>
+                  </TouchableOpacity>
+                  
+                  {showTimePicker && (
+                    <DateTimePicker
+                      value={startDate || new Date()}
+                      mode="time"
+                      display="default"
+                      onChange={handleDateChange}
+                      is24Hour={false}
+                    />
+                  )}
+                </View>
+                
+                <View style={styles.buttonRow}>
+                  <CustomButton 
+                    title="Back" 
+                    onPress={() => setSelectedSection("OPTIONS")}
+                    variant="outlined"
+                  />
+                  <CustomButton 
+                    title="Save Time" 
+                    onPress={handleSubmit}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* Vacation Section */}
+            {selectedSection === "VACATION" && (
+              <View style={styles.sectionContainer}>
+                <Text style={styles.label}>Vacation modification section will go here.</Text>
+                
+                <View style={styles.buttonRow}>
+                  <CustomButton 
+                    title="Back" 
+                    onPress={() => setSelectedSection("OPTIONS")}
+                    variant="outlined"
+                  />
+                  <CustomButton 
+                    title="Close" 
+                    onPress={onClose}
+                  />
+                </View>
+              </View>
+            )}
+
+            {isLoading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#1976d2" />
               </View>
             )}
           </View>
-
-          <View style={styles.modalContent}>
-            <Text style={styles.label}>New Start Date & Time</Text>
-            <TouchableOpacity 
-              onPress={() => setShowStartDatePicker(true)}
-              style={styles.dateInput}
-            >
-              <Text>
-                {startDate ? dayjs(startDate).format('YYYY-MM-DD HH:mm') : 'Select start date'}
-              </Text>
-            </TouchableOpacity>
-
-            {showStartDatePicker && (
-              <DateTimePicker
-                value={startDate || new Date()}
-                mode="datetime"
-                display="default"
-                onChange={handleStartDateChange}
-                minimumDate={new Date()}
-                maximumDate={maxDate90Days.toDate()}
-              />
-            )}
-
-            {booking.bookingType === 'SHORT_TERM' && (
-              <>
-                <Text style={styles.label}>New End Date</Text>
-                <TouchableOpacity 
-                  onPress={() => setShowEndDatePicker(true)}
-                  style={styles.dateInput}
-                  disabled={!startDate}
-                >
-                  <Text>
-                    {endDate ? dayjs(endDate).format('YYYY-MM-DD') : 'Select end date'}
-                  </Text>
-                </TouchableOpacity>
-
-                {showEndDatePicker && (
-                  <DateTimePicker
-                    value={endDate || (startDate ? dayjs(startDate).add(1, 'day').toDate() : new Date())}
-                    mode="date"
-                    display="default"
-                    onChange={handleEndDateChange}
-                    minimumDate={startDate ? dayjs(startDate).add(1, 'day').toDate() : new Date()}
-                    maximumDate={startDate ? dayjs(startDate).add(20, 'day').toDate() : maxDate90Days.toDate()}
-                  />
-                )}
-              </>
-            )}
-          </View>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              onPress={handleClose}
-              style={[styles.button, styles.cancelButton]}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleSubmit}
-              style={[styles.button, styles.saveButton]}
-              disabled={!startDate || (booking.bookingType === 'SHORT_TERM' && !endDate)}
-            >
-              <Text style={styles.buttonText}>Save Changes</Text>
-            </TouchableOpacity>
-          </View>
         </View>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  modalContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
+  dialogContainer: {
     width: '100%',
     maxWidth: 400,
   },
-  modalHeader: {
+  dialog: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#e0e0e0',
   },
-  modalTitle: {
+  title: {
     fontSize: 18,
     fontWeight: '600',
   },
-  bookingInfo: {
-    marginTop: 8,
+  closeButton: {
+    padding: 4,
   },
-  infoText: {
-    fontSize: 14,
-    color: '#6b7280',
+  closeIcon: {
+    fontSize: 24,
+    fontWeight: 'bold',
   },
-  modalContent: {
+  errorContainer: {
     padding: 16,
+    backgroundColor: '#ffebee',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ffcdd2',
+  },
+  errorText: {
+    color: '#d32f2f',
+    fontSize: 14,
+  },
+  optionsContainer: {
+    padding: 24,
+    gap: 16,
+  },
+  sectionContainer: {
+    padding: 16,
+    gap: 16,
+  },
+  pickerContainer: {
+    gap: 8,
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
+    color: '#666',
     marginBottom: 8,
   },
-  dateInput: {
+  bold: {
+    fontWeight: 'bold',
+  },
+  dateDisplay: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#ccc',
     borderRadius: 4,
     padding: 12,
     marginBottom: 16,
   },
-  modalFooter: {
+  buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
   button: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 4,
-    marginLeft: 8,
+    alignItems: 'center',
+    minWidth: 100,
   },
-  cancelButton: {
-    backgroundColor: '#f3f4f6',
+  containedButton: {
+    backgroundColor: '#1976d2',
+  },
+  outlinedButton: {
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#1976d2',
   },
-  saveButton: {
-    backgroundColor: '#3b82f6',
+  disabledButton: {
+    opacity: 0.6,
   },
   buttonText: {
-    color: 'white',
+    fontSize: 14,
     fontWeight: '500',
   },
-  cancelButtonText: {
-    color: '#374151',
-    fontWeight: '500',
+  containedButtonText: {
+    color: 'white',
+  },
+  outlinedButtonText: {
+    color: '#1976d2',
+  },
+  disabledButtonText: {
+    color: '#999',
+  },
+  statusMessage: {
+    fontSize: 14,
+    color: '#d32f2f',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -28,6 +28,7 @@ import MaidServiceDialog from "./MaidServiceDialog";
 import NannyServiceDialog from "./NannyServiceDialog";
 import DemoCook from "./demoCook";
 import NannyServicesDialog from "./NannyServiceDialog";
+import LinearGradient from 'react-native-linear-gradient';
 
 // Import local images
 const cookImage = require("../assets/images/CookAi.png");
@@ -69,6 +70,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [showCookDialog, setShowCookDialog] = useState(false);
   const [hoveredService, setHoveredService] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+const [hoveredButton, setHoveredButton] = useState<string | null>(null);
 
   // Carousel images array
   const carouselImages = [heroImage1, heroImage2, heroImage3];
@@ -376,9 +378,15 @@ const HomePage: React.FC<ChildComponentProps> = ({
 
   return (
     <ScrollView style={styles.container}>
-      
+       <LinearGradient
+            colors={['#0a2a66', '#004aad']}
+            start={{x: 0, y: 0}}
+            end={{x: 1, y: 0}}
+            style={styles.heroSectionGradient}
+          >
       {/* Hero Section */}
-      <View style={styles.heroSection}>
+      {/* <View style={styles.heroSection}> */}
+       
         <View style={styles.heroTextContainer}>
           <Text style={styles.heroTitle}>
             Book trusted household help in minutes
@@ -448,7 +456,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
             </View>
           </View>
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.outlineButton} onPress={() => setChatbotOpen(true)}>
+            {/* <TouchableOpacity style={styles.outlineButton} onPress={() => setChatbotOpen(true)}>
               <Text style={styles.outlineButtonText}>I need help</Text>
             </TouchableOpacity>
   
@@ -457,7 +465,30 @@ const HomePage: React.FC<ChildComponentProps> = ({
               onPress={handleWorkButtonClick}
             >
               <Text style={styles.outlineButtonText}>I want to work</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
+            <TouchableOpacity 
+  style={[
+    styles.outlineButton,
+    hoveredButton === "help" && styles.outlineButtonHover
+  ]}
+  onPress={() => setChatbotOpen(true)}
+  onPressIn={() => setHoveredButton("help")}
+  onPressOut={() => setHoveredButton(null)}
+>
+  <Text style={styles.outlineButtonText}>I need help</Text>
+</TouchableOpacity>
+
+<TouchableOpacity 
+  style={[
+    styles.outlineButton,
+    hoveredButton === "work" && styles.outlineButtonHover
+  ]}
+  onPress={handleWorkButtonClick}
+  onPressIn={() => setHoveredButton("work")}
+  onPressOut={() => setHoveredButton(null)}
+>
+  <Text style={styles.outlineButtonText}>I want to work</Text>
+</TouchableOpacity>
 
             <Chatbot 
               open={chatbotOpen} 
@@ -493,8 +524,8 @@ const HomePage: React.FC<ChildComponentProps> = ({
             ))}
           </View>
         </View>
-      </View>
-
+      {/* </View> */}
+</LinearGradient>
       {/* Services Section */}
       <View style={styles.servicesSection}>
         <Text style={styles.sectionTitle}>Popular Services</Text>
@@ -771,6 +802,8 @@ interface Styles {
   dialogOverlay: ViewStyle;
   dialogBox: ViewStyle;
   iconContainer:ViewStyle;
+  heroSectionGradient:ViewStyle;
+  outlineButtonHover:ViewStyle;
 }
 
 const { width } = Dimensions.get('window');
@@ -781,6 +814,10 @@ const styles = StyleSheet.create<Styles>({
     backgroundColor: "#fff",
     paddingTop: 16,
   },
+  heroSectionGradient: {
+  padding: 16,
+  flexDirection: "column",
+},
   heroSection: {
     backgroundColor: "#fff",
     padding: 16,
@@ -789,16 +826,18 @@ const styles = StyleSheet.create<Styles>({
   heroTextContainer: {
     flex: 1,
     paddingRight: 0,
+    
   },
   heroTitle: {
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 8,
     textAlign: "center",
+    color: "#fff",
   },
   heroSubtitle: {
     fontSize: 14,
-    color: "#666",
+    color: "#fff",
     marginBottom: 16,
     textAlign: "center",
   },
@@ -854,23 +893,35 @@ const styles = StyleSheet.create<Styles>({
     color: '#fff',
     fontSize: 12,
   },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 12,
-    paddingTop: 8,
-    marginBottom: 20,
-  },
-  outlineButton: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
+ buttonContainer: {
+  flexDirection: "row",
+  justifyContent: "center",
+  gap: 16, // Increased gap
+  paddingTop: 16,
+  marginBottom: 20,
+},
+  outlineButtonHover: {
+  backgroundColor: "#f8f9fa", // Light gray on hover
+  transform: [{ scale: 1.05 }],
+},
+ outlineButton: {
+  borderWidth: 1,
+  borderColor: "#fff", // White border
+  borderRadius: 25, // More rounded corners
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  backgroundColor: "#fff", // White background
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+  elevation: 3,
+},
   outlineButtonText: {
-    fontSize: 14,
-  },
+  fontSize: 14,
+  fontWeight: "600",
+  color: "#1976d2", // Vivid blue text
+},
   carouselContainer: {
     height: 270,
     position: 'relative',

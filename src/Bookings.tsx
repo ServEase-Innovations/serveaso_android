@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -14,16 +13,23 @@ import {
   Pressable,
   ViewStyle,
   TextStyle,
-  StyleProp
+  StyleProp,
+  Modal
 } from 'react-native';
 import { useAuth0 } from 'react-native-auth0';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axiosInstance from './axiosInstance';
 import dayjs from 'dayjs';
 
-// Keep these imports as they are
+// Import existing components
 import UserHoliday from './UserHoliday';
 import ModifyBookingDialog from './ModifyBookingDialog';
+
+// Import new components
+import ConfirmationDialog from './ConfirmationDialog';
+import AddReviewDialog from './AddReviewDialog';
+import WalletDialog from './WalletDialog';
+import LinearGradient from 'react-native-linear-gradient';
 
 // Implement Card component
 const Card: React.FC<{ children: React.ReactNode; style?: StyleProp<ViewStyle> }> = ({ children, style }) => {
@@ -71,6 +77,17 @@ const Separator: React.FC<{ style?: StyleProp<ViewStyle> }> = ({ style }) => {
   );
 };
 
+interface CustomerHoliday {
+  id: number;
+  engagementId: number;
+  customerId: number;
+  applyHolidayDate: string;
+  startDate: string;
+  endDate: string;
+  serviceType: string;
+  active: boolean;
+}
+
 interface Booking {
   id: number;
   name: string;
@@ -95,6 +112,7 @@ interface Booking {
   mealType: string;
   modifiedDate: string;
   responsibilities: string;
+  customerHolidays?: CustomerHoliday[];
 }
 
 const getServiceIcon = (type: string) => {
@@ -194,84 +212,108 @@ const getServiceTitle = (type: string) => {
   }
 };
 
+const hasMatchingHolidayIds = (booking: Booking): boolean => {
+  if (!booking.customerHolidays || booking.customerHolidays.length === 0) {
+    return false;
+  }
+  
+  return booking.customerHolidays.some(
+    (holiday) => holiday.engagementId === booking.id
+  );
+};
+
 const Booking: React.FC = () => {
+  // STATE VARIABLES (grouped by category)
   const [currentBookings, setCurrentBookings] = useState<Booking[]>([]);
   const [pastBookings, setPastBookings] = useState<Booking[]>([]);
   const [futureBookings, setFutureBookings] = useState<Booking[]>([]);
-  const [openDialog, setOpenDialog] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [timeSlots, setTimeSlots] = useState<string[]>([]);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
-  const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
   const [selectedBookingForLeave, setSelectedBookingForLeave] = useState<Booking | null>(null);
-  // const { user: auth0User, isAuthenticated } = useAuth0();
-  // const [customerId, setCustomerId] = useState<number | null>(null);
+  const [customerId, setCustomerId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [modifiedBookings, setModifiedBookings] = useState<number[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [bookingsWithVacation, setBookingsWithVacation] = useState<number[]>([]);
+  
+  // Dialog states
+  const [openDialog, setOpenDialog] = useState(false);
+  const [modifyDialogOpen, setModifyDialogOpen] = useState(false);
+  const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [selectedReviewBooking, setSelectedReviewBooking] = useState<Booking | null>(null);
+  const [walletDialogOpen, setWalletDialogOpen] = useState(false);
+
+  // Loading states
   const [isLoading, setIsLoading] = useState(true);
-const { user: auth0User } = useAuth0();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  
+  // Other states
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
+  const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+
+  // Confirmation dialog state
+  const [confirmationDialog, setConfirmationDialog] = useState<{
+    open: boolean;
+    type: 'cancel' | 'modify' | 'vacation' | null;
+    booking: Booking | null;
+    message: string;
+    title: string;
+    severity: 'info' | 'warning' | 'error' | 'success';
+  }>({
+    open: false,
+    type: null,
+    booking: null,
+    message: '',
+    title: '',
+    severity: 'info'
+  });
+
+  // AUTH & INITIALIZATION
+  const { user: auth0User } = useAuth0();
   const isAuthenticated = auth0User !== undefined && auth0User !== null;
-
-  // Update your state initialization
-  const [customerId, setCustomerId] = useState<number | null>(
-    auth0User?.customerid ? Number(auth0User.customerid) : null
-  );
-
-  // useEffect(() => {
-  //   if (isAuthenticated && auth0User) {
-  //     setCustomerId(auth0User.customerid);
-  //   }
-  // }, [isAuthenticated, auth0User]);
- // Update your useEffect
 
   useEffect(() => {
     if (auth0User) {
       setCustomerId(auth0User.customerid ? Number(auth0User.customerid) : null);
     }
   }, [auth0User]);
-  
-  const generateTimeSlots = async (serviceProviderId: number): Promise<string[]> => {
-    try {
-      const response = await axiosInstance.get(
-        `/api/serviceproviders/get/engagement/by/serviceProvider/${serviceProviderId}`
-      );
 
-      const engagementData = response.data.map((engagement: { id?: number; availableTimeSlots?: string[] }) => ({
-        id: engagement.id ?? Math.random(),
-        availableTimeSlots: engagement.availableTimeSlots || [],
-      }));
+  // DATA FETCHING FUNCTIONS
+  useEffect(() => {
+    setIsLoading(true);
+    
+    const fetchBookings = async () => {
+      try {
+        if (customerId !== null && customerId !== undefined) {
+          const response = await axiosInstance.get(
+            `api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`
+          );
+          
+          const { past = [], current = [], future = [] } = response.data || {};
+          setPastBookings(mapBookingData(past));
+          setCurrentBookings(mapBookingData(current));
+          setFutureBookings(mapBookingData(future));
+        }
+      } catch (error) {
+        console.error("Error fetching booking details:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-      const fullTimeSlots: string[] = Array.from({ length: 15 }, (_, i) =>
-        `${(i + 6).toString().padStart(2, '0')}:00`
-      );
-
-      const processedSlots = engagementData.map((entry: { availableTimeSlots: Iterable<unknown> | null | undefined; id: any; }) => {
-        const uniqueAvailableTimeSlots = Array.from(new Set(entry.availableTimeSlots)).sort();
-        const missingTimeSlots = fullTimeSlots.filter(slot => !uniqueAvailableTimeSlots.includes(slot));
-
-        return {
-          id: entry.id,
-          uniqueAvailableTimeSlots,
-          missingTimeSlots,
-        };
-      });
-
-      const uniqueMissingSlots: string[] = Array.from(
-        new Set(processedSlots.flatMap((slot: { missingTimeSlots: any; }) => slot.missingTimeSlots))
-      ).sort() as string[];
-
-      setUniqueMissingSlots(uniqueMissingSlots);
-
-      return fullTimeSlots.filter(slot => !uniqueMissingSlots.includes(slot));
-    } catch (error) {
-      console.error("Error fetching engagement data:", error);
-      return [];
+    if (customerId !== null && customerId !== undefined) {
+      fetchBookings();
+    } else if (isAuthenticated) {
+      // Customer ID will be set by the other useEffect, which will trigger this flow
+    } else {
+      setIsLoading(false);
     }
-  };
+  }, [customerId, isAuthenticated]);
 
+  // DATA MAPPING & UTILITY FUNCTIONS
   const mapBookingData = (data: any[]) => {
     return Array.isArray(data)
       ? data.map((item) => {
@@ -300,119 +342,118 @@ const { user: auth0User } = useAuth0();
             mealType: item.mealType,
             modifiedDate: item.modifiedDate,
             responsibilities: item.responsibilities,
+            customerHolidays: item.customerHolidays || [],
           };
         })
       : [];
   };
 
-  useEffect(() => {
-    if (customerId !== null && customerId !== undefined) {
-      setIsLoading(true);
-      axiosInstance
-        .get(`api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`)
-        .then((response) => {
-          const { past = [], current = [], future = [] } = response.data || {};
-          setPastBookings(mapBookingData(past));
-          setCurrentBookings(mapBookingData(current));
-          setFutureBookings(mapBookingData(future));
-        })
-        .catch((error) => {
-          console.error("Error fetching booking details:", error);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
-      setIsLoading(false);
-    }
-  }, [customerId]);
-
-  const handleModifyBooking = (booking: Booking) => {
-    setSelectedBooking(booking);
-    setOpenDialog(true);
+  // FILTER & SORT FUNCTIONS
+  const filterBookings = (bookings: Booking[], term: string) => {
+    if (!term) return bookings;
+    
+    return bookings.filter(booking => 
+      getServiceTitle(booking?.serviceType).toLowerCase().includes(term?.toLowerCase()) ||
+      booking.serviceProviderName?.toLowerCase().includes(term?.toLowerCase()) ||
+      booking.address?.toLowerCase().includes(term?.toLowerCase()) ||
+      booking.bookingType?.toLowerCase().includes(term?.toLowerCase())
+    );
   };
 
-  const handleSaveModifiedBooking = async (updatedData: {
-    startDate: string;
-    endDate: string;
-    timeSlot: string;
-  }) => {
-    if (!selectedBooking) return;
-
-    const serviceTypeUpperCase = selectedBooking.serviceType.toUpperCase();
-
-    let updatePayload: any = {
-      customerId: customerId,
-      startDate: updatedData.startDate,
-      endDate: updatedData.endDate,
-      timeslot: updatedData.timeSlot,
-      modifiedBy: "CUSTOMER",
+  const sortUpcomingBookings = (bookings: Booking[]): Booking[] => {
+    const statusOrder: Record<string, number> = {
+      'ACTIVE': 1,
+      'IN_PROGRESS': 2,
+      'NOT_STARTED': 3,
+      'COMPLETED': 4,
+      'CANCELLED': 5
     };
 
-    try {
-      setIsRefreshing(true);
-      const response = await axiosInstance.put(
-        `/api/serviceproviders/update/engagement/${selectedBooking.id}`,
-        updatePayload
-      );
+    return [...bookings].sort((a, b) => {
+      const statusComparison = statusOrder[a.taskStatus] - statusOrder[b.taskStatus];
+      if (statusComparison !== 0) return statusComparison;
+      return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
+    });
+  };
 
-      setCurrentBookings((prev) =>
-        prev.map((b) =>
-          b.id === selectedBooking.id
-            ? { 
-                ...b, 
-                startDate: updatedData.startDate,
-                endDate: updatedData.endDate,
-                timeSlot: updatedData.timeSlot 
-              }
-            : b
-        )
-      );
-      setFutureBookings((prev) =>
-        prev.map((b) =>
-          b.id === selectedBooking.id
-            ? { 
-                ...b, 
-                startDate: updatedData.startDate,
-                endDate: updatedData.endDate,
-                timeSlot: updatedData.timeSlot 
-              }
-            : b
-        )
-      );
-      setModifiedBookings(prev => [...prev, selectedBooking.id]);
-      setOpenDialog(false);
-      setOpenSnackbar(true);
-      
-      if (customerId !== null) {
-        await axiosInstance
-          .get(`api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`)
-          .then((response) => {
-            const { past = [], current = [], future = [] } = response.data || {};
-            setPastBookings(mapBookingData(past));
-            setCurrentBookings(mapBookingData(current));
-            setFutureBookings(mapBookingData(future));
-          });
+  // ACTION HANDLERS - CONFIRMATION DIALOG
+  const showConfirmation = (
+    type: 'cancel' | 'modify' | 'vacation',
+    booking: Booking,
+    title: string,
+    message: string,
+    severity: 'info' | 'warning' | 'error' | 'success' = 'info'
+  ) => {
+    setConfirmationDialog({
+      open: true,
+      type,
+      booking,
+      message,
+      title,
+      severity
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    const { type, booking } = confirmationDialog;
+    if (!booking) return;
+
+    setActionLoading(true);
+
+    try {
+      switch (type) {
+        case 'cancel':
+          await handleCancelBooking(booking);
+          break;
+        case 'modify':
+          setModifyDialogOpen(true);
+          setSelectedBooking(booking);
+          break;
+        case 'vacation':
+          setSelectedBookingForLeave(booking);
+          setHolidayDialogOpen(true);
+          break;
       }
-    } catch (error: any) {
-      console.error("Error updating booking:", error);
-      if (error.response) {
-        console.error("Full error response:", error.response.data);
-      }
+    } catch (error) {
+      console.error("Error performing action:", error);
+    } finally {
+      setActionLoading(false);
+      setConfirmationDialog(prev => ({ ...prev, open: false }));
     }
   };
 
-  const isBookingModified = (bookingId: number) => {
-    return modifiedBookings.includes(bookingId);
+  // ACTION HANDLERS - BUTTON CLICKS
+  const handleCancelClick = (booking: Booking) => {
+    showConfirmation(
+      'cancel',
+      booking,
+      'Cancel Booking',
+      `Are you sure you want to cancel your ${getServiceTitle(booking.serviceType)} booking? This action cannot be undone.`,
+      'warning'
+    );
   };
 
-  const isModificationAllowed = (startDate: string) => {
-    const today = dayjs();
-    const bookingStartDate = dayjs(startDate);
-    const daysDifference = bookingStartDate.diff(today, 'day');
-    return daysDifference >= 2;
+  const handleLeaveReviewClick = (booking: Booking) => {
+    setSelectedReviewBooking(booking);
+    setReviewDialogOpen(true);
   };
 
+  const handleModifyClick = (booking: Booking) => {
+    setSelectedBooking(booking);
+    setModifyDialogOpen(true);
+  };
+
+  const handleVacationClick = (booking: Booking) => {
+    setSelectedBookingForLeave(booking);
+    setHolidayDialogOpen(true);
+  };
+
+  const handleApplyLeaveClick = (booking: Booking) => {
+    setSelectedBookingForLeave(booking);
+    setHolidayDialogOpen(true);
+  };
+
+  // ACTION HANDLERS - API CALLS
   const handleCancelBooking = async (booking: Booking) => {
     const updatedStatus = "CANCELLED";
     const serviceTypeUpperCase = booking.serviceType.toUpperCase();
@@ -453,60 +494,106 @@ const { user: auth0User } = useAuth0();
     setOpenSnackbar(true);
   };
 
+  const handleSaveModifiedBooking = async (updatedData: {
+    startDate: string;
+    endDate: string;
+    timeSlot: string;
+  }) => {
+    if (!selectedBooking) return;
+
+    try {
+      setIsRefreshing(true);
+      
+      // Update local state
+      setCurrentBookings((prev) =>
+        prev.map((b) =>
+          b.id === selectedBooking.id
+            ? { 
+                ...b, 
+                startDate: updatedData.startDate,
+                endDate: updatedData.endDate,
+                timeSlot: updatedData.timeSlot 
+              }
+            : b
+        )
+      );
+      setFutureBookings((prev) =>
+        prev.map((b) =>
+          b.id === selectedBooking.id
+            ? { 
+                ...b, 
+                startDate: updatedData.startDate,
+                endDate: updatedData.endDate,
+                timeSlot: updatedData.timeSlot 
+              }
+            : b
+        )
+      );
+      setModifiedBookings(prev => [...prev, selectedBooking.id]);
+      setModifyDialogOpen(false);
+      setOpenSnackbar(true);
+      
+      // Refresh data
+      if (customerId !== null) {
+        await axiosInstance
+          .get(`api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`)
+          .then((response) => {
+            const { past = [], current = [], future = [] } = response.data || {};
+            setPastBookings(mapBookingData(past));
+            setCurrentBookings(mapBookingData(current));
+            setFutureBookings(mapBookingData(future));
+          });
+      }
+    } catch (error: any) {
+      console.error("Error updating booking:", error);
+      if (error.response) {
+        console.error("Full error response:", error.response.data);
+      }
+    }
+  };
+
   const handleLeaveSubmit = async (startDate: string, endDate: string, serviceType: string): Promise<void> => {
     if (!selectedBookingForLeave || !customerId) {
       throw new Error("Missing required information for leave application");
     }
 
     try {
+      setIsRefreshing(true);
+      
       await axiosInstance.post(
         '/api/customer/add-customer-holiday',
         {
-          customerId: customerId,
+          engagementId: selectedBookingForLeave.id,
           startDate: startDate,
           endDate: endDate,
           serviceType: serviceType.toUpperCase()
         }
       );
+
+      setBookingsWithVacation(prev => [...prev, selectedBookingForLeave.id]);
+
+      if (customerId !== null) {
+        await axiosInstance
+          .get(`api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`)
+          .then((response) => {
+            const { past = [], current = [], future = [] } = response.data || {};
+            setPastBookings(mapBookingData(past));
+            setCurrentBookings(mapBookingData(current));
+            setFutureBookings(mapBookingData(future));
+          });
+      }
+
       setOpenSnackbar(true);
+      setHolidayDialogOpen(false);
     } catch (error) {
       console.error("Error applying leave:", error);
       throw error;
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
-  const handleApplyLeaveClick = (booking: Booking) => {
-    setSelectedBookingForLeave(booking);
-    setHolidayDialogOpen(true);
-  };
-
-  const filterBookings = (bookings: Booking[], term: string) => {
-    if (!term) return bookings;
-    
-    return bookings.filter(booking => 
-      getServiceTitle(booking?.serviceType).toLowerCase().includes(term?.toLowerCase()) ||
-      booking.serviceProviderName?.toLowerCase().includes(term?.toLowerCase()) ||
-      booking.address?.toLowerCase().includes(term?.toLowerCase()) ||
-      booking.bookingType?.toLowerCase().includes(term?.toLowerCase())
-    );
-  };
-
-  const sortUpcomingBookings = (bookings: Booking[]): Booking[] => {
-    const statusOrder: Record<string, number> = {
-      'ACTIVE': 1,
-      'IN_PROGRESS': 2,
-      'NOT_STARTED': 3,
-      'COMPLETED': 4,
-      'CANCELLED': 5
-    };
-
-    return [...bookings].sort((a, b) => {
-      const statusComparison = statusOrder[a.taskStatus] - statusOrder[b.taskStatus];
-      if (statusComparison !== 0) return statusComparison;
-      return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
-    });
-  };
-
+  // DATA PROCESSING
   const upcomingBookings = sortUpcomingBookings([...currentBookings, ...futureBookings]);
   const filteredUpcomingBookings = filterBookings(upcomingBookings, searchTerm);
   const filteredPastBookings = filterBookings(pastBookings, searchTerm);
@@ -576,50 +663,183 @@ const { user: auth0User } = useAuth0();
       <Separator style={styles.separator} />
 
       <View style={styles.actionButtons}>
-        {item.taskStatus === 'CANCELLED' ? (
-          <Button style={styles.actionButton} onPress={() => {}}>
-            <Text>Book Again</Text>
-          </Button>
-        ) : (
+        {/* ACTIVE Status */}
+        {item.taskStatus === "ACTIVE" && (
           <>
-            {item.address && (
-              <Button style={styles.actionButton} onPress={() => {}}>
-                <Icon name="phone" size={16} color="#000" />
-                <Text>Call Provider</Text>
-              </Button>
-            )}
+            {/* Call Provider Button - Show for all booking types */}
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="phone" size={16} color="#000" />
+              <Text>Call Provider</Text>
+            </Button>
+
+            {/* Message Button - Show for all booking types */}
             <Button style={styles.actionButton} onPress={() => {}}>
               <Icon name="message-text" size={16} color="#000" />
               <Text>Message</Text>
             </Button>
-            {item.bookingType !== 'ON_DEMAND' && item.bookingType !== 'SHORT_TERM' && (
-              <Button 
-                style={styles.actionButton}
-                onPress={() => handleApplyLeaveClick(item)}
-              >
-                <Text>Add Vacation</Text>
-              </Button>
-            )}
+
+            {/* Cancel Booking Button - Show for all booking types */}
             <Button 
               style={[styles.actionButton, styles.cancelButton]}
-              onPress={() => handleCancelBooking(item)}
+              onPress={() => handleCancelClick(item)}
             >
               <Icon name="close-circle" size={16} color="#fff" />
               <Text style={styles.cancelButtonText}>Cancel Booking</Text>
             </Button>
-            {item.bookingType === 'MONTHLY' && (
+
+            {/* Modify Booking Button - Show only for MONTHLY bookings */}
+            {item.bookingType === "MONTHLY" && (
               <Button
                 style={styles.actionButton}
-                onPress={() => handleModifyBooking(item)}
-                disabled={
-                  new Date(item.modifiedDate).getTime() !==
-                  new Date(item.bookingDate).getTime()
-                }
+                onPress={() => handleModifyClick(item)}
               >
                 <Icon name="pencil" size={16} color="#000" />
                 <Text>Modify Booking</Text>
               </Button>
             )}
+
+            {/* Add Vacation Button - Show only for MONTHLY bookings */}
+            {item.bookingType === "MONTHLY" && (
+              <Button
+                style={styles.actionButton}
+                onPress={() => handleVacationClick(item)}
+                disabled={hasMatchingHolidayIds(item) || isRefreshing}
+              >
+                <Text>
+                  {hasMatchingHolidayIds(item)
+                    ? "Vacation Added"
+                    : "Add Vacation"}
+                </Text>
+              </Button>
+            )}
+          </>
+        )}
+
+        {/* IN_PROGRESS Status */}
+        {item.taskStatus === "IN_PROGRESS" && (
+          <>
+            {/* Call Provider Button - Show for all booking types */}
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="phone" size={16} color="#000" />
+              <Text>Call Provider</Text>
+            </Button>
+
+            {/* Message Button - Show for all booking types */}
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="message-text" size={16} color="#000" />
+              <Text>Message</Text>
+            </Button>
+
+            {/* Cancel Booking Button - Show for all booking types */}
+            <Button 
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={() => handleCancelClick(item)}
+            >
+              <Icon name="close-circle" size={16} color="#fff" />
+              <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+            </Button>
+
+            {/* Add Vacation Button - Show only for MONTHLY bookings */}
+            {item.bookingType === "MONTHLY" && (
+              <Button
+                style={styles.actionButton}
+                onPress={() => handleVacationClick(item)}
+                disabled={hasMatchingHolidayIds(item) || isRefreshing}
+              >
+                <Text>
+                  {hasMatchingHolidayIds(item)
+                    ? "Vacation Added"
+                    : "Add Vacation"}
+                </Text>
+              </Button>
+            )}
+          </>
+        )}
+
+        {/* NOT_STARTED Status */}
+        {item.taskStatus === "NOT_STARTED" && (
+          <>
+            {/* Call Provider Button - Show for all booking types */}
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="phone" size={16} color="#000" />
+              <Text>Call Provider</Text>
+            </Button>
+
+            {/* Message Button - Show for all booking types */}
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="message-text" size={16} color="#000" />
+              <Text>Message</Text>
+            </Button>
+
+            {/* Cancel Booking Button - Show for all booking types */}
+            <Button 
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={() => handleCancelClick(item)}
+            >
+              <Icon name="close-circle" size={16} color="#fff" />
+              <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+            </Button>
+
+            {/* Modify Booking Button - Show only for MONTHLY bookings */}
+            {item.bookingType === "MONTHLY" && (
+              <Button
+                style={styles.actionButton}
+                onPress={() => handleModifyClick(item)}
+              >
+                <Icon name="pencil" size={16} color="#000" />
+                <Text>Modify Booking</Text>
+              </Button>
+            )}
+
+            {/* Add Vacation Button - Show only for MONTHLY bookings */}
+            {item.bookingType === "MONTHLY" && (
+              <Button
+                style={styles.actionButton}
+                onPress={() => handleVacationClick(item)}
+                disabled={hasMatchingHolidayIds(item) || isRefreshing}
+              >
+                <Text>
+                  {hasMatchingHolidayIds(item)
+                    ? "Vacation Added"
+                    : "Add Vacation"}
+                </Text>
+              </Button>
+            )}
+          </>
+        )}
+
+        {/* COMPLETED Status */}
+        {item.taskStatus === "COMPLETED" && (
+          <>
+            {/* Rate Service Button - Show for all booking types */}
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="star" size={16} color="#000" />
+              <Text>Rate Service</Text>
+            </Button>
+
+            {/* Leave Review Button - Show for all booking types */}
+            <Button 
+              style={styles.actionButton}
+              onPress={() => handleLeaveReviewClick(item)}
+            >
+              <Icon name="message-text" size={16} color="#000" />
+              <Text>Leave Review</Text>
+            </Button>
+
+            {/* Book Again Button - Show for all booking types */}
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Text>Book Again</Text>
+            </Button>
+          </>
+        )}
+
+        {/* CANCELLED Status */}
+        {item.taskStatus === "CANCELLED" && (
+          <>
+            {/* Book Again Button - Show for all booking types */}
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Text>Book Again</Text>
+            </Button>
           </>
         )}
       </View>
@@ -636,111 +856,163 @@ const { user: auth0User } = useAuth0();
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+       <LinearGradient
+        colors={['rgba(139, 187, 221, 0.8)', 'rgba(213, 229, 233, 0.8)']}
+        start={{x: 1, y: 0}}
+        end={{x: 0, y: 0}}
+        style={styles.header}
+      >
+      {/* <View style={styles.header}> */}
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>My Bookings</Text>
           <Text style={styles.headerSubtitle}>Manage your household service appointments</Text>
         </View>
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search bookings..."
-            placeholderTextColor="#9ca3af"
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-          />
-          {searchTerm && (
-            <TouchableOpacity 
-              style={styles.clearSearchButton}
-              onPress={() => setSearchTerm('')}
-            >
-              <Icon name="close-circle" size={20} color="#9ca3af" />
-            </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search bookings..."
+              placeholderTextColor="#9ca3af"
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+            />
+            {searchTerm && (
+              <TouchableOpacity 
+                style={styles.clearSearchButton}
+                onPress={() => setSearchTerm('')}
+              >
+                <Icon name="close-circle" size={20} color="#9ca3af" />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity 
+            style={styles.walletButton}
+            onPress={() => setWalletDialogOpen(true)}
+          >
+            <Icon name="wallet" size={24} color="#fff" />
+            <Text style={styles.walletText}>Wallet</Text>
+          </TouchableOpacity>
+        </View>
+      {/* </View> */}
+</LinearGradient>
+      <ScrollView>
+        {/* Upcoming Bookings */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Icon name="alert-circle" size={24} color="#3b82f6" />
+            <View style={styles.sectionHeaderContent}>
+              <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
+              <Text style={styles.sectionSubtitle}>
+                {filteredUpcomingBookings.length} {filteredUpcomingBookings.length === 1 ? 'booking' : 'bookings'} scheduled
+              </Text>
+            </View>
+            <Badge style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>{upcomingBookings.length}</Text>
+            </Badge>
+          </View>
+
+          {filteredUpcomingBookings.length > 0 ? (
+            <FlatList
+              data={filteredUpcomingBookings}
+              renderItem={renderBookingItem}
+              keyExtractor={(item) => item.id.toString()}
+              scrollEnabled={false}
+            />
+          ) : (
+            <Card style={styles.emptyStateCard}>
+              <Icon name="calendar" size={48} color="#9ca3af" />
+              <Text style={styles.emptyStateTitle}>No Upcoming Bookings</Text>
+              <Text style={styles.emptyStateText}>Ready to book your next service?</Text>
+              <Button style={styles.emptyStateButton}>
+                <Text>Book a Service</Text>
+              </Button>
+            </Card>
           )}
         </View>
-      </View>
 
-      {/* Upcoming Bookings */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Icon name="alert-circle" size={24} color="#3b82f6" />
-          <View style={styles.sectionHeaderContent}>
-            <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
-            <Text style={styles.sectionSubtitle}>
-              {filteredUpcomingBookings.length} {filteredUpcomingBookings.length === 1 ? 'booking' : 'bookings'} scheduled
-            </Text>
+        {/* Past Bookings */}
+        <View style={styles.section}>
+          <View style={[styles.sectionHeader, styles.pastSectionHeader]}>
+            <Icon name="history" size={24} color="#6b7280" />
+            <View style={styles.sectionHeaderContent}>
+              <Text style={styles.sectionTitle}>Past Bookings</Text>
+              <Text style={styles.sectionSubtitle}>
+                {filteredPastBookings.length} {filteredPastBookings.length === 1 ? 'booking' : 'bookings'} in history
+              </Text>
+            </View>
+            <Badge style={[styles.sectionBadge, styles.pastBadge]}>
+              <Text style={[styles.sectionBadgeText, styles.pastBadgeText]}>{pastBookings.length}</Text>
+            </Badge>
           </View>
-          <Badge style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>{upcomingBookings.length}</Text>
-          </Badge>
+
+          {filteredPastBookings.length > 0 ? (
+            <FlatList
+              data={filteredPastBookings}
+              renderItem={renderBookingItem}
+              keyExtractor={(item) => item.id.toString()}
+              scrollEnabled={false}
+            />
+          ) : (
+            <Card style={styles.emptyStateCard}>
+              <Icon name="clock" size={48} color="#9ca3af" />
+              <Text style={styles.emptyStateTitle}>No Past Bookings</Text>
+              <Text style={styles.emptyStateText}>Your completed and cancelled bookings will appear here.</Text>
+            </Card>
+          )}
         </View>
+      </ScrollView>
 
-        {filteredUpcomingBookings.length > 0 ? (
-          <FlatList
-            data={filteredUpcomingBookings}
-            renderItem={renderBookingItem}
-            keyExtractor={(item) => item.id.toString()}
-            scrollEnabled={false}
-          />
-        ) : (
-          <Card style={styles.emptyStateCard}>
-            <Icon name="calendar" size={48} color="#9ca3af" />
-            <Text style={styles.emptyStateTitle}>No Upcoming Bookings</Text>
-            <Text style={styles.emptyStateText}>Ready to book your next service?</Text>
-            <Button style={styles.emptyStateButton}>
-              <Text>Book a Service</Text>
-            </Button>
-          </Card>
-        )}
-      </View>
-
-      {/* Past Bookings */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Icon name="history" size={24} color="#6b7280" />
-          <View style={styles.sectionHeaderContent}>
-            <Text style={styles.sectionTitle}>Past Bookings</Text>
-            <Text style={styles.sectionSubtitle}>
-              {filteredPastBookings.length} {filteredPastBookings.length === 1 ? 'booking' : 'bookings'} in history
-            </Text>
-          </View>
-          <Badge style={[styles.sectionBadge, styles.pastBadge]}>
-            <Text style={styles.sectionBadgeText}>{pastBookings.length}</Text>
-          </Badge>
-        </View>
-
-        {filteredPastBookings.length > 0 ? (
-          <FlatList
-            data={filteredPastBookings}
-            renderItem={renderBookingItem}
-            keyExtractor={(item) => item.id.toString()}
-            scrollEnabled={false}
-          />
-        ) : (
-          <Card style={styles.emptyStateCard}>
-            <Icon name="clock" size={48} color="#9ca3af" />
-            <Text style={styles.emptyStateTitle}>No Past Bookings</Text>
-            <Text style={styles.emptyStateText}>Your completed and cancelled bookings will appear here.</Text>
-          </Card>
-        )}
-      </View>
-
+      {/* Dialogs */}
       <UserHoliday 
         open={holidayDialogOpen}
         onClose={() => setHolidayDialogOpen(false)}
         booking={selectedBookingForLeave}
         onLeaveSubmit={handleLeaveSubmit}
       />
+      
       <ModifyBookingDialog
-        open={openDialog}
-        onClose={() => setOpenDialog(false)}
+        open={modifyDialogOpen}
+        onClose={() => setModifyDialogOpen(false)}
         booking={selectedBooking}
         timeSlots={timeSlots}
         onSave={handleSaveModifiedBooking}
+        customerId={customerId}
       />
-    </ScrollView>
+
+      <ConfirmationDialog
+        open={confirmationDialog.open}
+        onClose={() => setConfirmationDialog(prev => ({ ...prev, open: false }))}
+        onConfirm={handleConfirmAction}
+        title={confirmationDialog.title}
+        message={confirmationDialog.message}
+        confirmText={confirmationDialog.type === 'cancel' ? 'Yes, Cancel' : 'Confirm'}
+        loading={actionLoading}
+        severity={confirmationDialog.severity}
+      />
+
+      <AddReviewDialog
+        open={reviewDialogOpen}
+        onClose={() => setReviewDialogOpen(false)}
+        booking={selectedReviewBooking}
+      />
+
+      <WalletDialog 
+        open={walletDialogOpen}
+        onClose={() => setWalletDialogOpen(false)}
+      />
+
+      {/* Snackbar for notifications */}
+      {openSnackbar && (
+        <View style={styles.snackbar}>
+          <Text style={styles.snackbarText}>Operation completed successfully!</Text>
+          <TouchableOpacity onPress={() => setOpenSnackbar(false)}>
+            <Icon name="close" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 };
 
@@ -757,13 +1029,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   button: {
-    backgroundColor: '#3b82f6',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    margin: 4,
   },
   disabledButton: {
     opacity: 0.6,
@@ -776,6 +1051,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
+    marginHorizontal: 4,
   },
   separatorBase: {
     height: 1,
@@ -783,45 +1059,88 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
 
-  // Other styles from previous implementation
+  // Container styles
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
   },
-  header: {
-    padding: 16,
-    backgroundColor: 'rgba(23, 43, 77, 0.8)',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  loadingText: {
+    marginTop: 16,
+    color: '#4b5563',
+  },
+
+  // Header styles
+   header: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  // header: {
+  //   padding: 16,
+  //   backgroundColor: 'rgba(177, 213, 232, 1)',
+  //   borderBottomWidth: 1,
+  //   borderBottomColor: '#e5e7eb',
+  // },
   headerContent: {
     marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop:15,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'rgb(14, 48, 92)',
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(14, 48, 92, 0.8)',
     marginTop: 4,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   searchContainer: {
+    flex: 1,
     position: 'relative',
+    marginRight: 12,
   },
   searchInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    color: '#fff',
+    backgroundColor: '#fff',
+    color: '#000',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#e5e7eb',
   },
   clearSearchButton: {
     position: 'absolute',
     right: 12,
     top: 12,
   },
+  walletButton: {
+    backgroundColor: 'rgb(14, 48, 92)',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 60,
+  },
+  walletText: {
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 4,
+  },
+
+  // Section styles
   section: {
     padding: 16,
   },
@@ -863,10 +1182,14 @@ const styles = StyleSheet.create({
   },
   sectionBadgeText: {
     color: '#3b82f6',
+    fontSize: 14,
+    fontWeight: '600',
   },
   pastBadgeText: {
     color: '#6b7280',
   },
+
+  // Booking card styles
   bookingCard: {
     marginBottom: 16,
     borderRadius: 8,
@@ -959,6 +1282,8 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#fff',
   },
+
+  // Empty state styles
   emptyStateCard: {
     alignItems: 'center',
     padding: 32,
@@ -976,24 +1301,11 @@ const styles = StyleSheet.create({
   emptyStateButton: {
     marginTop: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#4b5563',
-  },
+
   // Badge styles
   activeBadge: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderColor: 'rgba(59, 130, 246, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   activeBadgeText: {
     color: '#3b82f6',
@@ -1003,11 +1315,6 @@ const styles = StyleSheet.create({
   completedBadge: {
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderColor: 'rgba(16, 185, 129, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   completedBadgeText: {
     color: '#10b981',
@@ -1017,11 +1324,6 @@ const styles = StyleSheet.create({
   cancelledBadge: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderColor: 'rgba(239, 68, 68, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   cancelledBadgeText: {
     color: '#ef4444',
@@ -1031,11 +1333,6 @@ const styles = StyleSheet.create({
   inProgressBadge: {
     backgroundColor: 'rgba(107, 114, 128, 0.1)',
     borderColor: 'rgba(107, 114, 128, 0.3)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   inProgressBadgeText: {
     color: '#6b7280',
@@ -1045,11 +1342,6 @@ const styles = StyleSheet.create({
   notStartedBadge: {
     backgroundColor: 'rgba(107, 114, 128, 0.1)',
     borderColor: 'rgba(107, 114, 128, 0.3)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   notStartedBadgeText: {
     color: '#6b7280',
@@ -1059,9 +1351,6 @@ const styles = StyleSheet.create({
   onDemandBadge: {
     backgroundColor: 'rgba(168, 85, 247, 0.1)',
     borderColor: 'rgba(168, 85, 247, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   onDemandBadgeText: {
     color: '#8b5cf6',
@@ -1070,9 +1359,6 @@ const styles = StyleSheet.create({
   monthlyBadge: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderColor: 'rgba(59, 130, 246, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   monthlyBadgeText: {
     color: '#3b82f6',
@@ -1081,9 +1367,6 @@ const styles = StyleSheet.create({
   shortTermBadge: {
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     borderColor: 'rgba(16, 185, 129, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   shortTermBadgeText: {
     color: '#10b981',
@@ -1092,13 +1375,27 @@ const styles = StyleSheet.create({
   defaultBadge: {
     backgroundColor: 'rgba(156, 163, 175, 0.1)',
     borderColor: 'rgba(156, 163, 175, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
   defaultBadgeText: {
     color: '#6b7280',
     fontSize: 12,
+  },
+
+  // Snackbar styles
+  snackbar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#10b981',
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  snackbarText: {
+    color: '#fff',
+    fontSize: 16,
   },
 });
 

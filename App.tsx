@@ -12,6 +12,8 @@ import Booking from './src/Bookings';
 import Dashboard from './src/ServiceProvider/Dashboard';
 import ProfileScreen from './src/ProfileScreen';
 import { BOOKINGS, DASHBOARD, PROFILE } from './src/Constants/pagesConstants';
+import UserHoliday from './src/UserHoliday';
+import ModifyBookingDialog from './src/ModifyBookingDialog';
 
 const App = () => {
   const [chatbotOpen, setChatbotOpen] = useState(false);
@@ -54,14 +56,12 @@ const App = () => {
         return <Booking />;
       case DASHBOARD:
         return showProfileFromDashboard ? (
-          <ProfileScreen onBackPress={handleBackToDashboard} />
+          <ProfileScreen/>
         ) : (
           <Dashboard onProfilePress={handleDashboardProfilePress} />
         );
       case PROFILE:
-        return <ProfileScreen onBackPress={function (): void {
-          throw new Error('Function not implemented.');
-        } } />;
+        return <ProfileScreen  />;
       default:
         return (
           <DetailsView 
@@ -84,7 +84,7 @@ const App = () => {
 
           {/* Scrollable Content Below Header */}
           <View style={styles.contentContainer}>
-            {currentView === PROFILE || (currentView === DASHBOARD && showProfileFromDashboard) ? (
+          {currentView === PROFILE || (currentView === DASHBOARD && showProfileFromDashboard) ? (
               <ScrollView 
                 style={styles.profileScrollView}
                 contentContainerStyle={styles.profileScrollContent}
@@ -153,3 +153,4 @@ const styles = StyleSheet.create({
 });
 
 export default App;
+
