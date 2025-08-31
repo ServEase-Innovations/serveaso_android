@@ -60,10 +60,14 @@ const ProfileScreen = () => {
   return (
     <ScrollView style={styles.container}>
       {/* Header with Linear Gradient */}
-      <LinearGradient
-        colors={['rgba(139, 187, 221, 0.8)', 'rgba(213, 229, 233, 0.8)']}
-        start={{x: 1, y: 0}}
-        end={{x: 0, y: 0}}
+       <LinearGradient
+        colors={[
+          'rgba(139, 187, 221, 0.8)', // Blue tone
+          'rgba(213, 229, 233, 0.8)', // Lighter blue
+          'rgba(255,255,255,1)'       // White at the bottom
+        ]}
+        start={{x: 0, y: 0}}
+        end={{x: 0, y: 1}} // Vertical fade
         style={styles.header}
       >
         <View style={styles.headerContent}>

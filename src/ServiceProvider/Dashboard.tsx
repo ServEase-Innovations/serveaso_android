@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import FeatherIcon from 'react-native-vector-icons/Feather';
@@ -7,8 +7,71 @@ import { DashboardMetricCard } from './DashboardMetricCard';
 import { BookingCard } from './BookingCard';
 import { PaymentHistory } from './PaymentHistory';
 import { useAuth0 } from 'react-native-auth0';
+import { AllBookingsDialog } from './AllBookingsDialog';
+import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from '../common/BookingUtils';
+import axiosInstance from '../axiosInstance';
+// import axiosInstance from './axiosInstance';
+import LinearGradient from 'react-native-linear-gradient';
 
-// Mock data
+// Types for API response
+interface CustomerHoliday {
+  id: number;
+  customerId: number;
+  applyHolidayDate: string;
+  startDate: string;
+  endDate: string;
+  serviceType: string;
+  active: boolean;
+}
+
+interface ServiceProviderLeave {
+  id: number;
+  serviceProviderId: number;
+  applyLeaveDate: string;
+  startDate: string;
+  endDate: string;
+  serviceType: string;
+  active: boolean;
+}
+
+interface Booking {
+  id: number;
+  serviceProviderId: number;
+  customerId: number;
+  startDate: string;
+  endDate: string;
+  engagements: string;
+  timeslot: string;
+  monthlyAmount: number;
+  paymentMode: string;
+  bookingType: string;
+  serviceType: string;
+  bookingDate: string;
+  responsibilities: string[];
+  housekeepingRole: string | null;
+  mealType: string | null;
+  noOfPersons: number | null;
+  experience: string | null;
+  childAge: number | null;
+  customerName: string;
+  serviceProviderName: string;
+  address: string | null;
+  taskStatus: string;
+  modifiedBy: string;
+  modifiedDate: string;
+  availableTimeSlots: string | null;
+  customerHolidays: CustomerHoliday[];
+  serviceProviderLeaves: ServiceProviderLeave[];
+  active: boolean;
+}
+
+interface BookingHistoryResponse {
+  current: Booking[];
+  future: Booking[];
+  past: Booking[];
+}
+
+// Mock data for metrics and payments
 const metrics = [
   {
     title: "Total Earnings",
@@ -19,64 +82,28 @@ const metrics = [
     description: "This month"
   },
   {
-    title: "Active Bookings",
-    value: "8",
-    change: "+3",
+    title: "Security Deposit",
+    value: "₹2,500",
+    change: "Held",
+    changeType: "neutral" as const,
+    icon: "home" as const,
+    description: "For active bookings"
+  },
+  {
+    title: "Service Fee",
+    value: "₹1,230",
+    change: "-10%",
+    changeType: "negative" as const,
+    icon: "rupee" as const,
+    description: "Service charges"
+  },
+  {
+    title: "Actual Payout",
+    value: "₹20,850",
+    change: "+10.2%",
     changeType: "positive" as const,
-    icon: "calendar" as const,
-    description: "Upcoming services"
-  },
-  {
-    title: "Average Rating",
-    value: "4.8",
-    change: "+0.2",
-    changeType: "positive" as const,
-    icon: "star" as const,
-    description: "From 156 reviews"
-  },
-  {
-    title: "Completion Rate",
-    value: "98%",
-    change: "+2%",
-    changeType: "positive" as const,
-    icon: "trending-up" as const,
-    description: "Last 30 days"
-  }
-];
-
-const recentBookings = [
-  {
-    id: "1",
-    clientName: "Priya Sharma",
-    service: "House Cleaning",
-    date: "Dec 28, 2024",
-    time: "10:00 AM",
-    location: "Koramangala, Bangalore",
-    status: "upcoming" as const,
-    amount: "₹800",
-    contact: "+91 98765 43210"
-  },
-  {
-    id: "2",
-    clientName: "Rajesh Kumar",
-    service: "Cooking Service",
-    date: "Dec 27, 2024",
-    time: "6:00 PM",
-    location: "Indiranagar, Bangalore",
-    status: "completed" as const,
-    amount: "₹1,200",
-    contact: "+91 87654 32109"
-  },
-  {
-    id: "3",
-    clientName: "Anita Patel",
-    service: "Elderly Care",
-    date: "Dec 29, 2024",
-    time: "2:00 PM",
-    location: "Whitefield, Bangalore",
-    status: "upcoming" as const,
-    amount: "₹1,500",
-    contact: "+91 76543 21098"
+    icon: "rupee" as const,
+    description: "After deductions"
   }
 ];
 
@@ -115,16 +142,96 @@ const paymentHistory = [
   }
 ];
 
+// Function to format API booking data for the BookingCard component
+const formatBookingForCard = (booking: Booking) => {
+  const status = booking.taskStatus === "COMPLETED" ? "completed" : 
+                booking.taskStatus === "IN_PROGRESS" ? "in-progress" : "upcoming";
+  
+  return {
+    id: booking.id.toString(),
+    clientName: booking.customerName,
+    service: getServiceTitle(booking.serviceType),
+    date: new Date(booking.startDate).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }),
+    time: booking.timeslot,
+    location: booking.address || "Address not provided",
+    status: status,
+    amount: `₹${booking.monthlyAmount}`,
+    contact: "Contact info not available",
+    bookingData: booking
+  };
+};
+
 interface DashboardProps {
   onProfilePress: () => void;
 }
 
 export default function Dashboard({ onProfilePress }: DashboardProps) {
-  const { clearSession } = useAuth0();
+  const { clearSession, user: auth0User } = useAuth0();
+  const [bookings, setBookings] = useState<BookingHistoryResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [serviceProviderId, setServiceProviderId] = useState<number | null>(null);
+  const [showAllBookings, setShowAllBookings] = useState(false);
+
+  // Extract name and serviceProviderId from Auth0 user
+  useEffect(() => {
+    if (auth0User) {
+      const name = auth0User.name || null;
+      const id = auth0User.serviceProviderId || null;
+
+      setUserName(name);
+      setServiceProviderId(id ? Number(id) : null);
+    }
+  }, [auth0User]);
+
+  // Fetch booking history once serviceProviderId is available
+  useEffect(() => {
+    if (!serviceProviderId) return;
+
+    const fetchBookingHistory = async () => {
+      try {
+        setLoading(true);
+        const response = await axiosInstance.get(
+          `/api/serviceproviders/get-sp-booking-history-by-serviceprovider?serviceProviderId=${serviceProviderId}`
+        );
+        if (response.status !== 200) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data: BookingHistoryResponse = response.data;
+        setBookings(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch booking history');
+        Alert.alert("Error", "Failed to load booking data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBookingHistory();
+  }, [serviceProviderId]);
 
   const handleContactClient = (booking: any) => {
-    console.log(`Call ${booking.clientName} at ${booking.contact}`);
+    Alert.alert(
+      "Contact Information",
+      `Call ${booking.clientName} at ${booking.contact}`,
+      [{ text: "OK" }]
+    );
   };
+
+  // Combine current and future bookings for display
+  const upcomingBookings = bookings ? [
+    ...(bookings.current || []),
+    ...(bookings.future || [])
+  ].map(formatBookingForCard) : [];
+
+  // Get the most recent booking for display
+  const latestBooking = upcomingBookings.length > 0 ? [upcomingBookings[0]] : [];
 
   const onLogout = async () => {
     try {
@@ -136,45 +243,70 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <View style={styles.logoContainer}>
-              <MaterialIcon name="home" size={24} color="#ffffff" />
-              <Text style={styles.logoText}>ServEase Provider</Text>
+
+      {/* Welcome Section */}
+       <LinearGradient
+  colors={[
+    'rgba(139, 187, 221, 0.8)', // Blue tone
+    'rgba(213, 229, 233, 0.8)', // Lighter blue
+    'rgba(255,255,255,1)'       // White at the bottom
+  ]}
+  start={{x: 0, y: 0}}
+  end={{x: 0, y: 1}} // Vertical fade
+  style={styles.welcomeBanner}
+>
+      {/* <View style={styles.welcomeBanner}> */}
+        <View style={styles.welcomeContent}>
+          <View style={styles.welcomeTextContainer}>
+           <View style={styles.welcomeIconRow}>
+  <MaterialIcon name="home" size={16} color="#0e305c" />
+  <View>
+    <Text style={styles.welcomeBackText}>Welcome back,</Text>
+    <Text style={styles.userNameText}>{userName || "Guest"}</Text>
+  </View>
+</View>
+            
+          </View>
+          
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Icon name="calendar" size={16} color="#3b82f6" />
+                <View style={styles.statBadge}>
+                  <Text style={styles.statBadgeText}>+3</Text>
+                </View>
+              </View>
+              <Text style={styles.statLabel}>Bookings</Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Icon name="star" size={16} color="#f59e0b" />
+                <View style={styles.statBadge}>
+                  <Text style={styles.statBadgeText}>+2%</Text>
+                </View>
+              </View>
+              <Text style={styles.statLabel}>Rating</Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Icon name="trending-up" size={16} color="#10b981" />
+                <View style={styles.statBadge}>
+                  <Text style={styles.statBadgeText}>+2%</Text>
+                </View>
+              </View>
+              <Text style={styles.statLabel}>Completion</Text>
             </View>
           </View>
-           
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.notificationButton}>
-              <Icon name="bell" size={20} color="#ffffff" />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.profileContainer} 
-              onPress={onProfilePress}
-            >
-              <View style={styles.profileText}>
-                <Text style={styles.profileName}>Maya Patel</Text>
-                <Text style={styles.profileRole}>Cleaning Specialist</Text>
-              </View>
-              <View style={styles.profileAvatar}>
-                <Text style={styles.avatarText}>MP</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
         </View>
-      </View>
+      {/* </View> */}
+</LinearGradient>
 
       <View style={styles.mainContent}>
-        {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeTitle}>Welcome back, Maya! 👋</Text>
-          <Text style={styles.welcomeSubtitle}>
-            Here's what's happening with your services today.
-          </Text>
-        </View>
-
+        <Text style={styles.welcomeSubtitle}>
+              Here's what's happening with your services today.
+            </Text>
         {/* Metrics Grid */}
         <View style={styles.metricsGrid}>
           {metrics.map((metric, index) => (
@@ -184,25 +316,89 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
 
         {/* Main Content Grid */}
         <View style={styles.mainGrid}>
-          {/* Recent Bookings */}
+          {/* Recent Booking */}
           <View style={styles.recentBookings}>
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Recent Bookings</Text>
-                <View style={styles.upcomingBadge}>
-                  <Text style={styles.upcomingBadgeText}>
-                    {recentBookings.filter(b => b.status === "upcoming").length} upcoming
-                  </Text>
-                </View>
+                <Text style={styles.cardTitle}>Recent Booking</Text>
+                {!loading && latestBooking.length > 0 && (
+                  <View style={styles.latestBadge}>
+                    <Text style={styles.latestBadgeText}>Latest</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.cardContent}>
-                {recentBookings.map((booking) => (
-                  <BookingCard
-                    key={booking.id}
-                    booking={booking}
-                    onContactClient={handleContactClient}
-                  />
-                ))}
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#3b82f6" />
+                  </View>
+                ) : error ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>Failed to load bookings. Please try again.</Text>
+                    <TouchableOpacity 
+                      style={styles.retryButton}
+                      onPress={() => {
+                        setError(null);
+                        setLoading(true);
+                        if (serviceProviderId) {
+                          axiosInstance.get(
+                            `/api/serviceproviders/get-sp-booking-history-by-serviceprovider?serviceProviderId=${serviceProviderId}`
+                          ).then(response => {
+                            setBookings(response.data);
+                            setLoading(false);
+                          }).catch(err => {
+                            setError(err instanceof Error ? err.message : 'Failed to fetch booking history');
+                            setLoading(false);
+                          });
+                        }
+                      }}
+                    >
+                      <Text style={styles.retryButtonText}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : latestBooking.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>No upcoming bookings found.</Text>
+                  </View>
+                ) : (
+                  latestBooking.map((booking) => (
+                    <View key={booking.id} style={styles.bookingItem}>
+                      <View style={styles.bookingHeader}>
+                        <View>
+                          <Text style={styles.clientName}>{booking.clientName}</Text>
+                          <Text style={styles.serviceType}>{booking.service}</Text>
+                        </View>
+                        <View style={styles.badgeContainer}>
+                          {getBookingTypeBadge(booking.bookingData.bookingType)}
+                          {getStatusBadge(booking.bookingData.taskStatus)}
+                        </View>
+                      </View>
+                      
+                      <View style={styles.bookingDetails}>
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Date & Time</Text>
+                          <Text style={styles.detailValue}>{booking.date} at {booking.time}</Text>
+                        </View>
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Amount</Text>
+                          <Text style={styles.detailValue}>{booking.amount}</Text>
+                        </View>
+                      </View>
+                      
+                      <View style={styles.addressContainer}>
+                        <Text style={styles.detailLabel}>Address</Text>
+                        <Text style={styles.detailValue}>{booking.location}</Text>
+                      </View>
+                      
+                      <TouchableOpacity 
+                        style={styles.contactButton}
+                        onPress={() => handleContactClient(booking)}
+                      >
+                        <Text style={styles.contactButtonText}>Contact Client</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
               </View>
             </View>
           </View>
@@ -214,13 +410,20 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
                 <Text style={styles.cardTitle}>Quick Actions</Text>
               </View>
               <View style={styles.cardContent}>
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => setShowAllBookings(true)}
+                >
                   <Icon name="users" size={16} style={styles.buttonIcon} />
                   <Text style={styles.actionButtonText}>View All Bookings</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>
                   <Icon name="rupee" size={16} style={styles.buttonIcon} />
                   <Text style={styles.actionButtonText}>Request Withdrawal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton}>
+                  <Icon name="calendar" size={16} style={styles.buttonIcon} />
+                  <Text style={styles.actionButtonText}>Apply Leave</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>
                   <Icon name="clock-o" size={16} style={styles.buttonIcon} />
@@ -262,7 +465,7 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
           </View>
         </View>
 
-        {/* Charts and Payment History */}
+        {/* Payment History */}
         <View style={styles.bottomSection}>
           <PaymentHistory payments={paymentHistory} />
         </View>
@@ -272,13 +475,19 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
           <Text style={styles.signOutButtonText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
+
+      {/* All Bookings Dialog */}
+      <AllBookingsDialog
+        visible={showAllBookings}
+        onClose={() => setShowAllBookings(false)}
+        bookings={upcomingBookings}
+        onContactClient={handleContactClient} trigger={undefined}      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 15,
     flex: 1,
     backgroundColor: '#f9fafb',
   },
@@ -306,7 +515,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginLeft: 8,
-    color: '#ffffff', // Changed to white
+    color: '#ffffff',
   },
   headerRight: {
     flexDirection: 'row',
@@ -326,11 +535,11 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontWeight: '600',
-    color: '#ffffff', // Changed to white
+    color: '#ffffff',
   },
   profileRole: {
     fontSize: 12,
-    color: '#e5e7eb', // Changed to light gray for better visibility on dark background
+    color: '#e5e7eb',
   },
   profileAvatar: {
     width: 40,
@@ -344,20 +553,95 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
-  mainContent: {
-    padding: 16,
+  welcomeBanner: {
+    backgroundColor: 'rgba(177, 213, 232, 1)',
+    padding: 10,
+    paddingTop: 30,
   },
-  welcomeSection: {
-    marginBottom: 24,
+  welcomeContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
-  welcomeTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
+  welcomeTextContainer: {
+    flex: 1,
+    minWidth: 180,
+  },
+  welcomeIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
+   welcomeBackText: {
+    fontSize: 13,
+    color: '#0e305c',
+    marginLeft: 4,
+    fontWeight: '400',
+  },
+  userNameText: {
+    fontSize: 20,
+    color: '#0e305c',
+    marginLeft: 4,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  welcomeTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#0e305c',
+    marginLeft: 4,
+  },
   welcomeSubtitle: {
-    color: '#6b7280',
+    fontSize: 15,
+    color: '#004aad',
+    opacity: 0.9,
+    textAlign: 'center', // Center the subtitle
+    paddingBottom: 20,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 8,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statIconContainer: {
+    position: 'relative',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 8,
+    marginBottom: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  statBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: 'rgba(135, 206, 235, 1)',
+    borderRadius: 10,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statBadgeText: {
+    fontSize: 9,
+    color: '#0e305c',
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    fontSize: 10,
+    color: '#0e305c',
+  },
+  mainContent: {
+    padding: 16,
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -401,19 +685,106 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
   },
-  upcomingBadge: {
+  latestBadge: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  upcomingBadgeText: {
+  latestBadgeText: {
     color: '#3b82f6',
     fontSize: 12,
     fontWeight: '500',
   },
   cardContent: {
     padding: 16,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  errorText: {
+    color: '#6b7280',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  retryButtonText: {
+    color: '#111827',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    color: '#6b7280',
+  },
+  bookingItem: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    padding: 16,
+  },
+  bookingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  clientName: {
+    fontWeight: '600',
+    fontSize: 16,
+    color: '#111827',
+  },
+  serviceType: {
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  bookingDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  detailRow: {
+    flex: 1,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#111827',
+  },
+  addressContainer: {
+    marginBottom: 12,
+  },
+  contactButton: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 6,
+    padding: 8,
+    alignItems: 'center',
+  },
+  contactButtonText: {
+    color: '#111827',
   },
   actionButton: {
     flexDirection: 'row',
