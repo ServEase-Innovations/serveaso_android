@@ -29,12 +29,13 @@ import NannyServiceDialog from "./NannyServiceDialog";
 import DemoCook from "./demoCook";
 import NannyServicesDialog from "./NannyServiceDialog";
 import LinearGradient from 'react-native-linear-gradient';
+import AgentRegistrationForm from './AgentRegistrationForm';
 
 // Import local images
 const cookImage = require("../assets/images/CookAi.png");
 const maidImage = require("../assets/images/MaidAi.png");
 const nannyImage = require("../assets/images/NannyAi.png");
-const heroImage1 = require("../assets/images/CookLand.png"); // Replace with your actual image paths
+const heroImage1 = require("../assets/images/CookLand.png");
 const heroImage2 = require("../assets/images/MaidLand.png");
 const heroImage3 = require("../assets/images/NannyLand.png");
 
@@ -70,8 +71,13 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [showCookDialog, setShowCookDialog] = useState(false);
   const [hoveredService, setHoveredService] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-const [hoveredButton, setHoveredButton] = useState<string | null>(null);
+  const [hoveredButton, setHoveredButton] = useState<string | null>(null);
+  const [showAgentRegistration, setShowAgentRegistration] = useState(false);
 
+  const handleAgentWorkButtonClick = () => {
+    setShowAgentRegistration(true);
+  };
+  
   // Carousel images array
   const carouselImages = [heroImage1, heroImage2, heroImage3];
 
@@ -92,22 +98,25 @@ const [hoveredButton, setHoveredButton] = useState<string | null>(null);
         icon: "✋",
         title: "Choose your service",
         desc: "Select from a variety of tasks that suit your needs.",
-        color: "#FF9E9E", // Light red
+        color: "#FF9E9E",
         iconColor: "#FF5C5C",
+        gradientColors: ['#FF9E9E', '#FFD2D2', '#FFF0F0']
       },
       {
         icon: "📅",
         title: "Schedule in minutes",
         desc: "Book a time that works for you, quickly and easily.",
-        color: "#9ED2FF", // Light blue
+        color: "#9ED2FF",
         iconColor: "#5C9EFF",
+        gradientColors: ['#9ED2FF', '#D2E9FF', '#F0F8FF']
       },
       {
         icon: "🏠",
         title: "Relax, we'll handle the rest",
         desc: "Our verified professionals ensure your peace of mind.",
-        color: "#9EFFB2", // Light green
+        color: "#9EFFB2",
         iconColor: "#5CFF7A",
+        gradientColors: ['#9EFFB2', '#D2FFD9', '#F0FFF2']
       },
     ];
 
@@ -116,10 +125,10 @@ const [hoveredButton, setHoveredButton] = useState<string | null>(null);
     const [currentSlide, setCurrentSlide] = useState(0);
 
     useEffect(() => {
-      let timer: NodeJS.Timeout;
+      let interval: NodeJS.Timeout;
       
-      const animateSlide = () => {
-        // Slide out animation
+      const animateSlideChange = () => {
+        // Fade out and slide out current slide
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 0,
@@ -132,16 +141,15 @@ const [hoveredButton, setHoveredButton] = useState<string | null>(null);
             useNativeDriver: true,
           }),
         ]).start(() => {
-          // Update slide index without triggering state update during animation
-          const nextSlide = (currentSlide + 1) % slides.length;
+          // Update slide index
+          setCurrentSlide((prevSlide) => 
+            prevSlide === slides.length - 1 ? 0 : prevSlide + 1
+          );
           
           // Reset animation values for next slide
           slideAnim.setValue(50);
           
-          // Set the new slide index
-          setCurrentSlide(nextSlide);
-          
-          // Slide in animation
+          // Fade in and slide in next slide
           Animated.parallel([
             Animated.timing(fadeAnim, {
               toValue: 1,
@@ -157,34 +165,21 @@ const [hoveredButton, setHoveredButton] = useState<string | null>(null);
         });
       };
 
-      // Start the animation cycle after initial render
-      timer = setTimeout(() => {
-        timer = setInterval(animateSlide, 3000);
-      }, 100);
+      // Set up interval for automatic slide changes
+      interval = setInterval(animateSlideChange, 3000);
 
       return () => {
-        if (timer) clearTimeout(timer);
-        if (timer) clearInterval(timer as unknown as number);
+        if (interval) clearInterval(interval);
+        fadeAnim.setValue(1);
+        slideAnim.setValue(0);
       };
-    }, [currentSlide]); // Add currentSlide as dependency
+    }, [fadeAnim, slideAnim]);
 
-    // Initialize animation when slide changes
+    // Initialize animation when component mounts
     useEffect(() => {
-      fadeAnim.setValue(0);
-      slideAnim.setValue(50);
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, [currentSlide]);
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+    }, []);
 
     return (
       <View style={styles.howItWorksSection}>
@@ -194,7 +189,6 @@ const [hoveredButton, setHoveredButton] = useState<string | null>(null);
             style={[
               styles.slide,
               {
-                backgroundColor: slides[currentSlide].color,
                 opacity: fadeAnim,
                 transform: [{ translateX: slideAnim }],
                 shadowColor: slides[currentSlide].iconColor,
@@ -205,13 +199,20 @@ const [hoveredButton, setHoveredButton] = useState<string | null>(null);
               },
             ]}
           >
-            <View style={styles.iconContainer}>
-              <Text style={[styles.stepIcon, { color: slides[currentSlide].iconColor }]}>
-                {slides[currentSlide].icon}
-              </Text>
-            </View>
-            <Text style={styles.stepTitle}>{slides[currentSlide].title}</Text>
-            <Text style={styles.stepDesc}>{slides[currentSlide].desc}</Text>
+            <LinearGradient
+              colors={slides[currentSlide].gradientColors}
+              start={{x: 0, y: 0}}
+              end={{x: 0, y: 1}}
+              style={styles.gradientContainer}
+            >
+              <View style={styles.iconContainer}>
+                <Text style={[styles.stepIcon, { color: slides[currentSlide].iconColor }]}>
+                  {slides[currentSlide].icon}
+                </Text>
+              </View>
+              <Text style={styles.stepTitle}>{slides[currentSlide].title}</Text>
+              <Text style={styles.stepDesc}>{slides[currentSlide].desc}</Text>
+            </LinearGradient>
           </Animated.View>
         </View>
         <View style={styles.dotsContainer}>
@@ -385,8 +386,6 @@ const [hoveredButton, setHoveredButton] = useState<string | null>(null);
             style={styles.heroSectionGradient}
           >
       {/* Hero Section */}
-      {/* <View style={styles.heroSection}> */}
-       
         <View style={styles.heroTextContainer}>
           <Text style={styles.heroTitle}>
             Book trusted household help in minutes
@@ -456,44 +455,55 @@ const [hoveredButton, setHoveredButton] = useState<string | null>(null);
             </View>
           </View>
           <View style={styles.buttonContainer}>
-            {/* <TouchableOpacity style={styles.outlineButton} onPress={() => setChatbotOpen(true)}>
+
+            <TouchableOpacity 
+              style={[
+                styles.outlineButton,
+                hoveredButton === "help" && styles.outlineButtonHover
+              ]}
+              onPress={() => setChatbotOpen(true)}
+              onPressIn={() => setHoveredButton("help")}
+              onPressOut={() => setHoveredButton(null)}
+            >
               <Text style={styles.outlineButtonText}>I need help</Text>
             </TouchableOpacity>
-  
+
             <TouchableOpacity 
-              style={styles.outlineButton}
+              style={[
+                styles.outlineButton,
+                hoveredButton === "work" && styles.outlineButtonHover
+              ]}
               onPress={handleWorkButtonClick}
+              onPressIn={() => setHoveredButton("work")}
+              onPressOut={() => setHoveredButton(null)}
             >
               <Text style={styles.outlineButtonText}>I want to work</Text>
-            </TouchableOpacity> */}
-            <TouchableOpacity 
-  style={[
-    styles.outlineButton,
-    hoveredButton === "help" && styles.outlineButtonHover
-  ]}
-  onPress={() => setChatbotOpen(true)}
-  onPressIn={() => setHoveredButton("help")}
-  onPressOut={() => setHoveredButton(null)}
->
-  <Text style={styles.outlineButtonText}>I need help</Text>
-</TouchableOpacity>
+            </TouchableOpacity>
 
-<TouchableOpacity 
-  style={[
-    styles.outlineButton,
-    hoveredButton === "work" && styles.outlineButtonHover
-  ]}
-  onPress={handleWorkButtonClick}
-  onPressIn={() => setHoveredButton("work")}
-  onPressOut={() => setHoveredButton(null)}
->
-  <Text style={styles.outlineButtonText}>I want to work</Text>
-</TouchableOpacity>
+            {/* Add the new Agent button */}
+            <TouchableOpacity 
+              style={[
+                styles.outlineButton,
+                hoveredButton === "agent" && styles.outlineButtonHover
+              ]}
+              onPress={handleAgentWorkButtonClick}
+              onPressIn={() => setHoveredButton("agent")}
+              onPressOut={() => setHoveredButton(null)}
+            >
+              <Text style={styles.outlineButtonText}>Work as Agent</Text>
+            </TouchableOpacity>
 
             <Chatbot 
               open={chatbotOpen} 
               onClose={() => setChatbotOpen(false)} 
             />
+
+            <Modal visible={showAgentRegistration} animationType="slide">
+              <AgentRegistrationForm
+                onBackToLogin={() => setShowAgentRegistration(false)}
+                onRegistrationSuccess={() => setShowAgentRegistration(false)}
+              />
+            </Modal>
 
             {/* Add the registration modal */}
             <Modal visible={showRegistration} animationType="slide">
@@ -524,8 +534,8 @@ const [hoveredButton, setHoveredButton] = useState<string | null>(null);
             ))}
           </View>
         </View>
-      {/* </View> */}
-</LinearGradient>
+      </LinearGradient>
+      
       {/* Services Section */}
       <View style={styles.servicesSection}>
         <Text style={styles.sectionTitle}>Popular Services</Text>
@@ -804,6 +814,7 @@ interface Styles {
   iconContainer:ViewStyle;
   heroSectionGradient:ViewStyle;
   outlineButtonHover:ViewStyle;
+  gradientContainer: ViewStyle;
 }
 
 const { width } = Dimensions.get('window');
@@ -815,9 +826,9 @@ const styles = StyleSheet.create<Styles>({
     paddingTop: 16,
   },
   heroSectionGradient: {
-  padding: 16,
-  flexDirection: "column",
-},
+    padding: 16,
+    flexDirection: "column",
+  },
   heroSection: {
     backgroundColor: "#fff",
     padding: 16,
@@ -826,7 +837,6 @@ const styles = StyleSheet.create<Styles>({
   heroTextContainer: {
     flex: 1,
     paddingRight: 0,
-    
   },
   heroTitle: {
     fontSize: 24,
@@ -893,40 +903,42 @@ const styles = StyleSheet.create<Styles>({
     color: '#fff',
     fontSize: 12,
   },
- buttonContainer: {
-  flexDirection: "row",
-  justifyContent: "center",
-  gap: 16, // Increased gap
-  paddingTop: 16,
-  marginBottom: 20,
-},
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 16,
+    paddingTop: 16,
+    marginBottom: 20,
+    flexWrap: 'wrap',
+  },
   outlineButtonHover: {
-  backgroundColor: "#f8f9fa", // Light gray on hover
-  transform: [{ scale: 1.05 }],
-},
- outlineButton: {
-  borderWidth: 1,
-  borderColor: "#fff", // White border
-  borderRadius: 25, // More rounded corners
-  paddingVertical: 12,
-  paddingHorizontal: 20,
-  backgroundColor: "#fff", // White background
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.2,
-  shadowRadius: 4,
-  elevation: 3,
-},
+    backgroundColor: "#f8f9fa",
+    transform: [{ scale: 1.05 }],
+  },
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: "#fff",
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+    minWidth: 120,
+  },
   outlineButtonText: {
-  fontSize: 14,
-  fontWeight: "600",
-  color: "#1976d2", // Vivid blue text
-},
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1976d2",
+    textAlign: 'center',
+  },
   carouselContainer: {
     height: 270,
     position: 'relative',
     marginTop: 10,
-    
   },
   carouselImage: {
     width: '100%',
@@ -954,7 +966,7 @@ const styles = StyleSheet.create<Styles>({
   servicesSection: {
     padding: 16,
     paddingTop: 40,
-     backgroundColor: '#ffffff',
+    backgroundColor: '#ffffff',
   },
   sectionTitle: {
     fontSize: 24,
@@ -1008,23 +1020,32 @@ const styles = StyleSheet.create<Styles>({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  gradientContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    borderRadius: 20,
+    width: '100%',
+    height: '100%',
+  },
   iconContainer: {
-  backgroundColor: 'rgba(255,255,255,0.3)',
-  width: 70,
-  height: 70,
-  borderRadius: 35,
-  justifyContent: 'center',
-  alignItems: 'center',
-  marginBottom: 16,
-},
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   slide: {
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 30,
-  borderRadius: 20,
-  width: '90%',
-  maxWidth: 350,
-},
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    width: '90%',
+    maxWidth: 350,
+    height: '100%',
+    overflow: 'hidden',
+  },
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1048,6 +1069,7 @@ const styles = StyleSheet.create<Styles>({
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 4,
+    color: '#333',
   },
   stepDesc: {
     fontSize: 14,
