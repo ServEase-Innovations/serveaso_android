@@ -13,6 +13,7 @@ import {
   Linking,
   TouchableWithoutFeedback,
   PermissionsAndroid,
+  Dimensions,
 } from 'react-native';
 import axios from 'axios';
 import { keys } from './env';
@@ -40,6 +41,8 @@ interface ChildComponentProps {
 }
 
 Geocoder.init(keys.api_key);
+
+const { width } = Dimensions.get('window');
 
 const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   const {
@@ -80,34 +83,30 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   const [currentPage, setCurrentPage] = useState('');
   const [userPreference, setUserPreference] = useState<any>([]);
   const [locationWatchId, setLocationWatchId] = useState<number | null>(null);
-const [isWalletOpen, setIsWalletOpen] = useState(false);
+  const [isWalletOpen, setIsWalletOpen] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     const run = async () => {
-      // Step 1: Get location first
       await requestLocationPermission();
 
-      // Step 2: Auth checks
       if (!auth0User || auth0Loading || !auth0User?.email) {
         console.log("Auth0 user not available yet");
         return;
       }
 
       try {
-        // Step 3: Get token
         const token = await getCredentials();
         console.log("Access Token:", token?.accessToken);
         console.log("User authenticated:", auth0User);
 
         const email = auth0User.email ?? "";
 
-        // Step 4: Check email (this must finish before moving on)
         const response = await axios.get(
           `https://utils-ndt3.onrender.com/customer/check-email?email=${encodeURIComponent(email)}`
         );
         console.log("Email check response:", response.data);
 
-        // Step 5: Conditional next steps
         if (!response.data.user_role) {
           await createUser(auth0User);
         } else if (response.data.user_role === "SERVICE_PROVIDER") {
@@ -248,15 +247,12 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
   };
 
   const getCurrentLocation = () => {
-    // Clear any existing watch
     if (locationWatchId !== null) {
       Geolocation.clearWatch(locationWatchId);
     }
 
-    // Use watchPosition instead of getCurrentPosition for better timeout handling
     const watchId = Geolocation.watchPosition(
       async (position) => {
-        // Clear the watch once we get a position
         if (locationWatchId !== null) {
           Geolocation.clearWatch(locationWatchId);
           setLocationWatchId(null);
@@ -288,7 +284,6 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
       (error) => {
         console.error("Location error:", error);
         
-        // Clear the watch on error
         if (locationWatchId !== null) {
           Geolocation.clearWatch(locationWatchId);
           setLocationWatchId(null);
@@ -312,15 +307,14 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
       },
       {
         enableHighAccuracy: true,
-        timeout: 30000, // Increased timeout to 30 seconds
+        timeout: 30000,
         maximumAge: 10000,
-        distanceFilter: 10, // Only update if moved at least 10 meters
+        distanceFilter: 10,
       }
     );
     
     setLocationWatchId(watchId);
     
-    // Set a timeout to clear the watch if it takes too long
     setTimeout(() => {
       if (locationWatchId !== null) {
         Geolocation.clearWatch(locationWatchId);
@@ -340,9 +334,8 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
           ]
         );
       }
-    }, 35000); // 35 second timeout
+    }, 35000);
   };
-
 
   const checkLocationAccuracy = async (): Promise<void> => {
     if (Platform.OS === 'android') {
@@ -396,7 +389,6 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
   const fetchLocation = () => {
     setLoading(true);
     setShowGPSButton(false);
-    
     getCurrentLocation();
   };
 
@@ -485,7 +477,7 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
     setCurrentPage(e);
     if (e === 'sign_out') {
       dispatch(remove());
-      sendDataToParent(""); // This will trigger navigation to HomePage
+      sendDataToParent("");
     } else {
       sendDataToParent(e);
     }
@@ -539,8 +531,8 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
   };
 
   const handleWalletClick = () => {
-     setMenuVisible(false);
-  setIsWalletOpen(true);
+    setMenuVisible(false);
+    setIsWalletOpen(true);
   };
 
   const handleMenuPress = () => {
@@ -625,9 +617,6 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
     }
   };
 
-  const [showDropdown, setShowDropdown] = useState(false);
-
-  // Clean up location watch on component unmount
   useEffect(() => {
     return () => {
       if (locationWatchId !== null) {
@@ -650,16 +639,19 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
         end={{x: 1, y: 0}}
         style={styles.headerContainer}
       >
+        {/* Logo */}
         <TouchableOpacity 
-          onPress={() => handleClick("")} // This sends empty string to parent
+          onPress={() => handleClick("")}
+          style={styles.logoContainer}
         >
           <Image
             source={require('../assets/images/Final1.png')}
             style={styles.logo}
           />
         </TouchableOpacity>
-        
-        <View style={styles.rightActionsContainer}>
+
+        {/* Location Selector */}
+        <View style={styles.locationSection}>
           <TouchableOpacity
             style={styles.locationContainer}
             onPress={() => setShowDropdown(!showDropdown)}
@@ -668,6 +660,7 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
             <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
               {location || 'Set Location'}
             </Text>
+            <MaterialIcon name="arrow-drop-down" size={18} color="#3b82f6" />
           </TouchableOpacity>
 
           {showDropdown && (
@@ -686,29 +679,35 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
               ))}
             </View>
           )}
+        </View>
 
-          <View style={styles.iconsContainer}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => setIsCartOpen(true)}
-            >
-              <View style={styles.cartBadge}>
-                <Text style={styles.badgeText}>{cartItems?.length || 0}</Text>
-              </View>
-              <FeatherIcon name="shopping-cart" size={20} color="#fff" />
-            </TouchableOpacity>
+        {/* Right Actions - Cart and Menu */}
+        <View style={styles.rightActionsContainer}>
+          {/* Cart Icon */}
+          <TouchableOpacity
+            style={styles.cartButton}
+            onPress={() => setIsCartOpen(true)}
+          >
+            <View style={styles.cartBadge}>
+              <Text style={styles.badgeText}>{cartItems?.length || 0}</Text>
+            </View>
+            <FeatherIcon name="shopping-cart" size={22} color="#fff" />
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.iconButton} onPress={handleMenuPress}>
-              {auth0User ? (
-                <Image
-                  source={{ uri: auth0User.picture }}
-                  style={styles.userAvatar}
-                />
-              ) : (
-                <FeatherIcon name="user" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
-          </View>
+          {/* Menu Icon */}
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={handleMenuPress}
+          >
+            {auth0User ? (
+              <Image
+                source={{ uri: auth0User.picture }}
+                style={styles.userAvatar}
+              />
+            ) : (
+              <FeatherIcon name="user" size={22} color="#fff" />
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Location Modal */}
@@ -866,6 +865,7 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
           </View>
         </Modal>
 
+        {/* Menu Dropdown */}
         {menuVisible && (
           <View style={styles.menuDropdown} ref={dropdownRef}>
             {!auth0User ? (
@@ -930,14 +930,13 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
                   <Icon name="user" size={18} color="#fff" style={styles.menuIcon} />
                   <Text style={styles.menuItemText}>Profile</Text>
                 </TouchableOpacity>
-             // In the menu section, replace the wallet menu item with:
-<TouchableOpacity
-  style={styles.menuItem}
-  onPress={handleWalletClick}
->
-  <MaterialIcon name="account-balance-wallet" size={18} color="#fff" style={styles.menuIcon} />
-  <Text style={styles.menuItemText}>Wallet</Text>
-</TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleWalletClick}
+                >
+                  <MaterialIcon name="account-balance-wallet" size={18} color="#fff" style={styles.menuIcon} />
+                  <Text style={styles.menuItemText}>Wallet</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleSignOut}
@@ -959,10 +958,11 @@ const [isWalletOpen, setIsWalletOpen] = useState(false);
           handleClick(CHECKOUT);
         }}
       />
-     <WalletDialog
-  open={isWalletOpen}
-  onClose={() => setIsWalletOpen(false)}
-/> 
+      
+      <WalletDialog
+        open={isWalletOpen}
+        onClose={() => setIsWalletOpen(false)}
+      /> 
     </View>
   );
 };
@@ -981,20 +981,23 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     height: 70,
+    paddingHorizontal: 16,
     elevation: 3,
   },
+  logoContainer: {
+    flex: 1,
+  },
   logo: {
-    height: 80,
-    width: 120,
+    height: 50,
+    width: 100,
     resizeMode: 'contain',
   },
-  rightActionsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+  locationSection: {
+    flex: 2,
+    marginHorizontal: 12,
     position: 'relative',
-    paddingLeft:35,
   },
   locationContainer: {
     flexDirection: 'row',
@@ -1003,36 +1006,43 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    maxWidth: 150,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    minWidth: 120,
+    maxWidth: 180,
   },
   locationText: {
     fontSize: 14,
     color: '#334155',
-    marginLeft: 6,
+    marginHorizontal: 6,
     fontWeight: '500',
+    flex: 1,
   },
   locationIcon: {
-    marginRight: 6,
+    marginRight: 4,
   },
-  iconsContainer: {
+  rightActionsContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'flex-end',
+    gap: 16,
   },
-  iconButton: {
+  cartButton: {
     padding: 8,
     position: 'relative',
   },
+  menuButton: {
+    padding: 8,
+  },
   cartBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -2,
+    right: -2,
     backgroundColor: 'white',
     borderRadius: 10,
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
@@ -1041,7 +1051,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: '#3b82f6',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
   },
   userAvatar: {
@@ -1181,7 +1191,7 @@ const styles = StyleSheet.create({
   menuDropdown: {
     position: 'absolute',
     top: 70,
-    right: 10,
+    right: 16,
     backgroundColor: 'black',
     borderRadius: 8,
     paddingVertical: 8,

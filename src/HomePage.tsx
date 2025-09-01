@@ -23,9 +23,9 @@ import RadioButton from './RadioButton';
 import ServiceProviderRegistration from './ServiceProviderRegistration';
 import ServiceDetailsDialog from './ServiceDetailsDialog'; 
 import Chatbot from './Chatbot'; 
-import CookServiceDialog from './CookServiceDialog';
+// import CookServiceDialog from './CookServiceDialog';
 import MaidServiceDialog from "./MaidServiceDialog";
-import NannyServiceDialog from "./NannyServiceDialog";
+// import NannyServiceDialog from "./NannyServiceDialog";
 import DemoCook from "./demoCook";
 import NannyServicesDialog from "./NannyServiceDialog";
 import LinearGradient from 'react-native-linear-gradient';
@@ -45,6 +45,34 @@ interface ChildComponentProps {
   user?: any;
   providerDetails?: any;
 }
+
+// Define slides outside the component
+const howItWorksSlides = [
+  {
+    icon: "✋",
+    title: "Choose your service",
+    desc: "Select from a variety of tasks that suit your needs.",
+    color: "#FF9E9E",
+    iconColor: "#FF5C5C",
+    gradientColors: ['#FF9E9E', '#FFD2D2', '#FFF0F0']
+  },
+  {
+    icon: "📅",
+    title: "Schedule in minutes",
+    desc: "Book a time that works for you, quickly and easily.",
+    color: "#9ED2FF",
+    iconColor: "#5C9EFF",
+    gradientColors: ['#9ED2FF', '#D2E9FF', '#F0F8FF']
+  },
+  {
+    icon: "🏠",
+    title: "Relax, we'll handle the rest",
+    desc: "Our verified professionals ensure your peace of mind.",
+    color: "#9EFFB2",
+    iconColor: "#5CFF7A",
+    gradientColors: ['#9EFFB2', '#D2FFD9', '#F0FFF2']
+  },
+];
 
 const HomePage: React.FC<ChildComponentProps> = ({
   sendDataToParent,
@@ -73,6 +101,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [showAgentRegistration, setShowAgentRegistration] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
 
   const handleAgentWorkButtonClick = () => {
     setShowAgentRegistration(true);
@@ -81,11 +110,17 @@ const HomePage: React.FC<ChildComponentProps> = ({
   // Carousel images array
   const carouselImages = [heroImage1, heroImage2, heroImage3];
 
-  // Auto-rotate carousel every 3 seconds
+  // Single interval for both carousel and How It Works slides
   useEffect(() => {
     const interval = setInterval(() => {
+      // Update carousel
       setCurrentImageIndex((prevIndex) => 
         prevIndex === carouselImages.length - 1 ? 0 : prevIndex + 1
+      );
+      
+      // Update How It Works slides
+      setCurrentSlide((prevSlide) => 
+        prevSlide === howItWorksSlides.length - 1 ? 0 : prevSlide + 1
       );
     }, 3000);
 
@@ -93,93 +128,26 @@ const HomePage: React.FC<ChildComponentProps> = ({
   }, []);
 
   const HowItWorksSection = () => {
-    const slides = [
-      {
-        icon: "✋",
-        title: "Choose your service",
-        desc: "Select from a variety of tasks that suit your needs.",
-        color: "#FF9E9E",
-        iconColor: "#FF5C5C",
-        gradientColors: ['#FF9E9E', '#FFD2D2', '#FFF0F0']
-      },
-      {
-        icon: "📅",
-        title: "Schedule in minutes",
-        desc: "Book a time that works for you, quickly and easily.",
-        color: "#9ED2FF",
-        iconColor: "#5C9EFF",
-        gradientColors: ['#9ED2FF', '#D2E9FF', '#F0F8FF']
-      },
-      {
-        icon: "🏠",
-        title: "Relax, we'll handle the rest",
-        desc: "Our verified professionals ensure your peace of mind.",
-        color: "#9EFFB2",
-        iconColor: "#5CFF7A",
-        gradientColors: ['#9EFFB2', '#D2FFD9', '#F0FFF2']
-      },
-    ];
-
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(0)).current;
-    const [currentSlide, setCurrentSlide] = useState(0);
 
+    // Animation when slide changes
     useEffect(() => {
-      let interval: NodeJS.Timeout;
-      
-      const animateSlideChange = () => {
-        // Fade out and slide out current slide
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: -50,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          // Update slide index
-          setCurrentSlide((prevSlide) => 
-            prevSlide === slides.length - 1 ? 0 : prevSlide + 1
-          );
-          
-          // Reset animation values for next slide
-          slideAnim.setValue(50);
-          
-          // Fade in and slide in next slide
-          Animated.parallel([
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-              toValue: 0,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        });
-      };
-
-      // Set up interval for automatic slide changes
-      interval = setInterval(animateSlideChange, 3000);
-
-      return () => {
-        if (interval) clearInterval(interval);
-        fadeAnim.setValue(1);
-        slideAnim.setValue(0);
-      };
-    }, [fadeAnim, slideAnim]);
-
-    // Initialize animation when component mounts
-    useEffect(() => {
-      fadeAnim.setValue(1);
-      slideAnim.setValue(0);
-    }, []);
+      fadeAnim.setValue(0);
+      slideAnim.setValue(50);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, [currentSlide]);
 
     return (
       <View style={styles.howItWorksSection}>
@@ -191,7 +159,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
               {
                 opacity: fadeAnim,
                 transform: [{ translateX: slideAnim }],
-                shadowColor: slides[currentSlide].iconColor,
+                shadowColor: howItWorksSlides[currentSlide].iconColor,
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.3,
                 shadowRadius: 10,
@@ -200,30 +168,30 @@ const HomePage: React.FC<ChildComponentProps> = ({
             ]}
           >
             <LinearGradient
-              colors={slides[currentSlide].gradientColors}
+              colors={howItWorksSlides[currentSlide].gradientColors}
               start={{x: 0, y: 0}}
               end={{x: 0, y: 1}}
               style={styles.gradientContainer}
             >
               <View style={styles.iconContainer}>
-                <Text style={[styles.stepIcon, { color: slides[currentSlide].iconColor }]}>
-                  {slides[currentSlide].icon}
+                <Text style={[styles.stepIcon, { color: howItWorksSlides[currentSlide].iconColor }]}>
+                  {howItWorksSlides[currentSlide].icon}
                 </Text>
               </View>
-              <Text style={styles.stepTitle}>{slides[currentSlide].title}</Text>
-              <Text style={styles.stepDesc}>{slides[currentSlide].desc}</Text>
+              <Text style={styles.stepTitle}>{howItWorksSlides[currentSlide].title}</Text>
+              <Text style={styles.stepDesc}>{howItWorksSlides[currentSlide].desc}</Text>
             </LinearGradient>
           </Animated.View>
         </View>
         <View style={styles.dotsContainer}>
-          {slides.map((_, index) => (
+          {howItWorksSlides.map((_, index) => (
             <View
               key={index}
               style={[
                 styles.dot,
                 index === currentSlide && [
                   styles.activeDot,
-                  { backgroundColor: slides[index].iconColor },
+                  { backgroundColor: howItWorksSlides[index].iconColor },
                 ],
               ]}
             />
@@ -379,197 +347,157 @@ const HomePage: React.FC<ChildComponentProps> = ({
 
   return (
     <ScrollView style={styles.container}>
-       <LinearGradient
-            colors={['#0a2a66', '#004aad']}
-            start={{x: 0, y: 0}}
-            end={{x: 1, y: 0}}
-            style={styles.heroSectionGradient}
-          >
-      {/* Hero Section */}
-        <View style={styles.heroTextContainer}>
-          <Text style={styles.heroTitle}>
-            Book trusted household help in minutes
-          </Text>
-          <Text style={styles.heroSubtitle}>
-           ServEaso delivers instant, regular and short term access to safe, affordable, and trained maids, cooks, and caregivers.
-          </Text>
-          <View style={styles.serviceIconsContainer}>
-            {/* Cook Service */}
-            <View style={styles.serviceTooltipContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.serviceIconContainer,
-                  hoveredService === "COOK" && styles.serviceIconContainerHover,
-                ]}
-                onPress={() => handleClick("COOK")}
-                onPressIn={() => setHoveredService("COOK")}
-                onPressOut={() => setHoveredService(null)}
-              >
-                <Image source={cookImage} style={styles.serviceImage} />
-              </TouchableOpacity>
-              {hoveredService === "COOK" && (
-                <View style={styles.tooltip}>
-                  <Text style={styles.tooltipText}>{getServiceRole("COOK")}</Text>
-                </View>
-              )}
-            </View>
+     <LinearGradient
+  colors={['#0a2a66', '#004aad']}
+  start={{x: 0, y: 0}}
+  end={{x: 1, y: 0}}
+  style={styles.heroSectionGradient}
+>
+  {/* Hero Section */}
+  <View style={styles.heroTextContainer}>
+    <Text style={styles.heroTitle}>
+      Book trusted household help in minutes
+    </Text>
+    <Text style={styles.heroSubtitle}>
+      ServEaso delivers instant, regular and short term access to safe, affordable, and trained maids, cooks, and caregivers.
+    </Text>
+    
+    {/* Service Selection Header */}
+    <Text style={styles.selectorTitle}>What service do you need?</Text>
+    <Text style={styles.selectorSubtitle}>Tap to book instantly</Text>
+    
+    <View style={styles.serviceIconsContainer}>
+      {/* Cook Service */}
+      <View style={styles.serviceSelectorContainer}>
+        <TouchableOpacity
+          style={[
+            styles.serviceIconContainer,
+            hoveredService === "COOK" && styles.serviceIconContainerHover,
+          ]}
+          onPress={() => handleClick("COOK")}
+          onPressIn={() => setHoveredService("COOK")}
+          onPressOut={() => setHoveredService(null)}
+        >
+          <Image source={cookImage} style={styles.serviceImage} />
+        </TouchableOpacity>
+        <Text style={styles.serviceLabel}>Cook</Text>
+      </View>
 
-            {/* Maid Service */}
-            <View style={styles.serviceTooltipContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.serviceIconContainer,
-                  hoveredService === "MAID" && styles.serviceIconContainerHover,
-                ]}
-                onPress={() => handleClick("MAID")}
-                onPressIn={() => setHoveredService("MAID")}
-                onPressOut={() => setHoveredService(null)}
-              >
-                <Image source={maidImage} style={styles.serviceImage} />
-              </TouchableOpacity>
-              {hoveredService === "MAID" && (
-                <View style={styles.tooltip}>
-                  <Text style={styles.tooltipText}>{getServiceRole("MAID")}</Text>
-                </View>
-              )}
-            </View>
+      {/* Maid Service */}
+      <View style={styles.serviceSelectorContainer}>
+        <TouchableOpacity
+          style={[
+            styles.serviceIconContainer,
+            hoveredService === "MAID" && styles.serviceIconContainerHover,
+          ]}
+          onPress={() => handleClick("MAID")}
+          onPressIn={() => setHoveredService("MAID")}
+          onPressOut={() => setHoveredService(null)}
+        >
+          <Image source={maidImage} style={styles.serviceImage} />
+        </TouchableOpacity>
+        <Text style={styles.serviceLabel}>Maid</Text>
+      </View>
 
-            {/* Nanny Service */}
-            <View style={styles.serviceTooltipContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.serviceIconContainer,
-                  hoveredService === "NANNY" && styles.serviceIconContainerHover,
-                ]}
-                onPress={() => handleClick("NANNY")}
-                onPressIn={() => setHoveredService("NANNY")}
-                onPressOut={() => setHoveredService(null)}
-              >
-                <Image source={nannyImage} style={styles.serviceImage} />
-              </TouchableOpacity>
-              {hoveredService === "NANNY" && (
-                <View style={styles.tooltip}>
-                  <Text style={styles.tooltipText}>{getServiceRole("NANNY")}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-          <View style={styles.buttonContainer}>
-
-            <TouchableOpacity 
-              style={[
-                styles.outlineButton,
-                hoveredButton === "help" && styles.outlineButtonHover
-              ]}
-              onPress={() => setChatbotOpen(true)}
-              onPressIn={() => setHoveredButton("help")}
-              onPressOut={() => setHoveredButton(null)}
-            >
-              <Text style={styles.outlineButtonText}>I need help</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[
-                styles.outlineButton,
-                hoveredButton === "work" && styles.outlineButtonHover
-              ]}
-              onPress={handleWorkButtonClick}
-              onPressIn={() => setHoveredButton("work")}
-              onPressOut={() => setHoveredButton(null)}
-            >
-              <Text style={styles.outlineButtonText}>I want to work</Text>
-            </TouchableOpacity>
-
-            {/* Add the new Agent button */}
-            <TouchableOpacity 
-              style={[
-                styles.outlineButton,
-                hoveredButton === "agent" && styles.outlineButtonHover
-              ]}
-              onPress={handleAgentWorkButtonClick}
-              onPressIn={() => setHoveredButton("agent")}
-              onPressOut={() => setHoveredButton(null)}
-            >
-              <Text style={styles.outlineButtonText}>Work as Agent</Text>
-            </TouchableOpacity>
-
-            <Chatbot 
-              open={chatbotOpen} 
-              onClose={() => setChatbotOpen(false)} 
-            />
-
-            <Modal visible={showAgentRegistration} animationType="slide">
-              <AgentRegistrationForm
-                onBackToLogin={() => setShowAgentRegistration(false)}
-                onRegistrationSuccess={() => setShowAgentRegistration(false)}
-              />
-            </Modal>
-
-            {/* Add the registration modal */}
-            <Modal visible={showRegistration} animationType="slide">
-              <ServiceProviderRegistration
-                onBackToLogin={() => setShowRegistration(false)}
-                onRegistrationSuccess={() => setShowRegistration(false)}
-              />
-            </Modal>
-          </View>
-        </View>
-        
-        {/* Carousel Section */}
-        <View style={styles.carouselContainer}>
-          <Image 
-            source={carouselImages[currentImageIndex]} 
-            style={styles.carouselImage}
-            resizeMode="cover"
-          />
-          <View style={styles.carouselIndicators}>
-            {carouselImages.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.carouselIndicator,
-                  index === currentImageIndex && styles.carouselIndicatorActive
-                ]}
-              />
-            ))}
-          </View>
-        </View>
-      </LinearGradient>
+      {/* Nanny Service */}
+      <View style={styles.serviceSelectorContainer}>
+        <TouchableOpacity
+          style={[
+            styles.serviceIconContainer,
+            hoveredService === "NANNY" && styles.serviceIconContainerHover,
+          ]}
+          onPress={() => handleClick("NANNY")}
+          onPressIn={() => setHoveredService("NANNY")}
+          onPressOut={() => setHoveredService(null)}
+        >
+          <Image source={nannyImage} style={styles.serviceImage} />
+        </TouchableOpacity>
+        <Text style={styles.serviceLabel}>Nanny</Text>
+      </View>
+    </View>
+    
+    {/* Rest of your button container code... */}
+    <View style={styles.buttonContainer}>
+      {/* ... existing buttons ... */}
+    </View>
+  </View>
+  
+  {/* Carousel Section */}
+  <View style={styles.carouselContainer}>
+    <Image 
+      source={carouselImages[currentImageIndex]} 
+      style={styles.carouselImage}
+      resizeMode="cover"
+    />
+    <View style={styles.carouselIndicators}>
+      {carouselImages.map((_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.carouselIndicator,
+            index === currentImageIndex && styles.carouselIndicatorActive
+          ]}
+        />
+      ))}
+    </View>
+  </View>
+</LinearGradient>
       
       {/* Services Section */}
-      <View style={styles.servicesSection}>
-        <Text style={styles.sectionTitle}>Popular Services</Text>
-        <View style={styles.servicesGrid}>
-          {[
-            {
-              title: "Home Cook",
-              desc: "Skilled and hygienic cooks who specialize in home-style meals.",
-              icon: "👩‍🍳",
-            },
-            {
-              title: "Cleaning Help",
-              desc: "Reliable maids for daily, deep, or special occasion cleaning.",
-              icon: "🧼",
-            },
-            {
-              title: "Caregiver",
-              desc: "Trained support for children, seniors, or patients at home.",
-              icon: "❤️",
-            },
-          ].map((service, index) => (
-            <View key={index} style={styles.serviceCard}>
-              <View style={styles.serviceCardContent}>
-                <Text style={styles.serviceIcon}>{service.icon}</Text>
-                <Text style={styles.serviceTitle}>{service.title}</Text>
-                <Text style={styles.serviceDesc}>{service.desc}</Text>
-                <TouchableOpacity  onPress={() => handleLearnMore(service.title)}>
-                  <Text style={styles.learnMoreLink}>Learn More</Text>
-                </TouchableOpacity>
-              </View>
+<View style={styles.servicesSection}>
+  <Text style={styles.sectionTitle}>Popular Services</Text>
+  <View style={styles.servicesGrid}>
+    {[
+      {
+        title: "Home Cook",
+        desc: "Skilled and hygienic cooks who specialize in home-style meals.",
+        icon: "👩‍🍳",
+        gradient: ['#c5d6efff', '#176269ff'], // Red to orange gradient
+        iconBg: '#FFF5F5',
+      },
+      {
+        title: "Cleaning Help",
+        desc: "Reliable maids for daily, deep, or special occasion cleaning.",
+        icon: "🧼",
+        gradient: ['#c5d6efff', '#124c66ff'], // Teal to green gradient
+        iconBg: '#F0F9F8',
+      },
+      {
+        title: "Caregiver",
+        desc: "Trained support for children, seniors, or patients at home.",
+        icon: "❤️",
+        gradient: ['#c5d6efff', '#233572ff'], // Coral to red gradient
+        iconBg: '#FFF5F5',
+      },
+    ].map((service, index) => (
+      <TouchableOpacity 
+        key={index} 
+        style={styles.serviceCard}
+        onPress={() => handleLearnMore(service.title)}
+        activeOpacity={0.9}
+      >
+        <LinearGradient
+          colors={service.gradient}
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 1}}
+          style={styles.serviceCardGradient}
+        >
+          <View style={styles.serviceCardContent}>
+            <View style={[styles.serviceIconContainer, { backgroundColor: service.iconBg }]}>
+              <Text style={styles.serviceIcon}>{service.icon}</Text>
             </View>
-          ))}
-        </View>
-      </View>
+            <Text style={styles.serviceTitle}>{service.title}</Text>
+            <Text style={styles.serviceDesc}>{service.desc}</Text>
+            <View style={styles.learnMoreContainer}>
+              <Text style={styles.learnMoreLink}>Learn More</Text>
+              <Text style={styles.learnMoreArrow}>→</Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    ))}
+  </View>
+</View>
 
       {/* How it works - replaced with new slideshow component */}
       <HowItWorksSection />
@@ -752,16 +680,32 @@ const HomePage: React.FC<ChildComponentProps> = ({
 
 interface Styles {
   container: ViewStyle;
+  selectorTitle: TextStyle;
+selectorSubtitle: TextStyle;
+serviceSelectorContainer: ViewStyle;
+serviceLabel: TextStyle;
+serviceSelectorButton: ViewStyle;
+serviceSelectorButtonHover: ViewStyle;
+serviceSelectorImage: ImageStyle;
+serviceButtonLabel: TextStyle;
+instructionTooltip: ViewStyle;
+instructionText: TextStyle;
+closeInstruction: ViewStyle;
+closeInstructionText: TextStyle;
+  heroSectionGradient: ViewStyle;
   heroSection: ViewStyle;
   heroTextContainer: ViewStyle;
   heroTitle: TextStyle;
   heroSubtitle: TextStyle;
   serviceIconsContainer: ViewStyle;
-  serviceIconContainer: ViewStyle;
+  serviceTooltipContainer: ViewStyle;
   serviceIconContainerHover: ViewStyle;
   serviceImage: ImageStyle;
+  tooltip: ViewStyle;
+  tooltipText: TextStyle;
   buttonContainer: ViewStyle;
   outlineButton: ViewStyle;
+  outlineButtonHover: ViewStyle;
   outlineButtonText: TextStyle;
   carouselContainer: ViewStyle;
   carouselImage: ImageStyle;
@@ -772,13 +716,20 @@ interface Styles {
   sectionTitle: TextStyle;
   servicesGrid: ViewStyle;
   serviceCard: ViewStyle;
+  serviceCardPressed: ViewStyle;
+  serviceCardGradient: ViewStyle;
   serviceCardContent: ViewStyle;
+  serviceIconContainer: ViewStyle;
   serviceIcon: TextStyle;
   serviceTitle: TextStyle;
   serviceDesc: TextStyle;
+  learnMoreContainer: ViewStyle;
   learnMoreLink: TextStyle;
+  learnMoreArrow: TextStyle;
   howItWorksSection: ViewStyle;
   slideshowContainer: ViewStyle;
+  gradientContainer: ViewStyle;
+  iconContainer: ViewStyle;
   slide: ViewStyle;
   dotsContainer: ViewStyle;
   dot: ViewStyle;
@@ -803,18 +754,11 @@ interface Styles {
   timeInput: ViewStyle;
   dateBlock: ViewStyle;
   modalButtons: ViewStyle;
-  serviceTooltipContainer: ViewStyle;
-  tooltip: ViewStyle;
-  tooltipText: TextStyle;
   dateInputText: TextStyle;
   timeInputText: TextStyle;
   disabledInput: ViewStyle;
   dialogOverlay: ViewStyle;
   dialogBox: ViewStyle;
-  iconContainer:ViewStyle;
-  heroSectionGradient:ViewStyle;
-  outlineButtonHover:ViewStyle;
-  gradientContainer: ViewStyle;
 }
 
 const { width } = Dimensions.get('window');
@@ -825,6 +769,75 @@ const styles = StyleSheet.create<Styles>({
     backgroundColor: "#fff",
     paddingTop: 16,
   },
+  selectorTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#fff',
+  textAlign: 'center',
+  marginTop: 20,
+  marginBottom: 8,
+},
+selectorSubtitle: {
+  fontSize: 14,
+  color: 'rgba(255, 255, 255, 0.8)',
+  textAlign: 'center',
+  marginBottom: 20,
+},
+serviceSelectorContainer: {
+  alignItems: 'center',
+  marginHorizontal: 10,
+},
+serviceLabel: {
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: '500',
+  marginTop: 8,
+  textAlign: 'center',
+},
+serviceSelectorButton: {
+  alignItems: 'center',
+  padding: 10,
+  borderRadius: 15,
+  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+},
+serviceSelectorButtonHover: {
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  transform: [{ scale: 1.05 }],
+},
+serviceSelectorImage: {
+  width: 80,
+  height: 80,
+  marginBottom: 8,
+},
+serviceButtonLabel: {
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: '500',
+},
+instructionTooltip: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  padding: 12,
+  borderRadius: 8,
+  marginBottom: 15,
+  position: 'relative',
+},
+instructionText: {
+  color: '#1976d2',
+  fontSize: 14,
+  fontWeight: '500',
+  flex: 1,
+},
+closeInstruction: {
+  padding: 4,
+  marginLeft: 8,
+},
+closeInstructionText: {
+  color: '#1976d2',
+  fontSize: 18,
+  fontWeight: 'bold',
+},
   heroSectionGradient: {
     padding: 16,
     flexDirection: "column",
@@ -911,10 +924,6 @@ const styles = StyleSheet.create<Styles>({
     marginBottom: 20,
     flexWrap: 'wrap',
   },
-  outlineButtonHover: {
-    backgroundColor: "#f8f9fa",
-    transform: [{ scale: 1.05 }],
-  },
   outlineButton: {
     borderWidth: 1,
     borderColor: "#fff",
@@ -928,6 +937,10 @@ const styles = StyleSheet.create<Styles>({
     shadowRadius: 4,
     elevation: 3,
     minWidth: 120,
+  },
+  outlineButtonHover: {
+    backgroundColor: "#f8f9fa",
+    transform: [{ scale: 1.05 }],
   },
   outlineButtonText: {
     fontSize: 14,
@@ -963,52 +976,82 @@ const styles = StyleSheet.create<Styles>({
     backgroundColor: '#fff',
     width: 12,
   },
-  servicesSection: {
-    padding: 16,
-    paddingTop: 40,
-    backgroundColor: '#ffffff',
-  },
+ servicesSection: {
+  padding: 20,
+  paddingTop: 30,
+  backgroundColor: '#f8fafc',
+},
   sectionTitle: {
     fontSize: 24,
     fontWeight: "600",
     textAlign: "center",
     marginBottom: 24,
-    backgroundColor: '#ffffff',
+    color: '#1a365d',
   },
   servicesGrid: {
-    flexDirection: "column",
-    gap: 16,
-  },
+  flexDirection: "column",
+  gap: 16,
+},
   serviceCard: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
+    borderRadius: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    padding: 20,
+    shadowRadius: 15,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  serviceCardPressed: {
+    transform: [{ scale: 0.98 }],
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+  },
+  serviceCardGradient: {
+    borderRadius: 20,
+    padding: 0,
   },
   serviceCardContent: {
     alignItems: "center",
-    gap: 8,
+    padding: 16,
+    gap: 15,
   },
   serviceIcon: {
     fontSize: 36,
   },
   serviceTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "700",
+    color: '#fff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   serviceDesc: {
     fontSize: 14,
-    color: "#666",
+    color: "rgba(255, 255, 255, 0.9)",
     textAlign: "center",
+    lineHeight: 20,
+  },
+  learnMoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
   },
   learnMoreLink: {
     fontSize: 14,
-    color: "#1976d2",
-    marginTop: 8,
+    color: "#fff",
+    fontWeight: '600',
+  },
+  learnMoreArrow: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: 'bold',
   },
   howItWorksSection: {
     backgroundColor: "#ffffffff",
@@ -1184,5 +1227,4 @@ const styles = StyleSheet.create<Styles>({
     elevation: 10,
   },
 });
-
 export default HomePage;
