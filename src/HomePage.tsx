@@ -23,9 +23,7 @@ import RadioButton from './RadioButton';
 import ServiceProviderRegistration from './ServiceProviderRegistration';
 import ServiceDetailsDialog from './ServiceDetailsDialog'; 
 import Chatbot from './Chatbot'; 
-// import CookServiceDialog from './CookServiceDialog';
 import MaidServiceDialog from "./MaidServiceDialog";
-// import NannyServiceDialog from "./NannyServiceDialog";
 import DemoCook from "./demoCook";
 import NannyServicesDialog from "./NannyServiceDialog";
 import LinearGradient from 'react-native-linear-gradient';
@@ -347,159 +345,212 @@ const HomePage: React.FC<ChildComponentProps> = ({
 
   return (
     <ScrollView style={styles.container}>
-     <LinearGradient
-  colors={['#0a2a66', '#004aad']}
-  start={{x: 0, y: 0}}
-  end={{x: 1, y: 0}}
-  style={styles.heroSectionGradient}
->
-  {/* Hero Section */}
-  <View style={styles.heroTextContainer}>
-    <Text style={styles.heroTitle}>
-      Book trusted household help in minutes
-    </Text>
-    <Text style={styles.heroSubtitle}>
-      ServEaso delivers instant, regular and short term access to safe, affordable, and trained maids, cooks, and caregivers.
-    </Text>
-    
-    {/* Service Selection Header */}
-    <Text style={styles.selectorTitle}>What service do you need?</Text>
-    <Text style={styles.selectorSubtitle}>Tap to book instantly</Text>
-    
-    <View style={styles.serviceIconsContainer}>
-      {/* Cook Service */}
-      <View style={styles.serviceSelectorContainer}>
-        <TouchableOpacity
-          style={[
-            styles.serviceIconContainer,
-            hoveredService === "COOK" && styles.serviceIconContainerHover,
-          ]}
-          onPress={() => handleClick("COOK")}
-          onPressIn={() => setHoveredService("COOK")}
-          onPressOut={() => setHoveredService(null)}
-        >
-          <Image source={cookImage} style={styles.serviceImage} />
-        </TouchableOpacity>
-        <Text style={styles.serviceLabel}>Cook</Text>
-      </View>
-
-      {/* Maid Service */}
-      <View style={styles.serviceSelectorContainer}>
-        <TouchableOpacity
-          style={[
-            styles.serviceIconContainer,
-            hoveredService === "MAID" && styles.serviceIconContainerHover,
-          ]}
-          onPress={() => handleClick("MAID")}
-          onPressIn={() => setHoveredService("MAID")}
-          onPressOut={() => setHoveredService(null)}
-        >
-          <Image source={maidImage} style={styles.serviceImage} />
-        </TouchableOpacity>
-        <Text style={styles.serviceLabel}>Maid</Text>
-      </View>
-
-      {/* Nanny Service */}
-      <View style={styles.serviceSelectorContainer}>
-        <TouchableOpacity
-          style={[
-            styles.serviceIconContainer,
-            hoveredService === "NANNY" && styles.serviceIconContainerHover,
-          ]}
-          onPress={() => handleClick("NANNY")}
-          onPressIn={() => setHoveredService("NANNY")}
-          onPressOut={() => setHoveredService(null)}
-        >
-          <Image source={nannyImage} style={styles.serviceImage} />
-        </TouchableOpacity>
-        <Text style={styles.serviceLabel}>Nanny</Text>
-      </View>
-    </View>
-    
-    {/* Rest of your button container code... */}
-    <View style={styles.buttonContainer}>
-      {/* ... existing buttons ... */}
-    </View>
-  </View>
-  
-  {/* Carousel Section */}
-  <View style={styles.carouselContainer}>
-    <Image 
-      source={carouselImages[currentImageIndex]} 
-      style={styles.carouselImage}
-      resizeMode="cover"
-    />
-    <View style={styles.carouselIndicators}>
-      {carouselImages.map((_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.carouselIndicator,
-            index === currentImageIndex && styles.carouselIndicatorActive
-          ]}
-        />
-      ))}
-    </View>
-  </View>
-</LinearGradient>
-      
-      {/* Services Section */}
-<View style={styles.servicesSection}>
-  <Text style={styles.sectionTitle}>Popular Services</Text>
-  <View style={styles.servicesGrid}>
-    {[
-      {
-        title: "Home Cook",
-        desc: "Skilled and hygienic cooks who specialize in home-style meals.",
-        icon: "👩‍🍳",
-        gradient: ['#c5d6efff', '#176269ff'], // Red to orange gradient
-        iconBg: '#FFF5F5',
-      },
-      {
-        title: "Cleaning Help",
-        desc: "Reliable maids for daily, deep, or special occasion cleaning.",
-        icon: "🧼",
-        gradient: ['#c5d6efff', '#124c66ff'], // Teal to green gradient
-        iconBg: '#F0F9F8',
-      },
-      {
-        title: "Caregiver",
-        desc: "Trained support for children, seniors, or patients at home.",
-        icon: "❤️",
-        gradient: ['#c5d6efff', '#233572ff'], // Coral to red gradient
-        iconBg: '#FFF5F5',
-      },
-    ].map((service, index) => (
-      <TouchableOpacity 
-        key={index} 
-        style={styles.serviceCard}
-        onPress={() => handleLearnMore(service.title)}
-        activeOpacity={0.9}
+      <LinearGradient
+        colors={['#0a2a66', '#004aad']}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 0}}
+        style={styles.heroSectionGradient}
       >
-        <LinearGradient
-          colors={service.gradient}
-          start={{x: 0, y: 0}}
-          end={{x: 1, y: 1}}
-          style={styles.serviceCardGradient}
-        >
-          <View style={styles.serviceCardContent}>
-            <View style={[styles.serviceIconContainer, { backgroundColor: service.iconBg }]}>
-              <Text style={styles.serviceIcon}>{service.icon}</Text>
+        {/* Hero Section */}
+        <View style={styles.heroTextContainer}>
+          <Text style={styles.heroTitle}>
+            Book trusted household help in minutes
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            ServEaso delivers instant, regular and short term access to safe, affordable, and trained maids, cooks, and caregivers.
+          </Text>
+          
+          {/* Service Selection Header */}
+          <Text style={styles.selectorTitle}>What service do you need?</Text>
+          <Text style={styles.selectorSubtitle}>Tap to book instantly</Text>
+          
+          <View style={styles.serviceIconsContainer}>
+            {/* Cook Service */}
+            <View style={styles.serviceSelectorContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.serviceIconContainer,
+                  hoveredService === "COOK" && styles.serviceIconContainerHover,
+                ]}
+                onPress={() => handleClick("COOK")}
+                onPressIn={() => setHoveredService("COOK")}
+                onPressOut={() => setHoveredService(null)}
+              >
+                <Image source={cookImage} style={styles.serviceImage} />
+              </TouchableOpacity>
+              <Text style={styles.serviceLabel}>Cook</Text>
             </View>
-            <Text style={styles.serviceTitle}>{service.title}</Text>
-            <Text style={styles.serviceDesc}>{service.desc}</Text>
-            <View style={styles.learnMoreContainer}>
-              <Text style={styles.learnMoreLink}>Learn More</Text>
-              <Text style={styles.learnMoreArrow}>→</Text>
+
+            {/* Maid Service */}
+            <View style={styles.serviceSelectorContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.serviceIconContainer,
+                  hoveredService === "MAID" && styles.serviceIconContainerHover,
+                ]}
+                onPress={() => handleClick("MAID")}
+                onPressIn={() => setHoveredService("MAID")}
+                onPressOut={() => setHoveredService(null)}
+              >
+                <Image source={maidImage} style={styles.serviceImage} />
+              </TouchableOpacity>
+              <Text style={styles.serviceLabel}>Maid</Text>
+            </View>
+
+            {/* Nanny Service */}
+            <View style={styles.serviceSelectorContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.serviceIconContainer,
+                  hoveredService === "NANNY" && styles.serviceIconContainerHover,
+                ]}
+                onPress={() => handleClick("NANNY")}
+                onPressIn={() => setHoveredService("NANNY")}
+                onPressOut={() => setHoveredService(null)}
+              >
+                <Image source={nannyImage} style={styles.serviceImage} />
+              </TouchableOpacity>
+              <Text style={styles.serviceLabel}>Nanny</Text>
             </View>
           </View>
-        </LinearGradient>
-      </TouchableOpacity>
-    ))}
-  </View>
-</View>
+          
+          {/* Three Buttons after service selectors */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.outlineButton,
+                hoveredButton === "help" && styles.outlineButtonHover
+              ]}
+              onPress={() => setChatbotOpen(true)}
+              onPressIn={() => setHoveredButton("help")}
+              onPressOut={() => setHoveredButton(null)}
+            >
+              <Text style={styles.outlineButtonText}>I need help</Text>
+            </TouchableOpacity>
 
-      {/* How it works - replaced with new slideshow component */}
+            <TouchableOpacity 
+              style={[
+                styles.outlineButton,
+                hoveredButton === "work" && styles.outlineButtonHover
+              ]}
+              onPress={handleWorkButtonClick}
+              onPressIn={() => setHoveredButton("work")}
+              onPressOut={() => setHoveredButton(null)}
+            >
+              <Text style={styles.outlineButtonText}>I want to work</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.outlineButton,
+                hoveredButton === "agent" && styles.outlineButtonHover
+              ]}
+              onPress={handleAgentWorkButtonClick}
+              onPressIn={() => setHoveredButton("agent")}
+              onPressOut={() => setHoveredButton(null)}
+            >
+              <Text style={styles.outlineButtonText}>Work as Agent</Text>
+            </TouchableOpacity>
+
+            <Chatbot 
+              open={chatbotOpen} 
+              onClose={() => setChatbotOpen(false)} 
+            />
+
+            <Modal visible={showAgentRegistration} animationType="slide">
+              <AgentRegistrationForm
+                onBackToLogin={() => setShowAgentRegistration(false)}
+                onRegistrationSuccess={() => setShowAgentRegistration(false)}
+              />
+            </Modal>
+
+            <Modal visible={showRegistration} animationType="slide">
+              <ServiceProviderRegistration
+                onBackToLogin={() => setShowRegistration(false)}
+                onRegistrationSuccess={() => setShowRegistration(false)}
+              />
+            </Modal>
+          </View>
+        </View>
+        
+        {/* Carousel Section */}
+        <View style={styles.carouselContainer}>
+          <Image 
+            source={carouselImages[currentImageIndex]} 
+            style={styles.carouselImage}
+            resizeMode="cover"
+          />
+          <View style={styles.carouselIndicators}>
+            {carouselImages.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.carouselIndicator,
+                  index === currentImageIndex && styles.carouselIndicatorActive
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+      </LinearGradient>
+      
+      {/* Services Section */}
+      <View style={styles.servicesSection}>
+        <Text style={styles.sectionTitle}>Popular Services</Text>
+        <View style={styles.servicesGrid}>
+          {[
+            {
+              title: "Home Cook",
+              desc: "Skilled and hygienic cooks who specialize in home-style meals.",
+              icon: "👩‍🍳",
+              gradient: ['#c5d6efff', '#176269ff'],
+              iconBg: '#FFF5F5',
+            },
+            {
+              title: "Cleaning Help",
+              desc: "Reliable maids for daily, deep, or special occasion cleaning.",
+              icon: "🧼",
+              gradient: ['#c5d6efff', '#124c66ff'],
+              iconBg: '#F0F9F8',
+            },
+            {
+              title: "Caregiver",
+              desc: "Trained support for children, seniors, or patients at home.",
+              icon: "❤️",
+              gradient: ['#c5d6efff', '#233572ff'],
+              iconBg: '#FFF5F5',
+            },
+          ].map((service, index) => (
+            <TouchableOpacity 
+              key={index} 
+              style={styles.serviceCard}
+              onPress={() => handleLearnMore(service.title)}
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={service.gradient}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 1}}
+                style={styles.serviceCardGradient}
+              >
+                <View style={styles.serviceCardContent}>
+                  <View style={[styles.serviceIconContainer, { backgroundColor: service.iconBg }]}>
+                    <Text style={styles.serviceIcon}>{service.icon}</Text>
+                  </View>
+                  <Text style={styles.serviceTitle}>{service.title}</Text>
+                  <Text style={styles.serviceDesc}>{service.desc}</Text>
+                  <View style={styles.learnMoreContainer}>
+                    <Text style={styles.learnMoreLink}>Learn More</Text>
+                    <Text style={styles.learnMoreArrow}>→</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* How it works */}
       <HowItWorksSection />
 
       {/* Booking Dialog */}
@@ -538,7 +589,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
             {/* Date/Time Selection Section */}
             {selectedRadioButtonValue && (
               <View style={styles.dateTimeContainer}>
-                {/* Date Selection - Show for all booking types */}
+                {/* Date Selection */}
                 <View style={styles.dateContainer}>
                   <Text style={styles.label}>
                     {selectedRadioButtonValue === "Monthly" ? "Select Month" : "Select Date"}
@@ -553,7 +604,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
                   </TouchableOpacity>
                 </View>
 
-                {/* Only show end date for non-monthly bookings */}
+                {/* End date for non-monthly bookings */}
                 {(selectedRadioButtonValue === "Date" || selectedRadioButtonValue === "Short term") && (
                   <View style={styles.dateContainer}>
                     <Text style={styles.label}>End Date</Text>
@@ -569,7 +620,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
                   </View>
                 )}
 
-                {/* Time Selection - Show for all booking types */}
+                {/* Time Selection */}
                 <View style={styles.timeInputContainer}>
                   <View style={styles.timeInputWrapper}>
                     <Text style={styles.label}>Start Time</Text>
@@ -583,7 +634,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
                     </TouchableOpacity>
                   </View>
                   
-                  {/* Only show end time for non-monthly bookings */}
+                  {/* End time for non-monthly bookings */}
                   {(selectedRadioButtonValue === "Date" || selectedRadioButtonValue === "Short term") && (
                     <View style={styles.timeInputWrapper}>
                       <Text style={styles.label}>End Time</Text>
@@ -681,19 +732,10 @@ const HomePage: React.FC<ChildComponentProps> = ({
 interface Styles {
   container: ViewStyle;
   selectorTitle: TextStyle;
-selectorSubtitle: TextStyle;
-serviceSelectorContainer: ViewStyle;
-serviceLabel: TextStyle;
-serviceSelectorButton: ViewStyle;
-serviceSelectorButtonHover: ViewStyle;
-serviceSelectorImage: ImageStyle;
-serviceButtonLabel: TextStyle;
-instructionTooltip: ViewStyle;
-instructionText: TextStyle;
-closeInstruction: ViewStyle;
-closeInstructionText: TextStyle;
+  selectorSubtitle: TextStyle;
+  serviceSelectorContainer: ViewStyle;
+  serviceLabel: TextStyle;
   heroSectionGradient: ViewStyle;
-  heroSection: ViewStyle;
   heroTextContainer: ViewStyle;
   heroTitle: TextStyle;
   heroSubtitle: TextStyle;
@@ -770,80 +812,31 @@ const styles = StyleSheet.create<Styles>({
     paddingTop: 16,
   },
   selectorTitle: {
-  fontSize: 18,
-  fontWeight: '600',
-  color: '#fff',
-  textAlign: 'center',
-  marginTop: 20,
-  marginBottom: 8,
-},
-selectorSubtitle: {
-  fontSize: 14,
-  color: 'rgba(255, 255, 255, 0.8)',
-  textAlign: 'center',
-  marginBottom: 20,
-},
-serviceSelectorContainer: {
-  alignItems: 'center',
-  marginHorizontal: 10,
-},
-serviceLabel: {
-  color: '#fff',
-  fontSize: 14,
-  fontWeight: '500',
-  marginTop: 8,
-  textAlign: 'center',
-},
-serviceSelectorButton: {
-  alignItems: 'center',
-  padding: 10,
-  borderRadius: 15,
-  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-},
-serviceSelectorButtonHover: {
-  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  transform: [{ scale: 1.05 }],
-},
-serviceSelectorImage: {
-  width: 80,
-  height: 80,
-  marginBottom: 8,
-},
-serviceButtonLabel: {
-  color: '#fff',
-  fontSize: 14,
-  fontWeight: '500',
-},
-instructionTooltip: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  padding: 12,
-  borderRadius: 8,
-  marginBottom: 15,
-  position: 'relative',
-},
-instructionText: {
-  color: '#1976d2',
-  fontSize: 14,
-  fontWeight: '500',
-  flex: 1,
-},
-closeInstruction: {
-  padding: 4,
-  marginLeft: 8,
-},
-closeInstructionText: {
-  color: '#1976d2',
-  fontSize: 18,
-  fontWeight: 'bold',
-},
-  heroSectionGradient: {
-    padding: 16,
-    flexDirection: "column",
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 8,
   },
-  heroSection: {
-    backgroundColor: "#fff",
+  selectorSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  serviceSelectorContainer: {
+    alignItems: 'center',
+    marginHorizontal: 10,
+  },
+  serviceLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  heroSectionGradient: {
     padding: 16,
     flexDirection: "column",
   },
@@ -976,11 +969,11 @@ closeInstructionText: {
     backgroundColor: '#fff',
     width: 12,
   },
- servicesSection: {
-  padding: 20,
-  paddingTop: 30,
-  backgroundColor: '#f8fafc',
-},
+  servicesSection: {
+    padding: 20,
+    paddingTop: 30,
+    backgroundColor: '#f8fafc',
+  },
   sectionTitle: {
     fontSize: 24,
     fontWeight: "600",
@@ -989,9 +982,9 @@ closeInstructionText: {
     color: '#1a365d',
   },
   servicesGrid: {
-  flexDirection: "column",
-  gap: 16,
-},
+    flexDirection: "column",
+    gap: 16,
+  },
   serviceCard: {
     borderRadius: 20,
     shadowColor: "#000",
@@ -1015,11 +1008,24 @@ closeInstructionText: {
     padding: 16,
     gap: 15,
   },
+  // serviceIconContainer: {
+  //   width: 60,
+  //   height: 60,
+  //   borderRadius: 30,
+  //   justifyContent: 'center',
+  //   alignItems: 'center',
+  //   marginBottom: 10,
+  //   shadowColor: "#000",
+  //   shadowOffset: { width: 0, height: 2 },
+  //   shadowOpacity: 0.1,
+  //   shadowRadius: 3,
+  //   elevation: 2,
+  // },
   serviceIcon: {
-    fontSize: 36,
+    fontSize: 28,
   },
   serviceTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "700",
     color: '#fff',
     textAlign: 'center',
@@ -1028,10 +1034,10 @@ closeInstructionText: {
     textShadowRadius: 2,
   },
   serviceDesc: {
-    fontSize: 14,
+    fontSize: 12,
     color: "rgba(255, 255, 255, 0.9)",
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 16,
   },
   learnMoreContainer: {
     flexDirection: 'row',
