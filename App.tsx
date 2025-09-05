@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, StatusBar } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, ScrollView, StatusBar, Image, Animated, AppState } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Auth0Provider } from 'react-native-auth0';
 import config from './auth0-configuration';
@@ -20,6 +20,52 @@ const App = () => {
   const [currentView, setCurrentView] = useState('HOME');
   const [selectedBookingType, setSelectedBookingType] = useState('');
   const [showProfileFromDashboard, setShowProfileFromDashboard] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const fadeAnim = useState(new Animated.Value(1))[0];
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    // Handle app state changes
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        // App has come to the foreground
+        setShowSplash(true);
+        fadeAnim.setValue(1);
+        
+        // Show splash for 2 seconds then fade out
+        setTimeout(() => {
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }).start(() => {
+            setShowSplash(false);
+          });
+        }, 1000);
+      }
+      
+      appState.current = nextAppState;
+    });
+
+    // Initial splash screen
+    const timer = setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowSplash(false);
+      });
+    }, 2000);
+
+    return () => {
+      subscription.remove();
+      clearTimeout(timer);
+    };
+  }, []);
 
   const handleViewChange = (view: string) => {
     // Empty string means HomePage
@@ -72,6 +118,18 @@ const App = () => {
     }
   };
 
+  if (showSplash) {
+    return (
+      <Animated.View style={[styles.splashContainer, { opacity: fadeAnim }]}>
+        <Image 
+          source={require('./assets/images/Final1.png')} 
+          style={styles.splashImage}
+          resizeMode="contain"
+        />
+      </Animated.View>
+    );
+  }
+
   return (
     <Auth0Provider domain={config.domain} clientId={config.clientId}>
       <SafeAreaProvider>
@@ -102,7 +160,8 @@ const App = () => {
                 contentInsetAdjustmentBehavior="automatic"
               >
                 {renderContent()}
-                {currentView !== BOOKINGS && currentView !== DASHBOARD && <Footer />}
+                {/* Only show Footer for HomePage */}
+                {currentView === 'HOME' && <Footer />}
               </ScrollView>
             )}
           </View>
@@ -119,6 +178,16 @@ const App = () => {
 };
 
 const styles = StyleSheet.create({
+  splashContainer: {
+    flex: 1,
+    backgroundColor: '#0d2b61ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  splashImage: {
+    width: '80%',
+    height: '80%',
+  },
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
@@ -153,4 +222,3 @@ const styles = StyleSheet.create({
 });
 
 export default App;
-

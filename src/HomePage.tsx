@@ -30,9 +30,9 @@ import LinearGradient from 'react-native-linear-gradient';
 import AgentRegistrationForm from './AgentRegistrationForm';
 
 // Import local images
-const cookImage = require("../assets/images/CookAi.png");
-const maidImage = require("../assets/images/MaidAi.png");
-const nannyImage = require("../assets/images/NannyAi.png");
+const cookImage = require("../assets/images/Cooknew.png");
+const maidImage = require("../assets/images/Maidnew.png");
+const nannyImage = require("../assets/images/Nannynew.png");
 const heroImage1 = require("../assets/images/CookLand.png");
 const heroImage2 = require("../assets/images/MaidLand.png");
 const heroImage3 = require("../assets/images/NannyLand.png");
@@ -50,9 +50,9 @@ const howItWorksSlides = [
     icon: "✋",
     title: "Choose your service",
     desc: "Select from a variety of tasks that suit your needs.",
-    color: "#FF9E9E",
-    iconColor: "#FF5C5C",
-    gradientColors: ['#FF9E9E', '#FFD2D2', '#FFF0F0']
+    color: "#c0aceeff",
+    iconColor: "#d7b0eeff",
+    gradientColors: ['#d59effff', '#e5dbf0ff', '#f2e9faff']
   },
   {
     icon: "📅",
@@ -66,9 +66,9 @@ const howItWorksSlides = [
     icon: "🏠",
     title: "Relax, we'll handle the rest",
     desc: "Our verified professionals ensure your peace of mind.",
-    color: "#9EFFB2",
-    iconColor: "#5CFF7A",
-    gradientColors: ['#9EFFB2', '#D2FFD9', '#F0FFF2']
+    color: "#a4f6c6ff",
+    iconColor: "#92f5d9ff",
+    gradientColors: ['#90e9e5ff', '#d2fff4ff', '#F0FFF2']
   },
 ];
 
@@ -369,48 +369,54 @@ const HomePage: React.FC<ChildComponentProps> = ({
             <View style={styles.serviceSelectorContainer}>
               <TouchableOpacity
                 style={[
-                  styles.serviceIconContainer,
-                  hoveredService === "COOK" && styles.serviceIconContainerHover,
+                  styles.serviceIconContainerRectangular,
+                  hoveredService === "COOK" && styles.serviceIconContainerRectangularHover,
                 ]}
                 onPress={() => handleClick("COOK")}
                 onPressIn={() => setHoveredService("COOK")}
                 onPressOut={() => setHoveredService(null)}
               >
-                <Image source={cookImage} style={styles.serviceImage} />
+                <Image source={cookImage} style={styles.serviceImageRectangular} />
+                <View style={styles.serviceOverlay}>
+                  <Text style={styles.serviceLabelRectangular}>Home Cook</Text>
+                </View>
               </TouchableOpacity>
-              <Text style={styles.serviceLabel}>Cook</Text>
             </View>
 
             {/* Maid Service */}
             <View style={styles.serviceSelectorContainer}>
               <TouchableOpacity
                 style={[
-                  styles.serviceIconContainer,
-                  hoveredService === "MAID" && styles.serviceIconContainerHover,
+                  styles.serviceIconContainerRectangular,
+                  hoveredService === "MAID" && styles.serviceIconContainerRectangularHover,
                 ]}
                 onPress={() => handleClick("MAID")}
                 onPressIn={() => setHoveredService("MAID")}
                 onPressOut={() => setHoveredService(null)}
               >
-                <Image source={maidImage} style={styles.serviceImage} />
+                <Image source={maidImage} style={styles.serviceImageRectangular} />
+                <View style={styles.serviceOverlay}>
+                  <Text style={styles.serviceLabelRectangular}>Cleaning Help</Text>
+                </View>
               </TouchableOpacity>
-              <Text style={styles.serviceLabel}>Maid</Text>
             </View>
 
             {/* Nanny Service */}
             <View style={styles.serviceSelectorContainer}>
               <TouchableOpacity
                 style={[
-                  styles.serviceIconContainer,
-                  hoveredService === "NANNY" && styles.serviceIconContainerHover,
+                  styles.serviceIconContainerRectangular,
+                  hoveredService === "NANNY" && styles.serviceIconContainerRectangularHover,
                 ]}
                 onPress={() => handleClick("NANNY")}
                 onPressIn={() => setHoveredService("NANNY")}
                 onPressOut={() => setHoveredService(null)}
               >
-                <Image source={nannyImage} style={styles.serviceImage} />
+                <Image source={nannyImage} style={styles.serviceImageRectangular} />
+                <View style={styles.serviceOverlay}>
+                  <Text style={styles.serviceLabelRectangular}>Caregiver</Text>
+                </View>
               </TouchableOpacity>
-              <Text style={styles.serviceLabel}>Nanny</Text>
             </View>
           </View>
           
@@ -801,6 +807,12 @@ interface Styles {
   disabledInput: ViewStyle;
   dialogOverlay: ViewStyle;
   dialogBox: ViewStyle;
+  // New styles for rectangular service selectors
+  serviceIconContainerRectangular: ViewStyle;
+  serviceIconContainerRectangularHover: ViewStyle;
+  serviceImageRectangular: ImageStyle;
+  serviceOverlay: ViewStyle;
+  serviceLabelRectangular: TextStyle;
 }
 
 const { width } = Dimensions.get('window');
@@ -828,6 +840,7 @@ const styles = StyleSheet.create<Styles>({
   serviceSelectorContainer: {
     alignItems: 'center',
     marginHorizontal: 10,
+    flex: 1,
   },
   serviceLabel: {
     color: '#fff',
@@ -1231,6 +1244,52 @@ const styles = StyleSheet.create<Styles>({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 10,
+  },
+  
+  // New styles for rectangular service selectors
+  serviceIconContainerRectangular: {
+    width: 100,
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: "#f0f0f0",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#1976d2",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    position: 'relative',
+  },
+  serviceIconContainerRectangularHover: {
+    transform: [{ scale: 1.05 }],
+    shadowColor: "#1976d2",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+    borderColor: "#0d47a1",
+    borderWidth: 2,
+  },
+  serviceImageRectangular: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  serviceOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 8,
+    alignItems: 'center',
+  },
+  serviceLabelRectangular: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 export default HomePage;
