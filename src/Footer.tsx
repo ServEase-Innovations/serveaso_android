@@ -324,7 +324,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     padding: 15,
     paddingBottom: 10,
-    height:230,
+    // height:250,
+     minHeight: 250, // Use minHeight instead of fixed height
   },
   leftSection: {
     flex: 1,

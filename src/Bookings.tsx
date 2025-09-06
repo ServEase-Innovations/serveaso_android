@@ -240,7 +240,6 @@ const Booking: React.FC = () => {
   const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-  const [selectedReviewBooking, setSelectedReviewBooking] = useState<Booking | null>(null);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
 
   // Loading states
@@ -253,6 +252,39 @@ const Booking: React.FC = () => {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
   const [showAllHistory, setShowAllHistory] = useState(false);
+ 
+// Add these state variables near your other dialog states
+const [reviewDialogVisible, setReviewDialogVisible] = useState(false);
+const [selectedReviewBooking, setSelectedReviewBooking] = useState<Booking | null>(null);
+
+// Add this handler function
+const handleReviewSubmitted = (bookingId: number) => {
+  // You can update your state here if needed
+  console.log(`Review submitted for booking ${bookingId}`);
+  // Optionally refresh your bookings data
+  if (customerId !== null) {
+    refreshBookings();
+  }
+};
+
+// Add refresh function if you don't have one
+const refreshBookings = async () => {
+  try {
+    setIsRefreshing(true);
+    const response = await axiosInstance.get(
+      `api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`
+    );
+    
+    const { past = [], current = [], future = [] } = response.data || {};
+    setPastBookings(mapBookingData(past));
+    setCurrentBookings(mapBookingData(current));
+    setFutureBookings(mapBookingData(future));
+  } catch (error) {
+    console.error("Error refreshing bookings:", error);
+  } finally {
+    setIsRefreshing(false);
+  }
+};
 
   // Confirmation dialog state
   const [confirmationDialog, setConfirmationDialog] = useState<{
@@ -433,10 +465,15 @@ const Booking: React.FC = () => {
     );
   };
 
-  const handleLeaveReviewClick = (booking: Booking) => {
-    setSelectedReviewBooking(booking);
-    setReviewDialogOpen(true);
-  };
+ const handleLeaveReviewClick = (booking: Booking) => {
+  setSelectedReviewBooking(booking);
+  setReviewDialogVisible(true);
+};
+
+const closeReviewDialog = () => {
+  setReviewDialogVisible(false);
+  setSelectedReviewBooking(null);
+};
 
   const handleModifyClick = (booking: Booking) => {
     setSelectedBooking(booking);
@@ -996,11 +1033,18 @@ const Booking: React.FC = () => {
         severity={confirmationDialog.severity}
       />
 
-      <AddReviewDialog
+      {/* <AddReviewDialog
         open={reviewDialogOpen}
         onClose={() => setReviewDialogOpen(false)}
         booking={selectedReviewBooking}
-      />
+      /> */}
+      
+      <AddReviewDialog
+  visible={reviewDialogVisible}
+  onClose={closeReviewDialog}
+  booking={selectedReviewBooking}
+  onReviewSubmitted={handleReviewSubmitted}
+/>
 
       <WalletDialog 
         open={walletDialogOpen}

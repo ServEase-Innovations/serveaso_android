@@ -1,3 +1,4 @@
+// AddReviewDialog.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -5,123 +6,192 @@ import {
   Modal,
   TouchableOpacity,
   TextInput,
-  ScrollView,
   StyleSheet,
-  SafeAreaView,
-  Platform,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
+import { X, Star, CheckCircle } from 'lucide-react-native';
+import { useAuth0 } from 'react-native-auth0';
+import axiosInstance from './axiosInstance';
 
-type AddReviewDialogProps = {
-  open: boolean;
+interface AddReviewDialogProps {
+   visible: boolean; // Changed from 'open' to 'visible'
   onClose: () => void;
-  booking?: any; // Replace 'any' with a more specific type if available
-};
+  booking: any;
+  onReviewSubmitted: (bookingId: number) => void;
+}
 
-const AddReviewDialog: React.FC<AddReviewDialogProps> = ({ open, onClose, booking }) => {
+const AddReviewDialog: React.FC<AddReviewDialogProps> = ({
+  visible,
+  onClose,
+  booking,
+  onReviewSubmitted,
+}) => {
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user: auth0User } = useAuth0();
 
-  const handleSubmit = () => {
-    // Hardcoded API call simulation
-    console.log('Review submitted:', { rating, review });
-    onClose();
+  const handleSubmit = async () => {
+    if (!rating) {
+      Alert.alert('Error', 'Please provide a rating');
+      return;
+    }
+
+    if (!booking || !auth0User) {
+      Alert.alert('Error', 'Missing required information');
+      return;
+    }
+
+    if (!booking.serviceProviderId) {
+      Alert.alert('Error', 'Service provider information is missing');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        customerId: auth0User.customerid,
+        serviceProviderId: booking.serviceProviderId,
+        rating: rating,
+        comment: review.trim() || 'No comment provided',
+      };
+
+      await axiosInstance.post('/api/customer/add-feedback', payload);
+      
+      onReviewSubmitted(booking.id);
+      
+      Alert.alert('Success', 'Review submitted successfully!');
+      
+      setTimeout(() => {
+        setRating(0);
+        setReview('');
+        onClose();
+      }, 1500);
+      
+    } catch (error: any) {
+      console.error('Error submitting review:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to submit review. Please try again.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  type StarProps = {
-    filled: boolean;
-    onPress: () => void;
-  };
-
-  const Star: React.FC<StarProps> = ({ filled, onPress }) => (
-    <TouchableOpacity onPress={onPress}>
-      <Text style={[styles.star, filled && styles.starFilled]}>
-        {filled ? '★' : '☆'}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  type ButtonProps = {
-    children: React.ReactNode;
-    onPress: () => void;
-    variant?: 'primary' | 'outline';
-  };
-
-  const Button: React.FC<ButtonProps> = ({ children, onPress, variant = 'primary' }) => (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        variant === 'primary' ? styles.primaryButton : styles.outlineButton,
-      ]}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.buttonText,
-          variant === 'primary' ? styles.primaryButtonText : styles.outlineButtonText,
-        ]}
+  const renderStars = () => {
+    return [1, 2, 3, 4, 5].map((star) => (
+      <TouchableOpacity
+        key={star}
+        onPress={() => !isSubmitting && setRating(star)}
+        disabled={isSubmitting}
       >
-        {children}
-      </Text>
-    </TouchableOpacity>
-  );
+        <Star
+          size={32}
+          color={rating >= star ? '#fbbf24' : '#d1d5db'}
+          fill={rating >= star ? '#fbbf24' : 'transparent'}
+        />
+      </TouchableOpacity>
+    ));
+  };
 
   return (
     <Modal
-      visible={open}
-      animationType="slide"
+      visible={visible}
       transparent={true}
-      onRequestClose={onClose}
+      animationType="fade"
+      onRequestClose={isSubmitting ? undefined : onClose}
     >
-      <SafeAreaView style={styles.modalContainer}>
+      <View style={styles.overlay}>
         <View style={styles.dialogContainer}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Add Review</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeIcon}>×</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              disabled={isSubmitting}
+              style={styles.closeButton}
+            >
+              <X size={24} color="#6b7280" />
             </TouchableOpacity>
           </View>
 
-          {/* Star Rating */}
-          <View style={styles.starContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Star
-                key={star}
-                filled={rating >= star}
-                onPress={() => setRating(star)}
+          <ScrollView>
+            {/* Service Information */}
+            {booking && (
+              <View style={styles.serviceInfo}>
+                <Text style={styles.serviceText}>
+                  Reviewing service:{' '}
+                  {booking.serviceType
+                    ? booking.serviceType.charAt(0).toUpperCase() +
+                      booking.serviceType.slice(1)
+                    : 'Unknown Service'}
+                </Text>
+                <Text style={styles.providerText}>
+                  Provider: {booking.serviceProviderName || 'Not specified'}
+                </Text>
+              </View>
+            )}
+
+            {/* Star Rating */}
+            <View style={styles.ratingSection}>
+              <Text style={styles.label}>
+                How would you rate this service? *
+              </Text>
+              <View style={styles.starsContainer}>{renderStars()}</View>
+            </View>
+
+            {/* Review Input */}
+            <View style={styles.reviewSection}>
+              <Text style={styles.label}>Your review (optional)</Text>
+              <TextInput
+                value={review}
+                onChangeText={setReview}
+                style={styles.textInput}
+                placeholder="Share your experience with this service..."
+                placeholderTextColor="#9ca3af"
+                multiline={true}
+                numberOfLines={6}
+                editable={!isSubmitting}
+                textAlignVertical="top"
               />
-            ))}
-          </View>
+            </View>
 
-          {/* Review Input */}
-          <TextInput
-            value={review}
-            onChangeText={setReview}
-            style={styles.textInput}
-            placeholder="Write your review..."
-            placeholderTextColor="#9ca3af"
-            multiline
-            numberOfLines={6}
-            textAlignVertical="top"
-          />
-
-          {/* Buttons */}
-          <View style={styles.buttonContainer}>
-            <Button variant="outline" onPress={onClose}>
-              Cancel
-            </Button>
-            <Button onPress={handleSubmit}>
-              Submit
-            </Button>
-          </View>
+            {/* Buttons */}
+            <View style={styles.buttonsContainer}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={onClose}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  styles.submitButton,
+                  (!rating || isSubmitting) && styles.submitButtonDisabled,
+                ]}
+                onPress={handleSubmit}
+                disabled={!rating || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Submit Review</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
@@ -129,19 +199,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   dialogContainer: {
-    backgroundColor: 'white',
-    borderRadius: 16,
     width: '100%',
     maxWidth: 500,
+    backgroundColor: 'white',
+    borderRadius: 16,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
+    maxHeight: '80%',
   },
   header: {
     flexDirection: 'row',
@@ -152,70 +215,86 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1f2937',
   },
   closeButton: {
     padding: 4,
   },
-  closeIcon: {
-    fontSize: 24,
-    color: '#9ca3af',
-    fontWeight: 'bold',
+  serviceInfo: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
   },
-  starContainer: {
+  serviceText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  providerText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  ratingSection: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  starsContainer: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 16,
-    justifyContent: 'center',
   },
-  star: {
-    fontSize: 24,
-    color: '#d1d5db',
-  },
-  starFilled: {
-    color: '#fbbf24',
-  },
-  textInput: {
-    width: '100%',
-    minHeight: 100,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 14,
-    textAlignVertical: 'top',
+  reviewSection: {
     marginBottom: 24,
   },
-  buttonContainer: {
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    color: '#1f2937',
+  },
+  buttonsContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
+    marginTop: 16,
   },
   button: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: 8,
+    minWidth: 100,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 80,
   },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-  },
-  outlineButton: {
+  cancelButton: {
     borderWidth: 1,
     borderColor: '#d1d5db',
-    backgroundColor: 'transparent',
+    backgroundColor: 'white',
   },
-  buttonText: {
-    fontSize: 14,
+  cancelButtonText: {
+    color: '#374151',
     fontWeight: '500',
   },
-  primaryButtonText: {
-    color: 'white',
+  submitButton: {
+    backgroundColor: '#2563eb',
   },
-  outlineButtonText: {
-    color: '#374151',
+  submitButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontWeight: '500',
   },
 });
 

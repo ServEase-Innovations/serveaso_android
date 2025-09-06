@@ -208,7 +208,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 20,
+    // paddingBottom: 20,
+     justifyContent: 'space-between', // This ensures content expands properly
+    minHeight: '100%', // Ensure it takes at least full height
   },
   fullScreenScrollContent: {
     paddingBottom: 0,
