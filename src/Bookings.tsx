@@ -14,12 +14,14 @@ import {
   ViewStyle,
   TextStyle,
   StyleProp,
-  Modal
+  Modal,
+  RefreshControl
 } from 'react-native';
 import { useAuth0 } from 'react-native-auth0';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axiosInstance from './axiosInstance';
 import dayjs from 'dayjs';
+import axios from 'axios';
 
 // Import existing components
 import UserHoliday from './UserHoliday';
@@ -241,6 +243,8 @@ const Booking: React.FC = () => {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [reviewedBookings, setReviewedBookings] = useState<number[]>([]);
 
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
@@ -252,39 +256,10 @@ const Booking: React.FC = () => {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
   const [showAllHistory, setShowAllHistory] = useState(false);
- 
-// Add these state variables near your other dialog states
-const [reviewDialogVisible, setReviewDialogVisible] = useState(false);
-const [selectedReviewBooking, setSelectedReviewBooking] = useState<Booking | null>(null);
 
-// Add this handler function
-const handleReviewSubmitted = (bookingId: number) => {
-  // You can update your state here if needed
-  console.log(`Review submitted for booking ${bookingId}`);
-  // Optionally refresh your bookings data
-  if (customerId !== null) {
-    refreshBookings();
-  }
-};
-
-// Add refresh function if you don't have one
-const refreshBookings = async () => {
-  try {
-    setIsRefreshing(true);
-    const response = await axiosInstance.get(
-      `api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`
-    );
-    
-    const { past = [], current = [], future = [] } = response.data || {};
-    setPastBookings(mapBookingData(past));
-    setCurrentBookings(mapBookingData(current));
-    setFutureBookings(mapBookingData(future));
-  } catch (error) {
-    console.error("Error refreshing bookings:", error);
-  } finally {
-    setIsRefreshing(false);
-  }
-};
+  // Add these state variables near your other dialog states
+  const [reviewDialogVisible, setReviewDialogVisible] = useState(false);
+  const [selectedReviewBooking, setSelectedReviewBooking] = useState<Booking | null>(null);
 
   // Confirmation dialog state
   const [confirmationDialog, setConfirmationDialog] = useState<{
@@ -320,14 +295,14 @@ const refreshBookings = async () => {
     const fetchBookings = async () => {
       try {
         if (customerId !== null && customerId !== undefined) {
-          const response = await axiosInstance.get(
-            `api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`
+          const response = await axios.get(
+            `https://payments-j5id.onrender.com/api/customers/${customerId}/engagements`
           );
           
-          const { past = [], current = [], future = [] } = response.data || {};
+          const { past = [], ongoing = [], upcoming = [] } = response.data || {};
           setPastBookings(mapBookingData(past));
-          setCurrentBookings(mapBookingData(current));
-          setFutureBookings(mapBookingData(future));
+          setCurrentBookings(mapBookingData(ongoing));
+          setFutureBookings(mapBookingData(upcoming));
         }
       } catch (error) {
         console.error("Error fetching booking details:", error);
@@ -350,29 +325,31 @@ const refreshBookings = async () => {
     return Array.isArray(data)
       ? data.map((item) => {
           return {
-            id: item.id,
+            id: item.engagement_id,
             customerId: item.customerId,
             serviceProviderId: item.serviceProviderId,
             name: item.customerName,
-            timeSlot: item.timeslot,
-            date: item.startDate,
-            startDate: item.startDate,
-            endDate: item.endDate,
-            bookingType: item.bookingType,
+            timeSlot: item.start_time,
+            date: item.start_date,
+            startDate: item.start_date,
+            endDate: item.end_date,
+            bookingType: item.booking_type,
             monthlyAmount: item.monthlyAmount,
             paymentMode: item.paymentMode,
             address: item.address || 'No address specified',
             customerName: item.customerName,
             serviceProviderName: item.serviceProviderName === "undefined undefined" ? "Not Assigned" : item.serviceProviderName,
-            taskStatus: item.taskStatus,
+            taskStatus: item.task_status,
             engagements: item.engagements,
-            bookingDate: item.bookingDate,
+            bookingDate: item.created_at,
             serviceType: item.serviceType?.toLowerCase() || 'other',
             childAge: item.childAge,
             experience: item.experience,
             noOfPersons: item.noOfPersons,
             mealType: item.mealType,
-            modifiedDate: item.modifiedDate,
+            modifiedDate: Array.isArray(item.modifications) && item.modifications.length > 0
+              ? item.modifications[item.modifications.length - 1]?.created_at
+              : item.created_at,
             responsibilities: item.responsibilities,
             customerHolidays: item.customerHolidays || [],
           };
@@ -406,6 +383,28 @@ const refreshBookings = async () => {
       if (statusComparison !== 0) return statusComparison;
       return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
     });
+  };
+
+ 
+
+  // Refresh function
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (customerId !== null) {
+        const response = await axios.get(
+          `https://payments-j5id.onrender.com/api/customers/${customerId}/engagements`
+        );
+        const { past = [], ongoing = [], upcoming = [] } = response.data || {};
+        setPastBookings(mapBookingData(past));
+        setCurrentBookings(mapBookingData(ongoing));
+        setFutureBookings(mapBookingData(upcoming));
+      }
+    } catch (error) {
+      console.error("Error refreshing bookings:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // ACTION HANDLERS - CONFIRMATION DIALOG
@@ -465,15 +464,26 @@ const refreshBookings = async () => {
     );
   };
 
- const handleLeaveReviewClick = (booking: Booking) => {
-  setSelectedReviewBooking(booking);
-  setReviewDialogVisible(true);
-};
+  const handleLeaveReviewClick = (booking: Booking) => {
+    setSelectedReviewBooking(booking);
+    setReviewDialogVisible(true);
+  };
 
-const closeReviewDialog = () => {
-  setReviewDialogVisible(false);
-  setSelectedReviewBooking(null);
-};
+  const closeReviewDialog = () => {
+    setReviewDialogVisible(false);
+    setSelectedReviewBooking(null);
+  };
+
+  const handleReviewSubmitted = (bookingId: number) => {
+    setReviewedBookings(prev => [...prev, bookingId]);
+    if (customerId !== null) {
+      onRefresh();
+    }
+  };
+
+  const hasReview = (booking: Booking): boolean => {
+    return reviewedBookings.includes(booking.id);
+  };
 
   const handleModifyClick = (booking: Booking) => {
     setSelectedBooking(booking);
@@ -572,13 +582,13 @@ const closeReviewDialog = () => {
       
       // Refresh data
       if (customerId !== null) {
-        await axiosInstance
-          .get(`api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`)
+        await axios
+          .get(`https://payments-j5id.onrender.com/api/customers/${customerId}/engagements`)
           .then((response) => {
-            const { past = [], current = [], future = [] } = response.data || {};
+            const { past = [], ongoing = [], upcoming = [] } = response.data || {};
             setPastBookings(mapBookingData(past));
-            setCurrentBookings(mapBookingData(current));
-            setFutureBookings(mapBookingData(future));
+            setCurrentBookings(mapBookingData(ongoing));
+            setFutureBookings(mapBookingData(upcoming));
           });
       }
     } catch (error: any) {
@@ -597,27 +607,27 @@ const closeReviewDialog = () => {
     try {
       setIsRefreshing(true);
       
-      await axiosInstance.post(
-        '/api/customer/add-customer-holiday',
+      await axios.post(
+        `https://payments-j5id.onrender.com/api/customer/${customerId}/leaves`,
         {
-          engagementId: selectedBookingForLeave.id,
-          startDate: startDate,
-          endDate: endDate,
-          serviceType: serviceType.toUpperCase()
+          engagement_id: selectedBookingForLeave.id,
+          leave_start_date: startDate,
+          leave_end_date: endDate,
+          leave_type: 'VACATION',
         }
       );
 
       setBookingsWithVacation(prev => [...prev, selectedBookingForLeave.id]);
 
+      // Refresh data
       if (customerId !== null) {
-        await axiosInstance
-          .get(`api/serviceproviders/get-sp-booking-history-by-customer?customerId=${customerId}`)
-          .then((response) => {
-            const { past = [], current = [], future = [] } = response.data || {};
-            setPastBookings(mapBookingData(past));
-            setCurrentBookings(mapBookingData(current));
-            setFutureBookings(mapBookingData(future));
-          });
+        const response = await axios.get(
+          `https://payments-j5id.onrender.com/api/customers/${customerId}/engagements`
+        );
+        const { past = [], ongoing = [], upcoming = [] } = response.data || {};
+        setPastBookings(mapBookingData(past));
+        setCurrentBookings(mapBookingData(ongoing));
+        setFutureBookings(mapBookingData(upcoming));
       }
 
       setOpenSnackbar(true);
@@ -632,7 +642,10 @@ const closeReviewDialog = () => {
 
   // DATA PROCESSING
   const upcomingBookings = sortUpcomingBookings([...currentBookings, ...futureBookings]);
-  const filteredUpcomingBookings = filterBookings(upcomingBookings, searchTerm);
+  const filteredByStatus = statusFilter === 'ALL' 
+    ? upcomingBookings 
+    : upcomingBookings.filter(booking => booking.taskStatus === statusFilter);
+  const filteredUpcomingBookings = filterBookings(filteredByStatus, searchTerm);
   const filteredPastBookings = filterBookings(pastBookings, searchTerm);
 
   const formatDate = (dateString: string) => {
@@ -644,6 +657,15 @@ const closeReviewDialog = () => {
       day: 'numeric'
     });
   };
+   // Define status options for tabs
+  const statusTabs = [
+    { value: 'ALL', label: 'All', count: upcomingBookings.length },
+    { value: 'NOT_STARTED', label: 'Not Started', count: upcomingBookings.filter(b => b.taskStatus === 'NOT_STARTED').length },
+    { value: 'ACTIVE', label: 'Active', count: upcomingBookings.filter(b => b.taskStatus === 'ACTIVE').length },
+    { value: 'IN_PROGRESS', label: 'In Progress', count: upcomingBookings.filter(b => b.taskStatus === 'IN_PROGRESS').length },
+    { value: 'COMPLETED', label: 'Completed', count: upcomingBookings.filter(b => b.taskStatus === 'COMPLETED').length },
+    { value: 'CANCELLED', label: 'Cancelled', count: upcomingBookings.filter(b => b.taskStatus === 'CANCELLED').length },
+  ];
 
   const renderBookingItem = ({ item }: { item: Booking }) => (
     <Card style={styles.bookingCard}>
@@ -848,20 +870,24 @@ const closeReviewDialog = () => {
         {/* COMPLETED Status */}
         {item.taskStatus === "COMPLETED" && (
           <>
-            {/* Rate Service Button - Show for all booking types */}
-            <Button style={styles.actionButton} onPress={() => {}}>
-              <Icon name="star" size={16} color="#000" />
-              <Text>Rate Service</Text>
-            </Button>
-
             {/* Leave Review Button - Show for all booking types */}
-            <Button 
-              style={styles.actionButton}
-              onPress={() => handleLeaveReviewClick(item)}
-            >
-              <Icon name="message-text" size={16} color="#000" />
-              <Text>Leave Review</Text>
-            </Button>
+            {hasReview(item) ? (
+              <Button
+                style={[styles.actionButton, styles.disabledButton]}
+                disabled={true}
+              >
+                <Icon name="check-circle" size={16} color="#000" />
+                <Text>Review Submitted</Text>
+              </Button>
+            ) : (
+              <Button
+                style={styles.actionButton}
+                onPress={() => handleLeaveReviewClick(item)}
+              >
+                <Icon name="message-text" size={16} color="#000" />
+                <Text>Leave Review</Text>
+              </Button>
+            )}
 
             {/* Book Again Button - Show for all booking types */}
             <Button style={styles.actionButton} onPress={() => {}}>
@@ -895,7 +921,7 @@ const closeReviewDialog = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-       <LinearGradient
+      <LinearGradient
         colors={[
           'rgba(139, 187, 221, 0.8)', // Blue tone
           'rgba(213, 229, 233, 0.8)', // Lighter blue
@@ -905,7 +931,6 @@ const closeReviewDialog = () => {
         end={{x: 0, y: 1}} // Vertical fade
         style={styles.header}
       >
-      {/* <View style={styles.header}> */}
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>My Bookings</Text>
           <Text style={styles.headerSubtitle}>Manage your household service appointments</Text>
@@ -936,9 +961,16 @@ const closeReviewDialog = () => {
             <Text style={styles.walletText}>Wallet</Text>
           </TouchableOpacity>
         </View>
-      {/* </View> */}
-</LinearGradient>
-      <ScrollView>
+      </LinearGradient>
+
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+          />
+        }
+      >
         {/* Upcoming Bookings */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -952,6 +984,32 @@ const closeReviewDialog = () => {
             <Badge style={styles.sectionBadge}>
               <Text style={styles.sectionBadgeText}>{upcomingBookings.length}</Text>
             </Badge>
+          </View>
+
+          {/* Status Filter Tabs */}
+          <View style={styles.statusFilterContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {statusTabs.map((tab) => (
+                <TouchableOpacity
+                  key={tab.value}
+                  style={[
+                    styles.statusTab,
+                    statusFilter === tab.value && styles.statusTabActive
+                  ]}
+                  onPress={() => setStatusFilter(tab.value)}
+                >
+                  <Text style={[
+                    styles.statusTabText,
+                    statusFilter === tab.value && styles.statusTabTextActive
+                  ]}>
+                    {tab.label}
+                  </Text>
+                  <View style={styles.statusTabCount}>
+                    <Text style={styles.statusTabCountText}>{tab.count}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
 
           {filteredUpcomingBookings.length > 0 ? (
@@ -1033,18 +1091,12 @@ const closeReviewDialog = () => {
         severity={confirmationDialog.severity}
       />
 
-      {/* <AddReviewDialog
-        open={reviewDialogOpen}
-        onClose={() => setReviewDialogOpen(false)}
-        booking={selectedReviewBooking}
-      /> */}
-      
       <AddReviewDialog
-  visible={reviewDialogVisible}
-  onClose={closeReviewDialog}
-  booking={selectedReviewBooking}
-  onReviewSubmitted={handleReviewSubmitted}
-/>
+        visible={reviewDialogVisible}
+        onClose={closeReviewDialog}
+        booking={selectedReviewBooking}
+        onReviewSubmitted={handleReviewSubmitted}
+      />
 
       <WalletDialog 
         open={walletDialogOpen}
@@ -1123,22 +1175,16 @@ const styles = StyleSheet.create({
   },
 
   // Header styles
-   header: {
+  header: {
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-  // header: {
-  //   padding: 16,
-  //   backgroundColor: 'rgba(177, 213, 232, 1)',
-  //   borderBottomWidth: 1,
-  //   borderBottomColor: '#e5e7eb',
-  // },
   headerContent: {
     marginBottom: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop:15,
+    paddingTop: 15,
   },
   headerTitle: {
     fontSize: 24,
@@ -1235,6 +1281,42 @@ const styles = StyleSheet.create({
   },
   pastBadgeText: {
     color: '#6b7280',
+  },
+
+  // Status filter styles
+  statusFilterContainer: {
+    marginBottom: 16,
+  },
+  statusTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+    marginRight: 8,
+  },
+  statusTabActive: {
+    backgroundColor: '#3b82f6',
+  },
+  statusTabText: {
+    color: '#4b5563',
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  statusTabTextActive: {
+    color: '#fff',
+  },
+  statusTabCount: {
+    backgroundColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  statusTabCountText: {
+    fontSize: 12,
+    color: '#4b5563',
+    fontWeight: '600',
   },
 
   // Booking card styles

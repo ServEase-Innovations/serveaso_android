@@ -21,6 +21,7 @@ const App = () => {
   const [selectedBookingType, setSelectedBookingType] = useState('');
   const [showProfileFromDashboard, setShowProfileFromDashboard] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const [isFirstLaunch, setIsFirstLaunch] = useState(true);
   const fadeAnim = useState(new Animated.Value(1))[0];
   const appState = useRef(AppState.currentState);
 
@@ -31,41 +32,51 @@ const App = () => {
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        // App has come to the foreground
-        setShowSplash(true);
-        fadeAnim.setValue(1);
-        
-        // Show splash for 2 seconds then fade out
-        setTimeout(() => {
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 500,
-            useNativeDriver: true,
-          }).start(() => {
-            setShowSplash(false);
-          });
-        }, 1000);
+        // App has come to the foreground - only show splash if it's the first launch
+        if (isFirstLaunch) {
+          setShowSplash(true);
+          fadeAnim.setValue(1);
+          
+          // Show splash for 2 seconds then fade out
+          setTimeout(() => {
+            Animated.timing(fadeAnim, {
+              toValue: 0,
+              duration: 500,
+              useNativeDriver: true,
+            }).start(() => {
+              setShowSplash(false);
+              setIsFirstLaunch(false);
+            });
+          }, 1000);
+        }
       }
       
       appState.current = nextAppState;
     });
 
-    // Initial splash screen
-    const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start(() => {
-        setShowSplash(false);
-      });
-    }, 2000);
-
+    // Initial splash screen - only on first launch
+    if (isFirstLaunch) {
+      const timer = setTimeout(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowSplash(false);
+          setIsFirstLaunch(false);
+        });
+      }, 2000);
+      
+      return () => {
+        subscription.remove();
+        clearTimeout(timer);
+      };
+    }
+    
     return () => {
       subscription.remove();
-      clearTimeout(timer);
     };
-  }, []);
+  }, [isFirstLaunch]);
 
   const handleViewChange = (view: string) => {
     // Empty string means HomePage
