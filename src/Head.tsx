@@ -1,274 +1,295 @@
-import React, { useState, useEffect } from 'react';
+// Head.tsx
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
-  TextInput,
   Image,
   StyleSheet,
   TouchableOpacity,
   Modal,
-  Platform,
-  Dimensions,
-  ActivityIndicator,
-  Alert,
-  Linking,
   TouchableWithoutFeedback,
-} from 'react-native';
-import axios from 'axios';
-import { keys } from './env';
-import Icon from 'react-native-vector-icons/FontAwesome';
-import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
-import FeatherIcon from 'react-native-vector-icons/Feather';
-import AntDesign from 'react-native-vector-icons/AntDesign';
-import { useSelector, useDispatch } from 'react-redux';
-import { remove } from './features/userSlice';
-import { ADMIN, BOOKINGS, CHECKOUT, DASHBOARD, LOGIN, PROFILE } from './Constants/pagesConstants';
-import { ViewStyle, TextStyle, ImageStyle } from 'react-native';
-import Geolocation from '@react-native-community/geolocation';
-import Geocoder from 'react-native-geocoding';
-import MapView, { Marker } from 'react-native-maps';
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
-import { NativeModules } from 'react-native';
-import {useAuth0} from 'react-native-auth0';
-import config from '../auth0-configuration';
-import { selectCartItems } from './features/addToSlice';
-import {CartDialog} from './CartDialog';
+  Dimensions,
+} from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
+import MaterialIcon from "react-native-vector-icons/MaterialIcons";
+import FeatherIcon from "react-native-vector-icons/Feather";
+import { useSelector, useDispatch } from "react-redux";
+import { remove } from "./features/userSlice";
+import {
+  ADMIN,
+  BOOKINGS,
+  CHECKOUT,
+  DASHBOARD,
+  LOGIN,
+  PROFILE,
+  WALLET,
+} from "./Constants/pagesConstants";
+import { useAuth0 } from "react-native-auth0";
+import { selectCartItems } from "./features/addToSlice";
+import { CartDialog } from "./CartDialog";
+import LinearGradient from "react-native-linear-gradient";
+import WalletDialog from "./WalletDialog";
+import TnC from "./TermsAndConditions/TnC";
+import AboutPage from "./AboutPage";
+import ContactUs from "./ContactUs";
+import LocationSelector from "./LocationSelector";
+import axios from "axios";
+import Snackbar from "react-native-snackbar";
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
 }
 
-Geocoder.init(keys.api_key);
+const { width } = Dimensions.get("window");
 
 const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
-  // const handleClick = (e: any) => {
-  //   if (e === 'sign_out') {
-  //     dispatch(remove());
-  //     sendDataToParent("");
-  //   } else {
-  //     sendDataToParent(e);
-  //   }
-  // };
-//  const handleClick = (e: any) => {
-//     if (e === 'sign_out') {
-//       dispatch(remove());
-//       sendDataToParent("");
-//     } else if (e === 'HOME') {
-//       sendDataToParent("HOME"); // This will trigger the view change in App.tsx
-//     } else {
-//       sendDataToParent(e);
-//     }
-//   };
-const handleClick = (e: any) => {
-  if (e === 'sign_out') {
-    dispatch(remove());
-    sendDataToParent("");
-  } else if (e === 'HOME') {
-    sendDataToParent("HOME");
-  } else {
-    sendDataToParent(e);
-  }
-};
+  const {
+    authorize,
+    clearSession,
+    user: auth0User,
+    getCredentials,
+    isLoading: auth0Loading,
+  } = useAuth0();
 
-// ...
-
-const handleBookingHistoryClick = () => {
-  setMenuVisible(false);
-  handleClick(BOOKINGS);
-};
-
-  const cart = useSelector((state: any) => state.cart?.value);
-  const user = useSelector((state: any) => state.user?.value);
   const dispatch = useDispatch();
-
-  const [location, setLocation] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
-  const [loggedInUser, setLoggedInUser] = useState<any>();
-  const [inputValue, setInputValue] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [dataFromMap, setDataFromMap] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [address, setAddress] = useState('');
-  const [loading, setLoading] = useState(true);
+  const cart = useSelector((state: any) => state.cart?.value);
+  const dropdownRef = useRef<View>(null);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [showGPSButton, setShowGPSButton] = useState(false);
-  const [isCheckingLocation, setIsCheckingLocation] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
-   const cartItems = useSelector(selectCartItems);
+  const cartItems = useSelector(selectCartItems);
+  const [currentPage, setCurrentPage] = useState("");
+  const [userPreference, setUserPreference] = useState<any>([]);
+  const [isWalletOpen, setIsWalletOpen] = useState(false);
+  const [showTnC, setShowTnC] = useState(false);
+  const [showAboutUs, setShowAboutUs] = useState(false);
+  const [showContactUs, setShowContactUs] = useState(false);
 
-const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Error, isLoading: auth0Loading} = useAuth0();
+  // Snackbar helper functions
+  const showSuccessSnackbar = (message: string) => {
+    Snackbar.show({
+      text: message,
+      duration: Snackbar.LENGTH_SHORT,
+      backgroundColor: "#10b981", // Green color
+      textColor: "#ffffff",
+    });
+  };
+
+  const showErrorSnackbar = (message: string) => {
+    Snackbar.show({
+      text: message,
+      duration: Snackbar.LENGTH_LONG,
+      backgroundColor: "#ef4444", // Red color
+      textColor: "#ffffff",
+    });
+  };
+
+  const showInfoSnackbar = (message: string) => {
+    Snackbar.show({
+      text: message,
+      duration: Snackbar.LENGTH_SHORT,
+      backgroundColor: "#3b82f6", // Blue color
+      textColor: "#ffffff",
+    });
+  };
+
+  const handleContactUsClick = () => {
+    setMenuVisible(false);
+    setShowContactUs(true);
+  };
+
+  const handleAboutUsClick = () => {
+    setMenuVisible(false);
+    setShowAboutUs(true);
+  };
+
+  const handleTnCClick = () => {
+    setMenuVisible(false);
+    setShowTnC(true);
+  };
 
   useEffect(() => {
-    setLoggedInUser(user);
-    console.log("User role is:", user?.role);
-  }, [user]);
-
-  const requestLocationPermission = async (): Promise<boolean> => {
-    try {
-      if (Platform.OS === 'android') {
-        const [fineStatus, coarseStatus] = await Promise.all([
-          request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION),
-          request(PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION),
-        ]);
-
-        if (Platform.Version >= 31) {
-          await request(PERMISSIONS.ANDROID.BLUETOOTH_SCAN);
-        }
-
-        return fineStatus === RESULTS.GRANTED || coarseStatus === RESULTS.GRANTED;
-      } else {
-        const iosStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-        return iosStatus === RESULTS.GRANTED;
+    const run = async () => {
+      if (!auth0User || auth0Loading || !auth0User?.email) {
+        console.log("Auth0 user not available yet");
+        return;
       }
-    } catch (err) {
-      console.warn('Permission request error:', err);
-      return false;
-    }
-  };
 
-  const checkLocationAccuracy = async (): Promise<void> => {
-    if (Platform.OS === 'android') {
       try {
-        const locationMode = await NativeModules.LocationSettings.getLocationMode();
-        
-        if (locationMode !== 'high_accuracy') {
-          Alert.alert(
-            'High Accuracy Recommended',
-            'For best results, please enable high accuracy location mode in your device settings.',
-            [
-              {
-                text: 'Open Settings',
-                onPress: () => NativeModules.LocationSettings.openLocationSettings(),
-              },
-              { text: 'Continue Anyway', onPress: () => {} },
-            ]
-          );
+        const token = await getCredentials();
+        console.log("Access Token:", token?.accessToken);
+        console.log("User authenticated:", auth0User);
+
+        const email = auth0User.email ?? "";
+
+        const response = await axios.get(
+          `https://utils-ndt3.onrender.com/customer/check-email?email=${encodeURIComponent(
+            email
+          )}`
+        );
+        console.log("Email check response:", response.data);
+
+        if (!response.data.user_role) {
+          await createUser(auth0User);
+        } else if (response.data.user_role === "SERVICE_PROVIDER") {
+          auth0User.role = "SERVICE_PROVIDER";
+          auth0User.serviceProviderId = response.data.id;
+        } else {
+          await getCustomerPreferences(Number(response.data.id));
         }
-      } catch (err) {
-        console.warn('Error checking location accuracy:', err);
-      }
-    }
-  };
 
-  const checkLocationServices = async (): Promise<boolean> => {
-    try {
-      if (Platform.OS === 'android') {
-        return await NativeModules.LocationSettings.checkLocationServices();
+        console.log("Post-login steps complete ✅");
+      } catch (error) {
+        console.error("Error during post-login API call:", error);
+        showErrorSnackbar("Failed to complete login process");
       }
-      return true;
-    } catch (err) {
-      console.warn('Error checking location services:', err);
-      return false;
-    }
-  };
+    };
 
-  const getAddressFromCoords = async (lat: number, lon: number) => {
+    run().catch((error) => {
+      console.error("Error in run function:", error);
+      showErrorSnackbar("Login process failed");
+    });
+  }, [auth0User, auth0Loading, getCredentials]);
+
+  const createUser = async (user: any) => {
     try {
-      const res = await Geocoder.from(lat, lon);
-      const addressComponent = res.results?.[0]?.formatted_address;
-      if (addressComponent) {
-        setAddress(addressComponent);
-        setLocation(addressComponent);
+      const userData = {
+        firstName: user.given_name || user.name?.split(" ")[0] || "User",
+        lastName: user.family_name || user.name?.split(" ")[1] || "",
+        emailId: user.email,
+        password: "password",
+      };
+
+      console.log("Creating user with data:", userData);
+
+      const response = await axios.post(
+        "https://servease-be-5x7f.onrender.com/api/customer/add-customer-new",
+        userData
+      );
+
+      console.log("User creation response:", response.data);
+
+      if (response.data && response.data.id) {
+        const customerId = Number(response.data.id);
+        user.customerid = customerId;
+        await getCustomerPreferences(customerId);
+      } else {
+        console.warn("Unexpected response format:", response.data);
+        showErrorSnackbar("Unexpected response during user creation");
       }
     } catch (error) {
-      console.warn('Geocoder error:', error);
+      console.error("Error creating user:", error);
+      showErrorSnackbar("Failed to create user account");
     }
   };
 
-  const fetchLocation = () => {
-    setLoading(true);
-    setShowGPSButton(false);
-    
-    Geolocation.getCurrentPosition(
-      position => {
-        const { latitude, longitude } = position.coords;
-        setLatitude(latitude);
-        setLongitude(longitude);
-        getAddressFromCoords(latitude, longitude);
-        setLoading(false);
-      },
-      error => {
-        console.warn('Location fetch error:', error);
-        setLoading(false);
-        setShowGPSButton(true);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
-  };
-
-  const fetchLocationWithChecks = async () => {
-    setIsCheckingLocation(true);
-    setLoading(true);
-    
+  const getCustomerPreferences = async (customerId: number) => {
     try {
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        Alert.alert(
-          'Permission Required',
-          'Location access is required for this feature. Please enable it in settings.',
-          [
-            {
-              text: 'Open Settings',
-              onPress: () => Linking.openSettings(),
-            },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
-        return;
-      }
+      const response = await axios.get(
+        `https://utils-ndt3.onrender.com/user-settings/${customerId}`
+      );
+      console.log("Response from user settings API:", response.data);
 
-      const servicesEnabled = await checkLocationServices();
-      if (!servicesEnabled) {
-        Alert.alert(
-          'Location Services Disabled',
-          'Please enable location services to continue.',
-          [
-            {
-              text: 'Enable',
-              onPress: () => Linking.openSettings(),
-            },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
-        setShowGPSButton(true);
-        return;
+      if (response.status === 200) {
+        console.log("Customer preferences fetched successfully:", response.data);
+        setUserPreference(response.data);
+        if (auth0User) {
+          auth0User.customerid = customerId;
+        }
+        // Show success message only if we just logged in
+        if (auth0User) {
+          showSuccessSnackbar(`Welcome back, ${auth0User.name || auth0User.email}!`);
+        }
       }
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        createUserPreferences(customerId);
+      } else {
+        console.error("Unexpected error fetching user settings:", error);
+        showErrorSnackbar("Failed to load user preferences");
+      }
+    }
+  };
 
-      await checkLocationAccuracy();
-      fetchLocation();
+  const createUserPreferences = async (customerId: number) => {
+    if (auth0User) {
+      auth0User.customerid = customerId;
+    }
+    try {
+      const payload: any = {
+        customerId,
+        savedLocations: [],
+      };
+
+      console.log("Creating user preferences with payload:", payload);
+
+      const response = await axios.post(
+        "https://utils-ndt3.onrender.com/user-settings",
+        payload
+      );
+
+      if (response.status === 200 || response.status === 201) {
+        setUserPreference(payload);
+        // Show welcome message for new users
+        if (auth0User) {
+          showSuccessSnackbar(`Welcome to Serveaso, ${auth0User.name || auth0User.email}!`);
+        }
+      } else {
+        console.warn("Unexpected response:", response);
+        showErrorSnackbar("Failed to create user preferences");
+      }
     } catch (error) {
-      console.warn('Location fetch error:', error);
-      setShowGPSButton(true);
-    } finally {
-      setIsCheckingLocation(false);
-      setLoading(false);
+      console.error("Error saving user settings:", error);
+      showErrorSnackbar("Failed to save user settings");
     }
   };
 
-  const handleLocationRefresh = async () => {
-    await fetchLocationWithChecks();
-  };
-
-  const handleOpenSettings = async () => {
-    await Linking.openSettings();
-    handleLocationRefresh();
-  };
-
-  const handleLocationSave = () => {
-    if (address) {
-      setLocation(address);
+  const handleClick = (e: any) => {
+    setCurrentPage(e);
+    if (e === "sign_out") {
+      dispatch(remove());
+      sendDataToParent("");
+    } else {
+      sendDataToParent(e);
     }
-    setOpen(false);
   };
 
-  const handleMenuPress = () => {
-    setMenuVisible(!menuVisible);
+  const handleSignOut = async () => {
+    try {
+      await clearSession({
+        returnToUrl: "com.serveaso://logout",
+      });
+
+      dispatch(remove());
+      setMenuVisible(false);
+      handleClick("sign_out");
+      showInfoSnackbar("Signed out successfully");
+    } catch (e) {
+      console.log("Log out error:", e);
+      showErrorSnackbar("Failed to sign out");
+    }
   };
 
-  const handleOverlayPress = () => {
+  const handleLoginClick = async () => {
     setMenuVisible(false);
+    try {
+      await authorize({
+        scope: "openid profile email",
+        redirectUrl:
+          "com.serveaso://dev-plavkbiy7v55pbg4.us.auth0.com/android/com.serveaso/callback",
+      });
+
+      const credentials = await getCredentials();
+      // Note: We don't show success here because the useEffect will handle it
+      // when auth0User becomes available
+    } catch (e) {
+      console.log("Login error:", e);
+      showErrorSnackbar("Login failed. Please try again.");
+    }
+  };
+
+  const handleBookingHistoryClick = () => {
+    setMenuVisible(false);
+    handleClick(BOOKINGS);
   };
 
   const handleProfileClick = () => {
@@ -281,684 +302,429 @@ const {authorize, clearSession, user: auth0User, getCredentials, error: auth0Err
     handleClick(DASHBOARD);
   };
 
-  // const handleBookingHistoryClick = () => {
-  //   setMenuVisible(false);
-  //   handleClick(BOOKINGS);
-  // };
-
-  // const handleSignOut = () => {
-  //   setMenuVisible(false);
-  //   handleClick('sign_out');
-  // };
-  const handleSignOut = async () => {
-    try {
-      await clearSession({
-        federated: false, // optional, set to true if you want to log out from identity provider too
-      });
-  
-      dispatch(remove());
-      setMenuVisible(false);
-      handleClick('sign_out');
-    } catch (e) {
-      console.log('Log out error:', e);
-    }
-  };
-  
-
-  // const handleLoginClick = () => {
-  //   setMenuVisible(false);
-  //   handleClick(LOGIN);
-  // };
-  // Modify the handleLoginClick function to use Auth0
-  const handleLoginClick = async () => {
+  const handleWalletClick = () => {
     setMenuVisible(false);
-    try {
-      await authorize(
-        {
-          scope: 'openid profile email',
-          redirectUrl: 'com.awesomeproject://dev-plavkbiy7v55pbg4.us.auth0.com/android/com.awesomeproject/callback',
-        }
-      );
-  
-      const credentials = await getCredentials();
-  
-      if (credentials?.accessToken) {
-        Alert.alert('Login Successful');
-        // Optional: dispatch(setUser(auth0User));
-      }
-    } catch (e) {
-      console.log('Login error:', e);
-    }
+    setIsWalletOpen(true);
+  };
+
+  const handleMenuPress = () => {
+    setMenuVisible(!menuVisible);
+  };
+
+  const handleOverlayPress = () => {
+    setMenuVisible(false);
+  };
+
+  const handleLocationChange = (location: string) => {
+    console.log("Location changed to:", location);
+    // You can add any additional logic here when location changes
   };
 
   return (
-    <View style={{ position: 'relative' }}>
+    <View style={{ position: "relative" }}>
       {menuVisible && (
         <TouchableWithoutFeedback onPress={handleOverlayPress}>
           <View style={styles.overlay} />
         </TouchableWithoutFeedback>
       )}
 
-      <View style={styles.headerContainer}>
-        <TouchableOpacity 
-  style={styles.logoContainer} 
-  onPress={() => handleClick('HOME')}
->
-  <Image
-    source={require('../assets/images/logo.png')}
-    style={styles.logo}
-  />
-  <Text style={styles.logoText}>ServEaso</Text>
-</TouchableOpacity>
+      <LinearGradient
+        colors={["#0a2a66ff", "#004aadff"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.headerContainer}
+      >
+        {/* Logo */}
+        <TouchableOpacity
+          onPress={() => handleClick("")}
+          style={styles.logoContainer}
+        >
+          <Image
+            source={require("../assets/images/serveasologo.png")}
+            style={styles.logo}
+          />
+        </TouchableOpacity>
 
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity 
-            style={styles.locationContainer} 
-            onPress={() => setOpen(true)}
+        {/* Location Selector */}
+        <LocationSelector
+          auth0User={auth0User}
+          userPreference={userPreference}
+          setUserPreference={setUserPreference}
+          onLocationChange={handleLocationChange}
+        />
+
+        {/* Right Actions - Cart and Menu */}
+        <View style={styles.rightActionsContainer}>
+          {/* Cart Icon */}
+          <TouchableOpacity
+            style={styles.cartButton}
+            onPress={() => setIsCartOpen(true)}
           >
-            <MaterialIcon name="location-on" size={16} color="#3b82f6" style={styles.locationIcon} />
-            <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
-              {location || 'Set Location'}
-            </Text>
+            <View style={styles.cartBadge}>
+              <Text style={styles.badgeText}>{cartItems?.length || 0}</Text>
+            </View>
+            <FeatherIcon name="shopping-cart" size={22} color="#fff" />
           </TouchableOpacity>
 
-          <View style={styles.iconsContainer}>
-          <TouchableOpacity 
-  style={styles.iconButton} 
-  onPress={() => setIsCartOpen(true)}
->
-  <View style={styles.cartBadge}>
-    <Text style={styles.badgeText}>{cartItems?.length || 0}</Text>
-  </View>
-  <FeatherIcon name="shopping-cart" size={20} color="#000" />
-</TouchableOpacity>
-
-            <TouchableOpacity style={styles.iconButton} onPress={handleMenuPress}>
-              {loggedInUser ? (
-                <FeatherIcon name="user" size={20} color="#000" />
-              ) : (
-                <FeatherIcon name="user" size={20} color="#000" />
-              )}
-            </TouchableOpacity>
-          </View>
+          {/* Menu Icon */}
+          <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress}>
+            {auth0User ? (
+              <Image
+                source={{ uri: auth0User.picture }}
+                style={styles.userAvatar}
+              />
+            ) : (
+              <FeatherIcon name="user" size={22} color="#fff" />
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* Location Modal */}
-        <Modal
-          visible={open}
-          animationType="slide"
-          transparent={false}
-          onRequestClose={() => setOpen(false)}
-          onShow={fetchLocationWithChecks}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Your Location</Text>
-              <TouchableOpacity onPress={() => setOpen(false)}>
-                <Icon name="close" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
-
-            {isCheckingLocation ? (
-              <View style={styles.statusContainer}>
-                <ActivityIndicator size="large" color="#3b82f6" />
-                <Text style={styles.statusText}>Checking location services...</Text>
-              </View>
-            ) : loading ? (
-              <View style={styles.statusContainer}>
-                <ActivityIndicator size="large" color="#3b82f6" />
-                <Text style={styles.statusText}>Getting your location...</Text>
-              </View>
-            ) : showGPSButton ? (
-              <View style={styles.statusContainer}>
-                <MaterialIcon name="location-off" size={50} color="red" />
-                <Text style={styles.statusText}>Location services are disabled</Text>
-                <View style={styles.buttonContainer}>
-                  <TouchableOpacity 
-                    style={[styles.button, styles.primaryButton]} 
-                    onPress={handleOpenSettings}
-                  >
-                    <Text style={styles.buttonText}>Enable Location Services</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.modalContent}>
-                <View style={styles.mapContainer}>
-                  <MapView
-                    style={styles.map}
-                    region={{
-                      latitude: latitude || 0,
-                      longitude: longitude || 0,
-                      latitudeDelta: 0.01,
-                      longitudeDelta: 0.01,
-                    }}>
-                    <Marker
-                      coordinate={{ latitude: latitude || 0, longitude: longitude || 0 }}
-                      title="You are here"
-                    />
-                  </MapView>
-                </View>
-
-                <View style={styles.locationInfoContainer}>
-                  <View style={styles.locationInfo}>
-                    <MaterialIcon name="location-on" size={20} color="#3b82f6" />
-                    <Text style={styles.addressText} numberOfLines={2}>{address}</Text>
-                  </View>
-
-                  <View style={styles.coordinatesContainer}>
-                    <Text style={styles.coordinateText}>Lat: {latitude?.toFixed(4)}</Text>
-                    <Text style={styles.coordinateText}>Lng: {longitude?.toFixed(4)}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.buttonGroup}>
-                  <TouchableOpacity 
-                    style={[styles.button, styles.secondaryButton]} 
-                    onPress={fetchLocationWithChecks}
-                  >
-                    <Text style={styles.secondaryButtonText}>Refresh</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.button, styles.primaryButton]} 
-                    onPress={handleLocationSave}
-                  >
-                    <Text style={styles.buttonText}>Confirm Location</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
-        </Modal>
-
-
-{menuVisible && (
-  <View style={styles.menuDropdown}>
-    {!auth0User && !loggedInUser ? (
-      <>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={handleLoginClick}
-        >
-          <Text style={styles.menuItemText}>Login / Signup</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={() => {
-            setMenuVisible(false);
-            Alert.alert('Terms & Conditions clicked');
-          }}
-        >
-          <Text style={styles.menuItemText}>Terms & Conditions</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={() => {
-            setMenuVisible(false);
-            Alert.alert('Contact Us clicked');
-          }}
-        >
-          <Text style={styles.menuItemText}>Contact Us</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={handleBookingHistoryClick}
-        >
-          <Text style={styles.menuItemText}>Booking History</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-                    style={styles.menuItem} 
-                    onPress={handleDashboardClick}
-                  >
-                    <Text style={styles.menuItemText}>Dashboard</Text>
-                  </TouchableOpacity>
-
-      </>
-    ) : (
-      <>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={handleProfileClick}
-        >
-          <Text style={styles.menuItemText}>Profile</Text>
-        </TouchableOpacity>
-        
-      
-        
-        {loggedInUser?.role === 'admin' && (
-          <TouchableOpacity 
-            style={styles.menuItem} 
-            onPress={handleDashboardClick}
-          >
-            <Text style={styles.menuItemText}>Dashboard</Text>
-          </TouchableOpacity>
-        )}
-        
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={handleSignOut}
-        >
-          <Text style={styles.menuItemText}>Sign Out</Text>
-        </TouchableOpacity>
-      </>
-    )}
-  </View>
-)}
-        {/* {menuVisible && (
-          <View style={styles.menuDropdown}>
-            {!loggedInUser ? (
+        {/* Menu Dropdown */}
+        {menuVisible && (
+          <View style={styles.menuDropdown} ref={dropdownRef}>
+            {!auth0User ? (
               <>
-                <TouchableOpacity 
-                  style={styles.menuItem} 
+                <TouchableOpacity
+                  style={styles.menuItem}
                   onPress={handleLoginClick}
                 >
+                  <Icon
+                    name="sign-in"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
                   <Text style={styles.menuItemText}>Login / Signup</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.menuItem} 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    Alert.alert('Terms & Conditions clicked');
-                  }}
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleTnCClick}
                 >
+                  <Icon
+                    name="file-text"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
                   <Text style={styles.menuItemText}>Terms & Conditions</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.menuItem} 
-                  onPress={() => {
-                    setMenuVisible(false);
-                    Alert.alert('Contact Us clicked');
-                  }}
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleContactUsClick}
                 >
+                  <Icon
+                    name="phone"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
                   <Text style={styles.menuItemText}>Contact Us</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleAboutUsClick}
+                >
+                  <Icon
+                    name="info-circle"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
+                  <Text style={styles.menuItemText}>About Us</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                <TouchableOpacity 
-                  style={styles.menuItem} 
-                  onPress={handleProfileClick}
-                >
-                  <Text style={styles.menuItemText}>Profile</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.menuItem} 
-                  onPress={handleBookingHistoryClick}
-                >
-                  <Text style={styles.menuItemText}>Booking History</Text>
-                </TouchableOpacity>
-                
-                {loggedInUser?.role === 'admin' && (
-                  <TouchableOpacity 
-                    style={styles.menuItem} 
+                {auth0User?.role === "admin" && (
+                  <TouchableOpacity
+                    style={styles.menuItem}
                     onPress={handleDashboardClick}
                   >
+                    <Icon
+                      name="dashboard"
+                      size={18}
+                      color="#fff"
+                      style={styles.menuIcon}
+                    />
                     <Text style={styles.menuItemText}>Dashboard</Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleProfileClick}
+                >
+                  <Icon
+                    name="user"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
+                  <Text style={styles.menuItemText}>Profile</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleBookingHistoryClick}
+                >
+                  <Icon
+                    name="history"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
+                  <Text style={styles.menuItemText}>My Bookings</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleDashboardClick}
+                >
+                  <Icon
+                    name="dashboard"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
+                  <Text style={styles.menuItemText}>Dashboard</Text>
+                </TouchableOpacity>
                 
-                <TouchableOpacity 
-                  style={styles.menuItem} 
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleWalletClick}
+                >
+                  <MaterialIcon
+                    name="account-balance-wallet"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
+                  <Text style={styles.menuItemText}>Wallet</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleAboutUsClick}
+                >
+                  <Icon
+                    name="info-circle"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
+                  <Text style={styles.menuItemText}>About Us</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleContactUsClick}
+                >
+                  <Icon
+                    name="phone"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
+                  <Text style={styles.menuItemText}>Contact Us</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
                   onPress={handleSignOut}
                 >
+                  <Icon
+                    name="sign-out"
+                    size={18}
+                    color="#fff"
+                    style={styles.menuIcon}
+                  />
                   <Text style={styles.menuItemText}>Sign Out</Text>
                 </TouchableOpacity>
               </>
             )}
           </View>
-        )} */}
-      </View>
-          <CartDialog 
-      open={isCartOpen}
-      handleClose={() => setIsCartOpen(false)}
-      handleCheckout={() => {
-        setIsCartOpen(false);
-        handleClick(CHECKOUT);
-      }}
-    />
+        )}
+      </LinearGradient>
 
+      <CartDialog
+        open={isCartOpen}
+        handleClose={() => setIsCartOpen(false)}
+        handleCheckout={() => {
+          setIsCartOpen(false);
+          handleClick(CHECKOUT);
+        }}
+      />
+
+      <WalletDialog
+        open={isWalletOpen}
+        onClose={() => setIsWalletOpen(false)}
+      />
+
+      <Modal
+        visible={showTnC}
+        animationType="slide"
+        onRequestClose={() => setShowTnC(false)}
+      >
+        <View style={styles.tncModalContainer}>
+          <View style={styles.tncModalHeader}>
+            <Text style={styles.tncModalTitle}>Terms and Conditions</Text>
+            <TouchableOpacity onPress={() => setShowTnC(false)}>
+              <Icon name="close" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+          <TnC />
+        </View>
+      </Modal>
+
+      <AboutPage visible={showAboutUs} onClose={() => setShowAboutUs(false)} />
+
+      <Modal
+        visible={showContactUs}
+        animationType="slide"
+        onRequestClose={() => setShowContactUs(false)}
+      >
+        <View style={styles.contactModalContainer}>
+          <View style={styles.contactModalHeader}>
+            <Text style={styles.contactModalTitle}>Contact Us</Text>
+            <TouchableOpacity onPress={() => setShowContactUs(false)}>
+              <Icon name="close" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+          <ContactUs />
+        </View>
+      </Modal>
     </View>
   );
 };
 
-type Styles = {
-  headerContainer: ViewStyle;
-  logoContainer: ViewStyle;
-  logo: ImageStyle;
-  logoText: TextStyle;
-  actionsContainer: ViewStyle;
-  locationInput: ViewStyle;
-  locationIcon: TextStyle;
-  locationTextInput: TextStyle;
-  iconButton: ViewStyle;
-  blueIconButton: ViewStyle;
-  cartBadge: ViewStyle;
-  badgeText: TextStyle;
-  modalContainer: ViewStyle;
-  modalHeader: ViewStyle;
-  modalTitle: TextStyle;
-  map: ViewStyle;
-  modalActions: ViewStyle;
-  cancelButton: ViewStyle;
-  saveButton: ViewStyle;
-  buttonText: TextStyle;
-  statusContainer: ViewStyle;
-  statusText: TextStyle;
-  buttonRow: ViewStyle;
-  infoBox: ViewStyle;
-  text: TextStyle;
-  overlay: ViewStyle;
-  menuDropdown: ViewStyle;
-  menuItem: ViewStyle;
-  menuItemText: TextStyle;
-  locationContainer: ViewStyle;
-  iconsContainer: ViewStyle;
-  modalContent: ViewStyle;
-  mapContainer: ViewStyle;
-  locationInfoContainer: ViewStyle;
-  locationInfo: ViewStyle;
-  coordinatesContainer: ViewStyle;
-  coordinateText: TextStyle;
-  addressText: TextStyle;
-  buttonGroup: ViewStyle;
-  buttonContainer: ViewStyle;
-  button: ViewStyle;
-  primaryButton: ViewStyle;
-  secondaryButton: ViewStyle;
-  secondaryButtonText: TextStyle;
-  locationText:TextStyle;
-};
-
-const styles = StyleSheet.create<Styles>({
+const styles = StyleSheet.create({
   headerContainer: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     zIndex: 50,
-    backgroundColor: 'white',
-    shadowColor: '#000',
+    backgroundColor: "#0d3888",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     height: 70,
+    paddingHorizontal: 16,
     elevation: 3,
   },
- logoContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  padding: 8, // Add some padding to make it easier to tap
-},
+  logoContainer: {
+    flex: 1,
+  },
   logo: {
-    height: 40,
-    width: 40,
-    resizeMode: 'contain',
+    height: 180,
+    width: 100,
+    resizeMode: "contain",
   },
-  logoText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#3b82f6',
-    marginLeft: 8,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  rightActionsContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
     gap: 16,
   },
-  locationInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#f3f4f6',
-    borderColor: '#f3f4f6',
-  },
-  locationIcon: {
-    marginRight: 8,
-  },
-  locationTextInput: {
-    backgroundColor: 'transparent',
-    fontSize: 14,
-    minWidth: 120,
-    padding: 0,
-    margin: 0,
-    includeFontPadding: false,
-  },
-  blueIconButton: {
-    backgroundColor: '#3b82f6',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  iconButton: {
+  cartButton: {
     padding: 8,
-    position: 'relative',
+    position: "relative",
+  },
+  menuButton: {
+    padding: 8,
   },
   cartBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: 'white',
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: "white",
     borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 10,
     borderWidth: 1,
-    borderColor: '#3b82f6',
+    borderColor: "#3b82f6",
   },
   badgeText: {
-    color: '#3b82f6',
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: "#3b82f6",
+    fontSize: 10,
+    fontWeight: "bold",
   },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  map: {
-    width: '100%',
-    height: 300,
-    marginBottom: 10,
-    borderRadius: 10,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  cancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-    backgroundColor: '#3b82f6',
-  },
-  buttonText: {
-    color: '#fff',
-  },
-  statusContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusText: {
-    marginTop: 15,
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#333',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 10,
-    marginTop: 10,
-  },
-  infoBox: {
-    width: '100%',
-    padding: 10,
-    backgroundColor: '#f0f8ff',
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  text: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
+  userAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   overlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   menuDropdown: {
-    position: 'absolute',
+    position: "absolute",
     top: 70,
-    right: 10,
-    backgroundColor: 'black',
+    right: 16,
+    backgroundColor: "black",
     borderRadius: 8,
     paddingVertical: 8,
     zIndex: 1000,
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    minWidth: 160,
+    minWidth: 200,
   },
   menuItem: {
-    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
     paddingHorizontal: 15,
   },
+  menuIcon: {
+    marginRight: 12,
+    width: 20,
+  },
   menuItemText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
   },
-   locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    maxWidth: 150,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#334155',
-    marginLeft: 6,
-    fontWeight: '500',
-  },
-  iconsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-   
-  modalContent: {
+  tncModalContainer: {
     flex: 1,
+    backgroundColor: "white",
+  },
+  tncModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
   },
-  mapContainer: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 16,
-    height: '50%',
+  tncModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
   },
-  locationInfoContainer: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
+  contactModalContainer: {
+    flex: 1,
+    backgroundColor: "white",
+  },
+  contactModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
-    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
   },
-  locationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+  contactModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
   },
-  addressText: {
-    fontSize: 16,
-    color: '#334155',
-    marginLeft: 8,
-    flex: 1,
-  },
-  coordinatesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  coordinateText: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  buttonGroup: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  buttonContainer: {
-    width: '100%',
-    paddingHorizontal: 24,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButton: {
-    backgroundColor: '#3b82f6',
-  },
-  secondaryButton: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  secondaryButtonText: {
-    color: '#334155',
-    fontWeight: '500',
-  },
- 
 });
 
 export default Head;

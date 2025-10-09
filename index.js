@@ -8,16 +8,17 @@ import { name as appName } from './app.json';
 import { Provider } from 'react-redux';
 import store from './src/store/userStore';
 // import { Provider } from 'react-redux';
+import { AppUserProvider } from './src/context/AppUserContext';
 
 
 const Root = () => (
-  
+  <AppUserProvider>
  <Provider store={store}>
  
     <App />
    
   </Provider>
- 
+ </AppUserProvider>
 );
 
 AppRegistry.registerComponent(appName, () => Root);

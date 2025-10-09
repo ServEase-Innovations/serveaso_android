@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  FlatList,
+  Linking,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { removeFromCart, selectCartItems, updateCartItem } from './features/addToSlice';
 import { CartItem, isMaidCartItem, isMealCartItem, isNannyCartItem } from './types/cartSlice';
 
@@ -55,6 +56,27 @@ export const CartDialog: React.FC<CartDialogProps> = ({
     dispatch(removeFromCart({ id, type: itemType }));
   };
 
+  const [termsAccepted, setTermsAccepted] = useState({
+    keyFacts: false,
+    termsConditions: false, 
+    privacyPolicy: false
+  });
+
+  const allTermsAccepted = termsAccepted.keyFacts && 
+                          termsAccepted.termsConditions && 
+                          termsAccepted.privacyPolicy;
+
+  const handleCheckboxChange = (term: keyof typeof termsAccepted) => {
+    setTermsAccepted(prev => ({
+      ...prev,
+      [term]: !prev[term]
+    }));
+  };
+
+  const openLink = (url: string) => {
+    Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+  };
+
   return (
     <Modal
       visible={open}
@@ -64,7 +86,7 @@ export const CartDialog: React.FC<CartDialogProps> = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          {/* Header with item count */}
+          {/* Header */}
           <View style={styles.dialogHeader}>
             <Text style={styles.dialogTitle}>Your Order Summary</Text>
             <Text style={styles.itemCountText}>
@@ -152,32 +174,114 @@ export const CartDialog: React.FC<CartDialogProps> = ({
                     <Text style={styles.totalLabel}>Total:</Text>
                     <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
                   </View>
+                  
+                  <View style={styles.termsDivider} />
+
+                  <View style={styles.termsContainer}>
+                    <Text style={styles.termsHeader}>
+                      We kindly ask you to review and agree to the following policies before proceeding:
+                    </Text>
+
+                    <View style={styles.termItem}>
+                      <TouchableOpacity 
+                        style={styles.checkbox}
+                        onPress={() => handleCheckboxChange('keyFacts')}
+                      >
+                        {termsAccepted.keyFacts ? (
+                          <Icon name="check-box" size={24} color="#3182ce" />
+                        ) : (
+                          <Icon name="check-box-outline-blank" size={24} color="#718096" />
+                        )}
+                      </TouchableOpacity>
+                      <Text style={styles.termText}>
+                        I agree to the ServEaso{' '}
+                        <Text 
+                          style={styles.linkText}
+                          onPress={() => openLink('http://localhost:3000/KeyFactsStatement')}
+                        >
+                          Key Facts Statement
+                        </Text>
+                        <Icon name="open-in-new" size={16} color="#3182ce" />
+                      </Text>
+                    </View>
+
+                    <View style={styles.termItem}>
+                      <TouchableOpacity 
+                        style={styles.checkbox}
+                        onPress={() => handleCheckboxChange('termsConditions')}
+                      >
+                        {termsAccepted.termsConditions ? (
+                          <Icon name="check-box" size={24} color="#3182ce" />
+                        ) : (
+                          <Icon name="check-box-outline-blank" size={24} color="#718096" />
+                        )}
+                      </TouchableOpacity>
+                      <Text style={styles.termText}>
+                        I agree to the ServEaso{' '}
+                        <Text 
+                          style={styles.linkText}
+                          onPress={() => openLink('http://localhost:3000/TnC')}
+                        >
+                          Terms and Conditions
+                        </Text>
+                        <Icon name="open-in-new" size={16} color="#3182ce" />
+                      </Text>
+                    </View>
+
+                    <View style={styles.termItem}>
+                      <TouchableOpacity 
+                        style={styles.checkbox}
+                        onPress={() => handleCheckboxChange('privacyPolicy')}
+                      >
+                        {termsAccepted.privacyPolicy ? (
+                          <Icon name="check-box" size={24} color="#3182ce" />
+                        ) : (
+                          <Icon name="check-box-outline-blank" size={24} color="#718096" />
+                        )}
+                      </TouchableOpacity>
+                      <Text style={styles.termText}>
+                        I agree to the ServEaso{' '}
+                        <Text 
+                          style={styles.linkText}
+                          onPress={() => openLink('http://localhost:3000/Privacy')}
+                        >
+                          Privacy Statement
+                        </Text>
+                        <Icon name="open-in-new" size={16} color="#3182ce" />
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </>
             )}
           </ScrollView>
           
           {/* Footer */}
-          <View style={styles.dialogFooter}>
-            <View style={styles.footerButtons}>
-              <TouchableOpacity 
-                style={styles.continueButton}
-                onPress={handleClose}
-              >
-                <Text style={styles.continueButtonText}>Continue Booking</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.checkoutButton, allCartItems.length === 0 && styles.disabledButton]}
-                onPress={handleCheckout}
-                disabled={allCartItems.length === 0}
-              >
-                <Text style={styles.checkoutButtonText}>
-                  Proceed to Checkout (₹{grandTotal.toFixed(2)})
-                </Text>
-              </TouchableOpacity>
+          {allCartItems.length > 0 && (
+            <View style={styles.dialogFooter}>
+              <View style={styles.footerButtons}>
+                <TouchableOpacity 
+                  style={styles.continueButton}
+                  onPress={handleClose}
+                >
+                  <Text style={styles.continueButtonText}>Continue Booking</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.checkoutButton,
+                    (allCartItems.length === 0 || !allTermsAccepted) && styles.disabledButton
+                  ]}
+                  onPress={handleCheckout}
+                  disabled={allCartItems.length === 0 || !allTermsAccepted}
+                >
+                  <Text style={styles.checkoutButtonText}>
+                    Proceed to Checkout (₹{grandTotal.toFixed(2)})
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -398,7 +502,7 @@ const CartItemCard = ({ item, onRemove, itemType }: CartItemCardProps) => {
 };
 
 const styles = StyleSheet.create({
-      modalOverlay: {
+  modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -411,13 +515,6 @@ const styles = StyleSheet.create({
     width: '90%',
     overflow: 'hidden',
   },
-  dialogContainer: {
-    backgroundColor: '#f8f9fa',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    maxHeight: '90%',
-    width: '100%',
-  },
   dialogHeader: {
     backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,
@@ -429,7 +526,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 20,
     color: '#2d3748',
-     marginBottom: 4,
+    marginBottom: 4,
+  },
+  itemCountText: {
+    color: '#4a5568',
+    fontWeight: '500',
+    fontSize: 14,
   },
   dialogContent: {
     padding: 0,
@@ -501,23 +603,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  termsDivider: {
+    height: 1,
+    backgroundColor: '#cbd5e0',
+    marginVertical: 16,
+  },
+  termsContainer: {
+    marginTop: 8,
+  },
+  termsHeader: {
+    fontSize: 14,
+    color: '#4a5568',
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  termItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  checkbox: {
+    marginRight: 8,
+  },
+  termText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#4a5568',
+  },
+  linkText: {
+    color: '#3182ce',
+    textDecorationLine: 'underline',
+  },
   dialogFooter: {
     padding: 24,
-    flexDirection: 'row',
+    // flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#edf2f7',
   },
-  itemCountText: {
-    color: '#4a5568',
-    fontWeight: '500',
-    fontSize: 14,
-  },
   footerButtons: {
-    flexDirection: 'row',
-    gap: 16,
+     flexDirection: 'column',
+    alignItems: 'center',
+    gap: 12,
   },
   continueButton: {
     backgroundColor: '#ebf8ff',
@@ -655,3 +784,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
+export default CartDialog;

@@ -22,6 +22,7 @@ import { usePricingFilterService } from './utils/PricingFilter';
 // Redux actions
 import { addToCart, removeFromCart, updateCartItem } from './features/addToSlice';
 import { CartDialog } from './CartDialog';
+import axios from 'axios';
 
 interface Package {
   name: string;
@@ -285,7 +286,7 @@ const DemoCook = ({
   };
 
   const handleCheckout = async () => {
-    try {
+    // try {
       setLoading(true);
       
       const selectedPackages = packages.filter(pkg => pkg.inCart);
@@ -300,10 +301,70 @@ const DemoCook = ({
         0
       ) * 100;
 
-      const bookingDetails: BookingDetails = {
+      
+
+    //   const bookingDetails: BookingDetails = {
+    //     serviceProviderId: providerDetails?.serviceproviderId || 1,
+    //     serviceProviderName: `${providerDetails?.firstName || ''} ${providerDetails?.lastName || ''}`.trim(),
+    //     customerId: user?.customerid || 1,
+    //     customerName: user?.name || "Demo User",
+    //     startDate: new Date().toISOString().split('T')[0],
+    //     endDate: '',
+    //     engagements: selectedPackages.map(p => `${p.name.toUpperCase()} (${p.persons || 1} persons)`).join(', '),
+    //     address: 'Demo Address',
+    //     timeslot: '10:00 AM - 2:00 PM',
+    //     monthlyAmount: totalAmount / 100,
+    //     paymentMode: 'UPI',
+    //     bookingType: bookingType?.bookingPreference ? getBookingTypeFromPreference(bookingType.bookingPreference) : 'DEMO',
+    //     taskStatus: 'COMPLETED',
+    //     serviceType: 'COOK',
+    //     responsibilities: []
+    //   };
+
+    //   const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      
+    //   await handleRazorpayPayment(bookingDetails, totalAmount, orderId);
+
+    // } catch (error) {
+    //   console.error('Checkout error:', error);
+    //   Alert.alert('Error', 'Failed to process checkout');
+    //   setLoading(false);
+    // }
+
+    try {
+      // Replace totalAmount * 100 for amount in paise, not totalPersons
+      const response = await axios.post(
+        "https://utils-ndt3.onrender.com/create-order",
+        { amount: totalAmount * 100 }, // amount in paise
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    
+      if (response.status === 200) {
+        const { id: orderId, currency, amount } = response.data;
+    
+        const options = {
+          key: "rzp_test_lTdgjtSRlEwreA", // Your Razorpay key
+          amount: amount,
+          currency: currency,
+          name: "Serveaso",
+          description: "Booking Payment",
+          order_id: orderId,
+          prefill: {
+            name: user?.name || "",
+            email: user?.email || "",
+            contact: user?.mobileNo || "",
+          },
+          theme: { color: "#3399cc" },
+        };
+    
+        RazorpayCheckout.open(options)
+          .then((razorpayResponse) => {
+          const bookingDetails: BookingDetails = {
         serviceProviderId: providerDetails?.serviceproviderId || 1,
         serviceProviderName: `${providerDetails?.firstName || ''} ${providerDetails?.lastName || ''}`.trim(),
-        customerId: user?.customerid || 1,
+        customerId: user?.customerid || 19,
         customerName: user?.name || "Demo User",
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
@@ -317,16 +378,18 @@ const DemoCook = ({
         serviceType: 'COOK',
         responsibilities: []
       };
-
-      const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      
-      await handleRazorpayPayment(bookingDetails, totalAmount, orderId);
-
+      handleSuccessfulPayment(razorpayResponse, bookingDetails);
+          })
+          .catch((error) => {
+            Alert.alert("Payment Failed", error.description || "Unknown error");
+            console.error("Razorpay payment error:", error);
+          });
+      }
     } catch (error) {
-      console.error('Checkout error:', error);
-      Alert.alert('Error', 'Failed to process checkout');
-      setLoading(false);
+      console.error("Error while creating Razorpay order:", error);
+      Alert.alert("Error", "Failed to initiate payment. Please try again.");
     }
+    
   };
 
   const handleRazorpayPayment = async (bookingDetails: BookingDetails, amount: number, orderId: string) => {
@@ -406,22 +469,22 @@ const DemoCook = ({
       );
 
       if (bookingResponse.status === 201) {
-        try {
-          await fetch(
-            "http://localhost:4000/send-notification",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                title: "Hello from ServEaso!",
-                body: `Your booking for ${bookingDetails.engagements} has been confirmed!`,
-                url: "http://localhost:3000",
-              }),
-              headers: { "Content-Type": "application/json" },
-            }
-          );
-        } catch (error) {
-          console.error("Notification error:", error);
-        }
+        // try {
+        //   await fetch(
+        //     "http://localhost:4000/send-notification",
+        //     {
+        //       method: "POST",
+        //       body: JSON.stringify({
+        //         title: "Hello from ServEaso!",
+        //         body: `Your booking for ${bookingDetails.engagements} has been confirmed!`,
+        //         url: "http://localhost:3000",
+        //       }),
+        //       headers: { "Content-Type": "application/json" },
+        //     }
+        //   );
+        // } catch (error) {
+        //   console.error("Notification error:", error);
+        // }
 
         const selectedPackages = packages.filter(pkg => pkg.inCart);
         selectedPackages.forEach(pkg => {

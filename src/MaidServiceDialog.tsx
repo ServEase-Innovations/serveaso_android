@@ -21,6 +21,7 @@ import { EnhancedProviderDetails } from './types/ProviderDetailsType';
 import axiosInstance from './axiosInstance';
 import { addToCart, removeFromCart, selectCartItems } from './features/addToSlice';
 import { isMaidCartItem } from './types/cartSlice';
+import RazorpayCheckout from 'react-native-razorpay';
 
 interface MaidServiceDialogProps {
   open: boolean;
@@ -85,7 +86,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   const bookingDetails: BookingDetails = {
     serviceProviderId: providerDetails?.serviceproviderId || 0,
     serviceProviderName: providerFullName,
-    customerId: users?.customerDetails?.customerId || 0,
+    customerId: 19, // Hardcoded customer ID as per requirement
     customerName: `${users?.customerDetails?.firstName} ${users?.customerDetails?.lastName}` || "",
     startDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
     endDate: bookingType?.endDate || "",
@@ -284,6 +285,40 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     return Object.values(cartItems).filter(item => item).length;
   };
 
+  const handleSuccessfulPayment = async (razorpayResponse: any, bookingDetails: BookingDetails) => {
+    try {
+      const bookingResponse = await axiosInstance.post(
+        "/api/serviceproviders/engagement/add",
+        bookingDetails,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (bookingResponse.status === 201) {
+        // Clear cart items
+        Object.keys(cartItems).forEach(itemName => {
+          if (cartItems[itemName]) {
+            const id = itemName.includes('package_') ? `package_${itemName}` : `addon_${itemName}`;
+            dispatch(removeFromCart({ id, type: 'maid' }));
+          }
+        });
+
+        if (sendDataToParent) {
+          sendDataToParent(BOOKINGS);
+        }
+        handleClose();
+      }
+    } catch (error) {
+      console.error("Booking error:", error);
+      Alert.alert("Error", "Failed to save booking details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCheckout = async () => {
     try {
       setLoading(true);
@@ -293,72 +328,56 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
 
       if (selectedItems.length === 0) {
         Alert.alert('Error', 'Please add at least one item to cart');
+        setLoading(false);
         return;
       }
 
       const totalAmount = calculateTotal();
+      
+      // Update booking details with selected items and total amount
+      bookingDetails.engagements = selectedItems.join(', ');
+      bookingDetails.monthlyAmount = totalAmount;
+
+      // Create Razorpay order
       const response = await axios.post(
         "https://utils-ndt3.onrender.com/create-order",
-        { amount: totalAmount * 100 },
-        { headers: { "Content-Type": "application/json" } }
-      );
-
-      if (response.status === 200 && response.data.success) {
-        const orderId = response.data.orderId;
-        const amount = totalAmount * 100;
-        const currency = "INR";
-
-        if (typeof window.Razorpay === "undefined") {
-          Alert.alert('Error', 'Razorpay SDK not loaded.');
-          return;
+        { amount: totalAmount * 100 }, // amount in paise
+        {
+          headers: { "Content-Type": "application/json" },
         }
-
-        bookingDetails.engagements = selectedItems.join(', ');
-        bookingDetails.monthlyAmount = totalAmount;
-
+      );
+    
+      if (response.status === 200) {
+        const { id: orderId, currency, amount } = response.data;
+    
         const options = {
-          key: "rzp_test_lTdgjtSRlEwreA",
-          amount,
-          currency,
+          key: "rzp_test_lTdgjtSRlEwreA", // Your Razorpay key
+          amount: amount,
+          currency: currency,
           name: "Serveaso",
           description: "Maid Service Booking",
           order_id: orderId,
-          handler: async function (razorpayResponse: any) {
-            Alert.alert('Success', `Payment successful! Payment ID: ${razorpayResponse.razorpay_payment_id}`);
-
-            try {
-              const bookingResponse = await axiosInstance.post(
-                "/api/serviceproviders/engagement/add",
-                bookingDetails,
-                {
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                }
-              );
-
-              if (bookingResponse.status === 201) {
-                if (sendDataToParent) {
-                  sendDataToParent(BOOKINGS);
-                }
-                handleClose();
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Booking saved but failed to update server.');
-            }
+          prefill: {
+            name: users?.customerDetails?.firstName || "",
+            email: users?.customerDetails?.email || "",
+            contact: users?.customerDetails?.mobileNo || "",
           },
-          theme: {
-            color: "#3399cc",
-          },
+          theme: { color: "#3399cc" },
         };
-
-        const rzp = new window.Razorpay(options);
-        rzp.open();
+    
+        RazorpayCheckout.open(options)
+          .then((razorpayResponse) => {
+            handleSuccessfulPayment(razorpayResponse, bookingDetails);
+          })
+          .catch((error) => {
+            Alert.alert("Payment Failed", error.description || "Unknown error");
+            console.error("Razorpay payment error:", error);
+            setLoading(false);
+          });
       }
     } catch (error) {
-      console.log("error => ", error);
-      Alert.alert('Error', 'Failed to initiate payment. Please try again.');
-    } finally {
+      console.error("Error while creating Razorpay order:", error);
+      Alert.alert("Error", "Failed to initiate payment. Please try again.");
       setLoading(false);
     }
   };

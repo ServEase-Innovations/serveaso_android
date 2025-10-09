@@ -78,15 +78,15 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.awesomeproject"
+    namespace "com.serveaso"
     defaultConfig {
-        applicationId "com.awesomeproject"
+        applicationId "com.serveaso"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
         manifestPlaceholders = [auth0Domain: "dev-y0yafxo2cjqtu8y2.us.auth0.com", auth0Scheme: "${applicationId}.auth0"]
-       
+        ndkVersion "27.1.12297006"
     }
     signingConfigs {
         debug {
@@ -95,12 +95,14 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-         release {
-        storeFile file(MYAPP_UPLOAD_STORE_FILE)
-        storePassword MYAPP_UPLOAD_STORE_PASSWORD
-        keyAlias MYAPP_UPLOAD_KEY_ALIAS
-        keyPassword MYAPP_UPLOAD_KEY_PASSWORD
-    }
+       release {
+            
+                storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+            
+        }
     }
     buildTypes {
         debug {
@@ -123,7 +125,10 @@ dependencies {
     implementation("com.facebook.react:react-android")
     implementation ("com.google.android.gms:play-services-location:21.0.1")
      implementation ("com.google.android.gms:play-services-maps:18.2.0")
-     
+     implementation 'com.razorpay:checkout:1.6.20' 
+     //new one
+   implementation 'com.google.android.gms:play-services-location:21.3.0'
+       implementation 'androidx.appcompat:appcompat:1.6.1'
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

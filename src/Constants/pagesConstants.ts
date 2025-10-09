@@ -6,3 +6,4 @@ export const BOOKINGS = "bookings"
 export const PROFILE = "profile";
 export const ADMIN = "admin";
 export const DASHBOARD = "dashboard"
+export const WALLET = 'wallet';

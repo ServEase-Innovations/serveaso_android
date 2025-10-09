@@ -11,9 +11,13 @@ import {
 import moment from "moment";
 import AddIcon from 'react-native-vector-icons/MaterialIcons';
 import RemoveIcon from 'react-native-vector-icons/MaterialIcons';
+import FavoriteIcon from 'react-native-vector-icons/MaterialIcons';
+import FavoriteBorderIcon from 'react-native-vector-icons/MaterialIcons';
 import { useDispatch, useSelector } from "react-redux";
 import { add, update } from "./features/bookingTypeSlice";
 import DemoCook from "./demoCook";
+import axiosInstance from "./axiosInstance";
+import { useAppUser } from "./context/AppUserContext";
 
 // Types
 interface BookingType {
@@ -67,12 +71,19 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const [morningSelection, setMorningSelection] = useState<number | null>(null);
   const [eveningSelectionTime, setEveningSelectionTime] = useState<string | null>(null);
   const [morningSelectionTime, setMorningSelectionTime] = useState<string | null>(null);
+  const [loggedInUser, setLoggedInUser] = useState();
   const [open, setOpen] = useState(false);
+  const [engagementData, setEngagementData] = useState(null);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [missingTimeSlots, setMissingTimeSlots] = useState<string[]>([]);
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("12:00");
   const [warning, setWarning] = useState("");
+  const [missingSlots, setMissingSlots] = useState<string[]>([]);
+  const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
   const [matchedMorningSelection, setMatchedMorningSelection] = useState<string | null>(null);
   const [matchedEveningSelection, setMatchedEveningSelection] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false); // New state for favorite status
 
   const hasCheckedRef = useRef(false);
 
@@ -119,15 +130,71 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     }
   };
 
-  const toggleExpand = () => {
+  // Toggle favorite status
+  const toggleFavorite = (event: any) => {
+    // In React Native, we don't need stopPropagation like in web
+    setIsFavorite(!isFavorite);
+    // Here you would typically make an API call to save the favorite status
+    console.log("Favorite toggled for provider:", props.serviceproviderId, "New status:", !isFavorite);
+  };
+
+  const checkMissingTimeSlots = () => {
+    const expectedTimeSlots = [
+      "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
+      "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"
+    ];
+
+    const missing = expectedTimeSlots.filter(slot => !props.availableTimeSlots?.includes(slot));
+    setMissingSlots(missing);
+  };
+
+  const toggleExpand = async () => {
     setIsExpanded(!isExpanded);
-    
-    if (!isExpanded && props.serviceproviderId === bookingType?.serviceproviderId) {
-      setMatchedMorningSelection(bookingType?.morningSelection || null);
-      setMatchedEveningSelection(bookingType?.eveningSelection || null);
-    } else {
-      setMatchedMorningSelection(null);
-      setMatchedEveningSelection(null);
+
+    if (!isExpanded) {
+      try {
+        if (props.serviceproviderId === bookingType?.serviceproviderId) {
+          setMatchedMorningSelection(bookingType?.morningSelection || null);
+          setMatchedEveningSelection(bookingType?.eveningSelection || null);
+        } else {
+          setMatchedMorningSelection(null);
+          setMatchedEveningSelection(null);
+        }
+
+        const response = await axiosInstance.get(
+          `/api/serviceproviders/get/engagement/by/serviceProvider/${props.serviceproviderId}`
+        );
+
+        const engagementData = response.data.map((engagement: { id?: number; availableTimeSlots?: string[] }) => ({
+          id: engagement.id ?? Math.random(),
+          availableTimeSlots: engagement.availableTimeSlots || [],
+        }));
+
+        const fullTimeSlots: string[] = Array.from({ length: 24 }, (_, i) =>
+          `${i.toString().padStart(2, "0")}:00`
+        );
+
+        const processedSlots = engagementData.map((entry: any) => {
+          const uniqueAvailableTimeSlots = Array.from(new Set(entry.availableTimeSlots)).sort();
+          const missingTimeSlots = fullTimeSlots.filter(slot => !uniqueAvailableTimeSlots.includes(slot));
+
+          return {
+            id: entry.id,
+            uniqueAvailableTimeSlots,
+            missingTimeSlots,
+          };
+        });
+
+        const uniqueMissingSlots: string[] = Array.from(
+          new Set(processedSlots.flatMap((slot: any) => slot.missingTimeSlots))
+        ).sort() as string[];
+
+        setUniqueMissingSlots(uniqueMissingSlots);
+        setAvailableTimeSlots(processedSlots.map((entry: any) => entry.uniqueAvailableTimeSlots));
+      } catch (error) {
+        console.error("Error fetching engagement data:", error);
+        Alert.alert("Error", "Failed to fetch engagement data");
+      }
     }
   };
 
@@ -178,7 +245,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   };
 
   const handleLogin = () => {
-    setOpen(true); // Directly open the dialog
+    setOpen(true);
   };
 
   const handleClose = () => {
@@ -187,6 +254,16 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
 
   const handleBookingPage = (e: string | undefined) => {
     setOpen(false);
+  };
+
+  const handleStartTimeChange = (newStartTime: string) => {
+    setStartTime(newStartTime);
+    validateTimeRange(newStartTime, endTime);
+  };
+
+  const handleEndTimeChange = (newEndTime: string) => {
+    setEndTime(newEndTime);
+    validateTimeRange(startTime, newEndTime);
   };
 
   const validateTimeRange = (start: string, end: string) => {
@@ -201,9 +278,18 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
       setWarning("");
     }
   };
+  
+  const { appUser } = useAppUser();
+
+  useEffect(() => {
+    if (appUser?.role === 'CUSTOMER') {
+      setLoggedInUser(user);
+    }
+  }, [appUser]);
 
   useEffect(() => {
     if (!hasCheckedRef.current) {
+      checkMissingTimeSlots();
       hasCheckedRef.current = true;
     }
   }, []);
@@ -250,6 +336,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
               <AddIcon name="add" size={24} color="#1976d2" />
             )}
           </TouchableOpacity>
+          
           <TouchableOpacity
             style={styles.bookNowButton}
             onPress={handleLogin}
@@ -257,10 +344,24 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
             <Text style={styles.bookNowText}>Book Now</Text>
           </TouchableOpacity>
 
+          {/* Favorite Button */}
+          <TouchableOpacity
+            style={styles.favoriteButton}
+            onPress={toggleFavorite}
+          >
+            {isFavorite ? (
+              <FavoriteIcon name="favorite" size={24} color="red" />
+            ) : (
+              <FavoriteBorderIcon name="favorite-border" size={24} color="gray" />
+            )}
+          </TouchableOpacity>
+
           <View style={styles.content}>
             <View style={styles.essentials}>
-              <Text style={styles.nameText}>
-                {props.firstName} {props.middleName} {props.lastName}
+              <View style={styles.nameContainer}>
+                <Text style={styles.nameText}>
+                  {props.firstName} {props.middleName} {props.lastName}
+                </Text>
                 <Text style={styles.genderAgeText}>
                   ({props.gender === "FEMALE" ? "F " : props.gender === "MALE" ? "M " : "O"}
                   {calculateAge(props.dob)})
@@ -269,7 +370,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
                   source={dietImage}
                   style={styles.dietImage}
                 />
-              </Text>
+              </View>
             </View>
 
             {isExpanded && (
@@ -281,7 +382,10 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
                   Experience: {props.experience || "1 year"}, 
                   Other Services: {props.otherServices || "N/A"}
                 </Text>
-                {warning && <Text style={styles.warningText}>{warning}</Text>}
+                
+                <View style={styles.warningContainer}>
+                  {warning && <Text style={styles.warningText}>{warning}</Text>}
+                </View>
               </View>
             )}
           </View>
@@ -326,6 +430,12 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 4,
   },
+  favoriteButton: {
+    position: 'absolute',
+    top: 10,
+    right: 160,
+    padding: 8,
+  },
   bookNowText: {
     color: '#1976d2',
     fontSize: 14,
@@ -336,12 +446,14 @@ const styles = StyleSheet.create({
   essentials: {
     marginBottom: 10,
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
   nameText: {
     fontWeight: 'bold',
     fontSize: 18,
-    marginBottom: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   genderAgeText: {
     fontWeight: 'bold',
@@ -356,10 +468,15 @@ const styles = StyleSheet.create({
   detailText: {
     fontWeight: 'bold',
     marginBottom: 5,
+    fontSize: 14,
+  },
+  warningContainer: {
+    alignItems: 'flex-end',
+    marginTop: 5,
   },
   warningText: {
     color: 'red',
-    textAlign: 'right',
+    fontSize: 12,
   },
 });
 
