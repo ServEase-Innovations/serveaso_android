@@ -1,11 +1,121 @@
-android/app/build/
-android/build/
+# React Native / Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+yarn-debug.log*
+.pnpm-debug.log*
+.pnpm-lock.yaml
+# Track lockfiles for reproducible installs:
+# (remove the lines below if you intentionally want to ignore lockfiles)
+# package-lock.json
+# yarn.lock
+
+# Expo / Metro / Cache
+.expo/
+.expo-shared/
+.cache/
+react-native-packager-cache-*
+react-packager-cache-*
+metro-cache/
+
+# Bundle outputs
+*.jsbundle
+*.map
+*.pack
+*.pack.gz
+
+# -------------------------
+# Android
+# -------------------------
+/android/.gradle/
+/android/.cxx/
+/android/build/
+/android/app/build/
+android/local.properties
+android/app/google-services.json
+android/app/app-debug.keystore
+android/app/app-release.keystore
+android/app/app.jks
+android/app/app-release.jks
+
+# per-flavor google-services / keys
+android/app/src/**/google-services.json
+android/app/src/**/app-*.keystore
+android/app/src/**/app-*.jks
+android/app/src/**/res/values/google-services.xml
+
+# Gradle / build artifacts
+.gradle/
+build/
+gradle-app.settings
+gradle-wrapper.jar
+gradle-wrapper.properties
+captures/
+.externalNativeBuild/
+
+# NDK / CMake
+**/obj/
+**/gen/
+.cxx/
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+*.hprof
+*.orig
+output.json
+navigation/xml
+
+# Keystores and signing files
+*.keystore
+*.jks
+*.p12
+*.pem
+
+# fastlane / fabric / crashlytics
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+crashlytics.properties
+fabric.properties
+
+# -------------------------
+# iOS
+# -------------------------
+/ios/Pods/
+/ios/build/
+/ios/DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Note: don't ignore the entire ios/.xcworkspace unless you intentionally
+# want that omitted. Consider keeping Podfile and Podfile.lock tracked.
+
+# -------------------------
+# OS / Editor / Misc
+# -------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+.vscode/
+.history/
+*.log
+*.tmp
+*.swp
+*.zip
+*.bak
+*.old
+
+# Env files (secrets)
+.env
+.env.*
+
+# Binary build outputs you should not commit
 *.apk
-*.so
-/node_modules
-/android/app/build/android/app/build/
-*.apk
-*.so
-node_modules
-node_modules
-android/app/debug.keystore
+*.aab
+*.ipa
