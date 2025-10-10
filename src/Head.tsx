@@ -35,6 +35,7 @@ import ContactUs from "./ContactUs";
 import LocationSelector from "./LocationSelector";
 import axios from "axios";
 import Snackbar from "react-native-snackbar";
+import { useAppUser } from "./context/AppUserContext";
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
@@ -107,6 +108,8 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     setShowTnC(true);
   };
 
+  const { setAppUser } = useAppUser();
+
   useEffect(() => {
     const run = async () => {
       if (!auth0User || auth0Loading || !auth0User?.email) {
@@ -133,7 +136,19 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
         } else if (response.data.user_role === "SERVICE_PROVIDER") {
           auth0User.role = "SERVICE_PROVIDER";
           auth0User.serviceProviderId = response.data.id;
+
+          setAppUser({
+            ...auth0User,
+            role: "SERVICE_PROVIDER",
+            serviceProviderId: response.data.id,
+          });
+
         } else {
+          setAppUser({
+            ...auth0User,
+            role: "CUSTOMER",
+            customerid: response.data.id,
+          });
           await getCustomerPreferences(Number(response.data.id));
         }
 
@@ -170,7 +185,11 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
 
       if (response.data && response.data.id) {
         const customerId = Number(response.data.id);
-        user.customerid = customerId;
+        setAppUser({
+          ...user,
+          role: "CUSTOMER",
+          customerid: response.data.id,
+        });
         await getCustomerPreferences(customerId);
       } else {
         console.warn("Unexpected response format:", response.data);
@@ -194,6 +213,11 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
         setUserPreference(response.data);
         if (auth0User) {
           auth0User.customerid = customerId;
+          setAppUser({
+            ...auth0User,
+            role: "CUSTOMER",
+            customerid: customerId,
+          });
         }
         // Show success message only if we just logged in
         if (auth0User) {
