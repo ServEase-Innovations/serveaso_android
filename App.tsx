@@ -29,8 +29,10 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import NotificationButton from "./src/NotificationButton";
 import NotificationClient from "./src/NotificationClient/NotificationClient";
 import BookingRequestToast from "./src/Notifications/BookingRequestToast";
-import { io, Socket } from "socket.io-client";
+import io, { Socket } from "socket.io-client";
 import { AppUserProvider, useAppUser } from "./src/context/AppUserContext";
+import { Platform } from "react-native";
+
 
 // Define types based on your component expectations
 interface Engagement {
@@ -64,9 +66,10 @@ const MainApp = () => {
   const [showNotificationClient, setShowNotificationClient] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const appState = useRef<AppStateStatus>(AppState.currentState);
+  const socketRef = useRef<Socket | null>(null);
+  const SOCKET_URL = "https://payments-j5id.onrender.com";
 
-  // Use the actual AppUserContext
-  const { appUser } = useAppUser();
+
 
   useEffect(() => {
     // Handle app state changes
@@ -119,66 +122,72 @@ const MainApp = () => {
   }, [isFirstLaunch, fadeAnim]);
 
   // Socket connection for notifications
-  useEffect(() => {
-    // if (!appUser) {
-    //   console.log("⏳ Waiting for user authentication...");
-    //   return;
-    // }
+    // Use the actual AppUserContext
+    const { appUser } = useAppUser();
 
-    console.log("🔎 Full user object:", appUser);
-
-    // if (appUser?.role?.toUpperCase() === "SERVICE_PROVIDER") {
-      console.log("++++++++++++++ CONNECTING TO SOCKET ++++++++++++++");
-
-      const socketUrl = "http://localhost:5000";
-
-      const newSocket = io(socketUrl, {
-        transports: ["websocket"],
-        withCredentials: true,
-      });
-
-      newSocket.on("connect", () => {
-        console.log("✅ Connected to server:", newSocket.id);
-        newSocket.emit("join", { providerId: 202 });
-      });
-
-      newSocket.on("new-engagement", (data: SocketEngagementData) => {
-        console.log("📩 New engagement received:", data);
-        setActiveToast(data.engagement);
-        
-        Alert.alert(
-          "New Booking Request",
-          `You have a new booking request for ${data.engagement.service_type}`,
-          [
-            {
-              text: "View",
-              onPress: () => setActiveToast(data.engagement)
-            },
-            {
-              text: "Dismiss",
-              style: "cancel"
-            }
-          ]
-        );
-      });
-
-      newSocket.on("disconnect", () => {
-        console.log("❌ Disconnected from server");
-      });
-
-      newSocket.on("connect_error", (err: Error) => {
-        console.error("❌ Connection error:", err.message);
-      });
-
-      setSocket(newSocket);
-
-      return () => {
-        console.log("🔌 Closing socket connection...");
-        newSocket.disconnect();
-      };
-    // }
+    useEffect(() => {
+      if (!appUser) return;
+      if (appUser.role?.toUpperCase() !== "SERVICE_PROVIDER") return;
+      if (socketRef.current) return; // already connected
     
-  }, [appUser]);
+      let mounted = true;
+    
+      (async () => {
+        const token = appUser?.accessToken ?? null;
+    
+        const socket = io(SOCKET_URL, {
+          transports: ["polling", "websocket"], // typed
+          auth: token ? { token } : undefined, // typed
+          timeout: 20000, // typed: connection timeout in ms
+          reconnectionAttempts: 10,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          withCredentials: true,
+          // extraHeaders: { Authorization: `Bearer ${token}` }, // iOS only; optional
+        });
+    
+        socketRef.current = socket;
+    
+        socket.on("connect", () => {
+          console.log("[socket] connected", socket.id);
+          socket.emit("join", { providerId: appUser.serviceProviderId });
+        });
+    
+        socket.on("new-engagement", (payload: any) => {
+          console.log("[socket] new-engagement", payload);
+          const engagement = payload?.engagement ?? payload;
+          // handle your engagement
+          Alert.alert("New Booking Request", `Booking for ${engagement?.service_type ?? "a service"}`);
+        });
+    
+        socket.on("connect_error", (err) => {
+          console.error("[socket] connect_error", err);
+        });
+    
+        socket.io.on("reconnect_attempt", (attempt) => {
+          console.log("[socket] reconnect attempt", attempt);
+        });
+    
+        if (!mounted) {
+          socket.disconnect();
+          socketRef.current = null;
+        }
+      })().catch((e) => {
+        console.warn("[socket] init failed", e);
+      });
+    
+      return () => {
+        mounted = false;
+        const s = socketRef.current;
+        if (s) {
+          s.off("connect");
+          s.off("new-engagement");
+          s.off("connect_error");
+          s.disconnect();
+          socketRef.current = null;
+        }
+      };
+    }, [appUser]);
 
   const handleAccept = async (engagementId: number) => {
     try {
