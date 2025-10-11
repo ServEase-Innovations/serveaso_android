@@ -17,6 +17,7 @@ import { useAuth0 } from "react-native-auth0";
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from "react-native-vector-icons/Feather";
 import axios from "axios";
+import { useAppUser } from "./context/AppUserContext";
 
 const { width } = Dimensions.get('window');
 
@@ -58,6 +59,10 @@ interface ServiceProvider {
 
 const ProfileScreen = () => {
   const { user: auth0User, isLoading: auth0Loading } = useAuth0();
+
+   const { appUser } = useAppUser();
+
+   console.log("App User from Context:", appUser);
 
   const [userName, setUserName] = useState<string | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
@@ -596,7 +601,7 @@ const ProfileScreen = () => {
                 <Text style={styles.inputLabel}>Username</Text>
                 <TextInput
                   style={[styles.input, styles.readOnlyInput]}
-                  value={auth0User?.nickname || userName || "User"}
+                  value={appUser?.nickname || userName || "User"}
                   editable={false}
                 />
               </View>
@@ -604,7 +609,7 @@ const ProfileScreen = () => {
                 <Text style={styles.inputLabel}>Email address</Text>
                 <TextInput
                   style={[styles.input, styles.readOnlyInput]}
-                  value={auth0User?.email || "No email available"}
+                  value={appUser?.email || "No email available"}
                   editable={false}
                 />
               </View>
@@ -636,8 +641,8 @@ const ProfileScreen = () => {
                 <TextInput
                   style={[styles.input, styles.readOnlyInput]}
                   value={
-                    auth0User?.serviceproviderId ||
-                    auth0User?.customerid ||
+                    appUser?.serviceProviderId ||
+                    appUser?.customerid ||
                     "N/A"
                   }
                   editable={false}
