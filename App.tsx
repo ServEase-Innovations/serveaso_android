@@ -32,6 +32,9 @@ import BookingRequestToast from "./src/Notifications/BookingRequestToast";
 import io, { Socket } from "socket.io-client";
 import { AppUserProvider, useAppUser } from "./src/context/AppUserContext";
 import { Platform } from "react-native";
+import axios from 'axios';
+import { useDispatch } from "react-redux";
+import { add } from "./src/features/pricingSlice";
 
 
 // Define types based on your component expectations
@@ -70,9 +73,11 @@ const MainApp = () => {
   const SOCKET_URL = "https://payments-j5id.onrender.com";
 
 
-
+  const dispatch = useDispatch();
   useEffect(() => {
     // Handle app state changes
+
+    getPricingData();
     const subscription = AppState.addEventListener("change", (nextAppState: AppStateStatus) => {
       if (
         appState.current.match(/inactive|background/) &&
@@ -120,6 +125,20 @@ const MainApp = () => {
       subscription.remove();
     };
   }, [isFirstLaunch, fadeAnim]);
+
+
+  const getPricingData = async () => {
+    // utilsInstance.get('/records').then(function (response) {
+    //   console.log(response.data);
+    //   dispatch(add(response.data));
+    // }).catch(function (error) { console.log(error) });
+
+    const response = await axios.get(
+      `https://utils-ndt3.onrender.com/records`
+    );
+    dispatch(add(response.data))
+    console.log("Pricing Data:", response.data);
+  };
 
   // Socket connection for notifications
     // Use the actual AppUserContext

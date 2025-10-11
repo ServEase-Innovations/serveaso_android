@@ -86,7 +86,7 @@ const DemoCook = ({
   const cart = useSelector((state: any) => state.addToCart?.items || []);
   const { getFilteredPricing } = usePricingFilterService();
   
-  const cookPricing = useMemo(() => getFilteredPricing('COOK'), [getFilteredPricing]);
+  const cookPricing = getFilteredPricing('cook');
   const [showCartDialog, setShowCartDialog] = useState(false);
 
   const [packages, setPackages] = useState<Package[]>([]);
@@ -112,66 +112,83 @@ const DemoCook = ({
 
   const initialPackages = useMemo(() => {
     const isOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
-    
-    if (cookPricing && cookPricing.length > 0) {
-      return cookPricing.map((item: any) => ({
-        name: item.ServiceName || '',
-        price: item.Price || 0,
-        rating: 4.8,
-        reviews: '1.7M reviews',
-        prepTime: item.BookingType === 'On Demand' ? '30 mins preparation' : '45 mins preparation',
-        includes: getIncludesForPackage(item.ServiceName, item.BookingType === 'On Demand' ? 'ON_DEMAND' : 'REGULAR'),
-        selected: false,
-        persons: 1,
-        inCart: false,
-        bookingType: item.BookingType === 'On Demand' ? 'ON_DEMAND' : 'REGULAR'
-      }));
-    }
 
-    return [
-      {
-        name: 'Breakfast',
-        price: isOnDemand ? 200 : 2000,
-        rating: 4.8,
-        reviews: '2.9M reviews',
-        prepTime: isOnDemand ? '30 mins preparation' : '45 mins preparation',
-        includes: isOnDemand 
-          ? ['5-8 chapatis/parathas', '1 dry veg/non-veg item'] 
-          : ['5-8 chapatis/parathas', '1 dry veg/non-veg item', 'Daily service'],
-        selected: false,
-        persons: 1,
-        inCart: false,
-        bookingType: isOnDemand ? 'ON_DEMAND' : 'REGULAR'
-      },
-      {
-        name: 'Lunch',
-        price: isOnDemand ? 300 : 3500,
-        rating: 4.84,
-        reviews: '1.7M reviews',
-        prepTime: isOnDemand ? '45 mins preparation' : '1 hour preparation',
-        includes: isOnDemand 
-          ? ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice']
-          : ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice', 'Daily service'],
-        selected: false,
-        persons: 1,
-        inCart: false,
-        bookingType: isOnDemand ? 'ON_DEMAND' : 'REGULAR'
-      },
-      {
-        name: 'Dinner',
-        price: isOnDemand ? 300 : 3500,
-        rating: 4.84,
-        reviews: '2.7M reviews',
-        prepTime: isOnDemand ? '1.5 hrs preparation' : '1 hour preparation',
-        includes: isOnDemand 
-          ? ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice']
-          : ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice', 'Daily service'],
-        selected: false,
-        persons: 1,
-        inCart: false,
-        bookingType: isOnDemand ? 'ON_DEMAND' : 'REGULAR'
-      },
-    ];
+    console.log('Cook Pricing:', cookPricing);
+    
+    // if (cookPricing && cookPricing.length > 0) {
+    //   return cookPricing.map((item: any) => ({
+    //     name: item.ServiceName || '',
+    //     price: item.Price || 0,
+    //     rating: 4.8,
+    //     reviews: '1.7M reviews',
+    //     prepTime: item.BookingType === 'On Demand' ? '30 mins preparation' : '45 mins preparation',
+    //     includes: getIncludesForPackage(item.ServiceName, item.BookingType === 'On Demand' ? 'ON_DEMAND' : 'REGULAR'),
+    //     selected: false,
+    //     persons: 1,
+    //     inCart: false,
+    //     bookingType: item.BookingType === 'On Demand' ? 'ON_DEMAND' : 'REGULAR'
+    //   }));
+    // }
+
+    // return [
+    //   {
+    //     name: 'Breakfast',
+    //     price: isOnDemand ? 200 : 2000,
+    //     rating: 4.8,
+    //     reviews: '2.9M reviews',
+    //     prepTime: isOnDemand ? '30 mins preparation' : '45 mins preparation',
+    //     includes: isOnDemand 
+    //       ? ['5-8 chapatis/parathas', '1 dry veg/non-veg item'] 
+    //       : ['5-8 chapatis/parathas', '1 dry veg/non-veg item', 'Daily service'],
+    //     selected: false,
+    //     persons: 1,
+    //     inCart: false,
+    //     bookingType: isOnDemand ? 'ON_DEMAND' : 'REGULAR'
+    //   },
+    //   {
+    //     name: 'Lunch',
+    //     price: isOnDemand ? 300 : 3500,
+    //     rating: 4.84,
+    //     reviews: '1.7M reviews',
+    //     prepTime: isOnDemand ? '45 mins preparation' : '1 hour preparation',
+    //     includes: isOnDemand 
+    //       ? ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice']
+    //       : ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice', 'Daily service'],
+    //     selected: false,
+    //     persons: 1,
+    //     inCart: false,
+    //     bookingType: isOnDemand ? 'ON_DEMAND' : 'REGULAR'
+    //   },
+    //   {
+    //     name: 'Dinner',
+    //     price: isOnDemand ? 300 : 3500,
+    //     rating: 4.84,
+    //     reviews: '2.7M reviews',
+    //     prepTime: isOnDemand ? '1.5 hrs preparation' : '1 hour preparation',
+    //     includes: isOnDemand 
+    //       ? ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice']
+    //       : ['5-8 chapatis/parathas', '1 dry veg/non-veg item', '1 gravy veg/non-veg item', 'Rice', 'Daily service'],
+    //     selected: false,
+    //     persons: 1,
+    //     inCart: false,
+    //     bookingType: isOnDemand ? 'ON_DEMAND' : 'REGULAR'
+    //   },
+    // ];
+
+    return cookPricing.map((item: any) => ({
+          name: item.ServiceName || '',
+          price: bookingType?.bookingPreference?.toLowerCase() === "date" 
+          ? item["Price /Day (INR)"] 
+          : item["Price /Month (INR)"],
+          rating: 4.8,
+          reviews: '1.7M reviews',
+          prepTime: item.BookingType === 'On Demand' ? '30 mins preparation' : '45 mins preparation',
+          includes: getIncludesForPackage(item.ServiceName, item.BookingType === 'On Demand' ? 'ON_DEMAND' : 'REGULAR'),
+          selected: false,
+          persons: 1,
+          inCart: false,
+          bookingType: item.BookingType === 'On Demand' ? 'ON_DEMAND' : 'REGULAR'
+        }));
   }, [cookPricing, bookingType?.bookingPreference, getIncludesForPackage]);
 
   useEffect(() => {
