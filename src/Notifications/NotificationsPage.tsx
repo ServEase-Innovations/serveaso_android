@@ -1,4 +1,4 @@
-/* eslint-disable */
+// NotificationsDialog.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -8,8 +8,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Dimensions,
 } from "react-native";
-import { Card, Button, Portal, Dialog } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 interface Engagement {
@@ -36,6 +36,31 @@ interface NotificationsDialogProps {
   visible: boolean;
   onClose: () => void;
 }
+
+const { width, height } = Dimensions.get("window");
+
+// Custom Card Components
+const Card: React.FC<{ children: React.ReactNode; style?: any }> = ({ 
+  children, 
+  style 
+}) => {
+  return (
+    <View style={[styles.card, style]}>
+      {children}
+    </View>
+  );
+};
+
+const CardContent: React.FC<{ children: React.ReactNode; style?: any }> = ({ 
+  children, 
+  style 
+}) => {
+  return (
+    <View style={[styles.cardContent, style]}>
+      {children}
+    </View>
+  );
+};
 
 function NotificationItem({
   engagement,
@@ -67,7 +92,7 @@ function NotificationItem({
 
   return (
     <Card style={[styles.notificationCard, { borderLeftWidth: 4, borderLeftColor: "#2563eb" }]}>
-      <Card.Content>
+      <CardContent style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
           <View style={styles.statusContainer}>
             <Icon name={getStatusIcon(engagement.status)} size={20} color={statusStyle.color} />
@@ -102,27 +127,23 @@ function NotificationItem({
 
         {engagement.status === "pending" && (
           <View style={styles.actionButtons}>
-            <Button
-              mode="outlined"
+            <TouchableOpacity
               style={[styles.button, styles.rejectButton]}
-              labelStyle={styles.rejectButtonText}
               onPress={() => onReject(engagement.engagement_id)}
             >
               <Icon name="close-circle" size={16} color="#dc2626" />
               <Text style={styles.rejectButtonText}> Reject</Text>
-            </Button>
-            <Button
-              mode="contained"
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.button, styles.acceptButton]}
-              labelStyle={styles.acceptButtonText}
               onPress={() => onAccept(engagement.engagement_id)}
             >
               <Icon name="check-circle" size={16} color="#ffffff" />
               <Text style={styles.acceptButtonText}> Accept</Text>
-            </Button>
+            </TouchableOpacity>
           </View>
         )}
-      </Card.Content>
+      </CardContent>
     </Card>
   );
 }
@@ -240,124 +261,158 @@ export default function NotificationsDialog({ visible, onClose }: NotificationsD
   };
 
   return (
-    <Portal>
-      <Dialog visible={visible} onDismiss={onClose} style={styles.dialog}>
-        {/* Dialog Header */}
-        <Dialog.Title style={styles.dialogHeader}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerIcon}>
-              <Icon name="bell" size={24} color="#ffffff" />
-            </View>
-            <View style={styles.headerText}>
-              <Text style={styles.dialogTitle}>Notifications</Text>
-              <Text style={styles.dialogSubtitle}>Manage your booking requests and updates</Text>
-            </View>
-          </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Icon name="close" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        </Dialog.Title>
-
-        <Dialog.Content style={styles.dialogContent}>
-          {/* Stats and Filters */}
-          <Card style={styles.statsCard}>
-            <Card.Content>
-              <View style={styles.statsContainer}>
-                <View style={styles.statsRow}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{getNotificationCount("pending")}</Text>
-                    <Text style={styles.statLabel}>Pending</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, styles.acceptedStat]}>{getNotificationCount("accepted")}</Text>
-                    <Text style={styles.statLabel}>Accepted</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, styles.totalStat]}>{notifications.length}</Text>
-                    <Text style={styles.statLabel}>Total</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.filterContainer}>
-                  <Icon name="filter" size={16} color="#6b7280" />
-                  <View style={styles.filterSelect}>
-                    <Text style={styles.filterText}>
-                      {filter === "all" ? "All Notifications" : 
-                       filter === "pending" ? "Pending" :
-                       filter === "accepted" ? "Accepted" :
-                       filter === "rejected" ? "Rejected" : "Completed"}
-                    </Text>
-                    <Icon name="chevron-down" size={16} color="#6b7280" />
-                  </View>
-                </View>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={onClose}
+      statusBarTranslucent={true}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.dialog}>
+          {/* Dialog Header */}
+          <View style={styles.dialogHeader}>
+            <View style={styles.headerContent}>
+              <View style={styles.headerIcon}>
+                <Icon name="bell" size={24} color="#ffffff" />
               </View>
-            </Card.Content>
-          </Card>
-
-          {/* Clear All Button */}
-          {notifications.length > 0 && (
-            <View style={styles.clearAllContainer}>
-              <Button
-                mode="outlined"
-                onPress={handleClearAll}
-                style={styles.clearAllButton}
-                labelStyle={styles.clearAllText}
-              >
-                <Icon name="delete-outline" size={16} color="#dc2626" />
-                <Text style={styles.clearAllText}> Clear All</Text>
-              </Button>
+              <View style={styles.headerText}>
+                <Text style={styles.dialogTitle}>Notifications</Text>
+                <Text style={styles.dialogSubtitle}>Manage your booking requests and updates</Text>
+              </View>
             </View>
-          )}
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Icon name="close" size={24} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
 
-          {/* Notifications List */}
-          <ScrollView style={styles.notificationsList}>
-            {filteredNotifications.length === 0 ? (
-              <Card style={styles.emptyCard}>
-                <Card.Content style={styles.emptyContent}>
-                  <Icon name="bell-outline" size={48} color="#d1d5db" />
-                  <Text style={styles.emptyTitle}>No notifications</Text>
-                  <Text style={styles.emptyText}>
-                    {notifications.length === 0 
-                      ? "You don't have any notifications yet." 
-                      : `No ${filter === "all" ? "" : filter + " "}notifications found.`
-                    }
-                  </Text>
-                </Card.Content>
-              </Card>
-            ) : (
-              <View>
-                {filteredNotifications.map((notification) => (
-                  <NotificationItem
-                    key={notification.engagement_id}
-                    engagement={notification}
-                    onAccept={handleAccept}
-                    onReject={handleReject}
-                    onDelete={handleDelete}
-                  />
-                ))}
+          <View style={styles.dialogContent}>
+            {/* Stats and Filters */}
+            <Card style={styles.statsCard}>
+              <CardContent>
+                <View style={styles.statsContainer}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statNumber}>{getNotificationCount("pending")}</Text>
+                      <Text style={styles.statLabel}>Pending</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statNumber, styles.acceptedStat]}>{getNotificationCount("accepted")}</Text>
+                      <Text style={styles.statLabel}>Accepted</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statNumber, styles.totalStat]}>{notifications.length}</Text>
+                      <Text style={styles.statLabel}>Total</Text>
+                    </View>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.filterContainer}
+                    onPress={() => {
+                      // Simple filter toggle for demo
+                      setFilter(filter === "all" ? "pending" : "all");
+                    }}
+                  >
+                    <Icon name="filter" size={16} color="#6b7280" />
+                    <View style={styles.filterSelect}>
+                      <Text style={styles.filterText}>
+                        {filter === "all" ? "All Notifications" : 
+                         filter === "pending" ? "Pending" :
+                         filter === "accepted" ? "Accepted" :
+                         filter === "rejected" ? "Rejected" : "Completed"}
+                      </Text>
+                      <Icon name="chevron-down" size={16} color="#6b7280" />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </CardContent>
+            </Card>
+
+            {/* Clear All Button */}
+            {notifications.length > 0 && (
+              <View style={styles.clearAllContainer}>
+                <TouchableOpacity
+                  onPress={handleClearAll}
+                  style={styles.clearAllButton}
+                >
+                  <Icon name="delete-outline" size={16} color="#dc2626" />
+                  <Text style={styles.clearAllText}> Clear All</Text>
+                </TouchableOpacity>
               </View>
             )}
-          </ScrollView>
-        </Dialog.Content>
-      </Dialog>
-    </Portal>
+
+            {/* Notifications List */}
+            <ScrollView 
+              style={styles.notificationsList}
+              showsVerticalScrollIndicator={false}
+            >
+              {filteredNotifications.length === 0 ? (
+                <Card style={styles.emptyCard}>
+                  <CardContent style={styles.emptyContent}>
+                    <Icon name="bell-outline" size={48} color="#d1d5db" />
+                    <Text style={styles.emptyTitle}>No notifications</Text>
+                    <Text style={styles.emptyText}>
+                      {notifications.length === 0 
+                        ? "You don't have any notifications yet." 
+                        : `No ${filter === "all" ? "" : filter + " "}notifications found.`
+                      }
+                    </Text>
+                  </CardContent>
+                </Card>
+              ) : (
+                <View>
+                  {filteredNotifications.map((notification) => (
+                    <NotificationItem
+                      key={notification.engagement_id}
+                      engagement={notification}
+                      onAccept={handleAccept}
+                      onReject={handleReject}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   dialog: {
     borderRadius: 12,
-    maxHeight: "90%",
+    maxHeight: "85%",
     backgroundColor: "#ffffff",
+    // width: '100%',
+    maxWidth: 500,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   dialogHeader: {
     backgroundColor: "#0a2a66",
     padding: 24,
-    margin: 0,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
   },
   headerIcon: {
     padding: 8,
@@ -379,14 +434,27 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.8)",
   },
   closeButton: {
-    position: "absolute",
-    right: 16,
-    top: 16,
     padding: 4,
   },
   dialogContent: {
-    padding: 0,
+    flex: 1,
   },
+  // Card Styles
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  cardContent: {
+    padding: 16,
+  },
+  // Stats Card
   statsCard: {
     margin: 16,
     marginBottom: 0,
@@ -444,11 +512,18 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   clearAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
     borderColor: "#fecaca",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   clearAllText: {
     color: "#dc2626",
     fontSize: 14,
+    fontWeight: "500",
   },
   notificationsList: {
     maxHeight: 400,
@@ -456,11 +531,9 @@ const styles = StyleSheet.create({
   },
   notificationCard: {
     marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+  },
+  notificationContent: {
+    padding: 16,
   },
   notificationHeader: {
     flexDirection: "row",
@@ -522,9 +595,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
   },
   rejectButton: {
     borderColor: "#dc2626",
+    backgroundColor: "transparent",
   },
   rejectButtonText: {
     color: "#dc2626",
@@ -533,6 +611,7 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     backgroundColor: "#059669",
+    borderColor: "#059669",
   },
   acceptButtonText: {
     color: "#ffffff",

@@ -36,7 +36,6 @@ import axios from 'axios';
 import { useDispatch } from "react-redux";
 import { add } from "./src/features/pricingSlice";
 
-
 // Define types based on your component expectations
 interface Engagement {
   engagement_id: number;
@@ -72,12 +71,26 @@ const MainApp = () => {
   const socketRef = useRef<Socket | null>(null);
   const SOCKET_URL = "https://payments-j5id.onrender.com";
 
-
   const dispatch = useDispatch();
+  const { appUser } = useAppUser(); // Remove clearAppUser since it doesn't exist
+
+  // Enhanced useEffect to handle user state changes
+  useEffect(() => {
+    console.log("🔄 AppUser changed:", appUser ? `Logged in as ${appUser.role}` : "Logged out");
+    
+    // If user logs out, always reset to HOME view
+    if (!appUser) {
+      console.log("👤 No user detected, resetting to HOME view");
+      setCurrentView("HOME");
+      setShowProfileFromDashboard(false);
+      setShowNotificationClient(false);
+    }
+  }, [appUser]);
+
   useEffect(() => {
     // Handle app state changes
-
     getPricingData();
+    
     const subscription = AppState.addEventListener("change", (nextAppState: AppStateStatus) => {
       if (
         appState.current.match(/inactive|background/) &&
@@ -126,87 +139,88 @@ const MainApp = () => {
     };
   }, [isFirstLaunch, fadeAnim]);
 
-
   const getPricingData = async () => {
-    // utilsInstance.get('/records').then(function (response) {
-    //   console.log(response.data);
-    //   dispatch(add(response.data));
-    // }).catch(function (error) { console.log(error) });
-
-    const response = await axios.get(
-      `https://utils-ndt3.onrender.com/records`
-    );
-    dispatch(add(response.data))
-    console.log("Pricing Data:", response.data);
+    try {
+      const response = await axios.get(
+        `https://utils-ndt3.onrender.com/records`
+      );
+      dispatch(add(response.data));
+      console.log("Pricing Data:", response.data);
+    } catch (error) {
+      console.error("Error fetching pricing data:", error);
+    }
   };
 
   // Socket connection for notifications
-    // Use the actual AppUserContext
-    const { appUser } = useAppUser();
+  useEffect(() => {
+    if (!appUser) {
+      // Clean up socket if user logs out
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      return;
+    }
+    
+    if (appUser.role?.toUpperCase() !== "SERVICE_PROVIDER") return;
+    if (socketRef.current) return; // already connected
+  
+    let mounted = true;
+  
+    (async () => {
+      const token = appUser?.accessToken ?? null;
 
-    useEffect(() => {
-      if (!appUser) return;
-      if (appUser.role?.toUpperCase() !== "SERVICE_PROVIDER") return;
-      if (socketRef.current) return; // already connected
-    
-      let mounted = true;
-    
-      (async () => {
-        const token = appUser?.accessToken ?? null;
-    
-        const socket = io(SOCKET_URL, {
-          transports: ["polling", "websocket"], // typed
-          auth: token ? { token } : undefined, // typed
-          timeout: 20000, // typed: connection timeout in ms
-          reconnectionAttempts: 10,
-          reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
-          withCredentials: true,
-          // extraHeaders: { Authorization: `Bearer ${token}` }, // iOS only; optional
-        });
-    
-        socketRef.current = socket;
-    
-        socket.on("connect", () => {
-          console.log("[socket] connected", socket.id);
-          socket.emit("join", { providerId: appUser.serviceProviderId });
-        });
-    
-        socket.on("new-engagement", (payload: any) => {
-          console.log("[socket] new-engagement", payload);
-          const engagement = payload?.engagement ?? payload;
-          // handle your engagement
-          Alert.alert("New Booking Request", `Booking for ${engagement?.service_type ?? "a service"}`);
-        });
-    
-        socket.on("connect_error", (err) => {
-          console.error("[socket] connect_error", err);
-        });
-    
-        socket.io.on("reconnect_attempt", (attempt) => {
-          console.log("[socket] reconnect attempt", attempt);
-        });
-    
-        if (!mounted) {
-          socket.disconnect();
-          socketRef.current = null;
-        }
-      })().catch((e) => {
-        console.warn("[socket] init failed", e);
+      const socket = io(SOCKET_URL, {
+        transports: ["polling", "websocket"],
+        auth: token ? { token } : undefined,
+        timeout: 20000,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        withCredentials: true,
       });
-    
-      return () => {
-        mounted = false;
-        const s = socketRef.current;
-        if (s) {
-          s.off("connect");
-          s.off("new-engagement");
-          s.off("connect_error");
-          s.disconnect();
-          socketRef.current = null;
-        }
-      };
-    }, [appUser]);
+
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        console.log("[socket] connected", socket.id);
+        socket.emit("join", { providerId: appUser.serviceProviderId });
+      });
+
+      socket.on("new-engagement", (payload: any) => {
+        console.log("[socket] new-engagement", payload);
+        const engagement = payload?.engagement ?? payload;
+        Alert.alert("New Booking Request", `Booking for ${engagement?.service_type ?? "a service"}`);
+      });
+
+      socket.on("connect_error", (err) => {
+        console.error("[socket] connect_error", err);
+      });
+
+      socket.io.on("reconnect_attempt", (attempt) => {
+        console.log("[socket] reconnect attempt", attempt);
+      });
+
+      if (!mounted) {
+        socket.disconnect();
+        socketRef.current = null;
+      }
+    })().catch((e) => {
+      console.warn("[socket] init failed", e);
+    });
+  
+    return () => {
+      mounted = false;
+      const s = socketRef.current;
+      if (s) {
+        s.off("connect");
+        s.off("new-engagement");
+        s.off("connect_error");
+        s.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [appUser]);
 
   const handleAccept = async (engagementId: number) => {
     try {
@@ -231,7 +245,8 @@ const MainApp = () => {
   };
 
   const handleViewChange = (view: string) => {
-    if (view === "") {
+    console.log("🔄 View changing to:", view);
+    if (view === "" || view === "FORCE_HOME") {
       setCurrentView("HOME");
       setShowProfileFromDashboard(false);
     } else {
@@ -256,6 +271,20 @@ const MainApp = () => {
   };
 
   const renderContent = () => {
+    console.log("🎨 Rendering content - User:", appUser ? appUser.role : "None", "View:", currentView);
+    
+    // If user is SERVICE_PROVIDER and on HOME view, show Dashboard instead
+    if (appUser && appUser.role?.toUpperCase() === "SERVICE_PROVIDER" && currentView === "HOME") {
+      console.log("📊 Showing Dashboard for SERVICE_PROVIDER");
+      return showProfileFromDashboard ? (
+        <ProfileScreen />
+      ) : (
+        <Dashboard onProfilePress={handleDashboardProfilePress} />
+      );
+    }
+
+    // For all other cases (CUSTOMER, not logged in, or other views), use normal flow
+    console.log("🏠 Showing normal flow for view:", currentView);
     switch (currentView) {
       case "HOME":
         return (
@@ -308,7 +337,7 @@ const MainApp = () => {
         </View>
         
         {/* Notification Button - Positioned below header */}
-        {appUser?.role?.toUpperCase() === "SERVICE_PROVIDER" && currentView === "HOME" && (
+        {appUser && appUser.role?.toUpperCase() === "SERVICE_PROVIDER" && (
           <View style={styles.notificationButtonContainer}>
             <NotificationButton onPress={handleNotificationButtonPress} />
           </View>
@@ -335,7 +364,8 @@ const MainApp = () => {
               contentInsetAdjustmentBehavior="automatic"
             >
               {renderContent()}
-              {currentView === "HOME" && <Footer />}
+              {/* Only show footer for CUSTOMER users on HOME page or when no one is logged in */}
+              {currentView === "HOME" && (!appUser || appUser?.role?.toUpperCase() === "CUSTOMER") && <Footer />}
             </ScrollView>
           )}
         </View>
@@ -396,7 +426,6 @@ const App = () => {
     <Auth0Provider domain={config.domain} clientId={config.clientId}>
       <AppUserProvider>
         <MainApp />
-        {/* <NotificationButton /> */}
       </AppUserProvider>
     </Auth0Provider>
   );

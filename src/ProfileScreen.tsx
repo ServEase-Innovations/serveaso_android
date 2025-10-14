@@ -59,10 +59,9 @@ interface ServiceProvider {
 
 const ProfileScreen = () => {
   const { user: auth0User, isLoading: auth0Loading } = useAuth0();
+  const { appUser } = useAppUser();
 
-   const { appUser } = useAppUser();
-
-   console.log("App User from Context:", appUser);
+  console.log("App User from Context:", appUser);
 
   const [userName, setUserName] = useState<string | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
@@ -95,27 +94,98 @@ const ProfileScreen = () => {
   const [showCountryCodePicker, setShowCountryCodePicker] = useState(false);
   const [showAltCountryCodePicker, setShowAltCountryCodePicker] = useState(false);
 
+  // Function to get user's first letter for profile picture
+  const getUserInitial = () => {
+    const name = userName || appUser?.nickname || "User";
+    return name.charAt(0).toUpperCase();
+  };
+
+  // Function to get background color based on user initial
+  const getAvatarBackgroundColor = (initial: string) => {
+    const colors = [
+      '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', 
+      '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+    ];
+    const charCode = initial.charCodeAt(0);
+    return colors[charCode % colors.length];
+  };
+
+  // Function to render profile picture with fallback
+  const renderProfilePicture = () => {
+    const profilePictureUri = auth0User?.picture;
+    
+    if (profilePictureUri) {
+      return (
+        <Image
+          source={{ uri: profilePictureUri }}
+          style={styles.profileImage}
+        />
+      );
+    } else {
+      const initial = getUserInitial();
+      const backgroundColor = getAvatarBackgroundColor(initial);
+      
+      return (
+        <View style={[styles.avatarFallback, { backgroundColor }]}>
+          <Text style={styles.avatarText}>{initial}</Text>
+        </View>
+      );
+    }
+  };
+
+  // Function to get display name for greeting
+  const getDisplayName = () => {
+    return userName || appUser?.nickname || "User";
+  };
+
   useEffect(() => {
     const initializeProfile = async () => {
       setIsLoading(true);
 
-      if (auth0User) {
-        const name = auth0User.name || null;
-        const role = auth0User.role || auth0User["https://yourdomain.com/roles"]?.[0] || "CUSTOMER";
+      if (auth0User || appUser) {
+        // Priority for name: Use auth0User.name (full name) first, then appUser nickname
+        const name = auth0User?.name || appUser?.nickname || null;
+        
+        // Get role from appUser context first, then fallback to auth0User
+        const role = appUser?.role || 
+                    auth0User?.role || 
+                    auth0User?.["https://yourdomain.com/roles"]?.[0] || 
+                    "CUSTOMER";
+        
         setUserRole(role);
 
-        const id = auth0User.serviceproviderId || 
-                  auth0User["https://yourdomain.com/serviceProviderId"] || 
-                  auth0User.customerid || null;
+        // Get user ID from multiple possible sources
+        const id = appUser?.serviceProviderId ||
+                  appUser?.customerid ||
+                  auth0User?.serviceproviderId || 
+                  auth0User?.["https://yourdomain.com/serviceProviderId"] || 
+                  auth0User?.customerid || 
+                  null;
+        
         setUserName(name);
         setUserId(id ? Number(id) : null);
 
-        if (name) {
-          const nameParts = name.split(" ");
+        // Set first name and last name from available data
+        if (auth0User?.name) {
+          const nameParts = auth0User.name.split(" ");
           setUserData(prev => ({
             ...prev,
             firstName: nameParts[0] || "",
             lastName: nameParts.slice(1).join(" ") || ""
+          }));
+        } else if (appUser?.nickname) {
+          setUserData(prev => ({
+            ...prev,
+            firstName: appUser.nickname || "",
+            lastName: ""
+          }));
+        }
+
+        // Set contact info if available in appUser
+        if (appUser?.contactNumber) {
+          setUserData(prev => ({
+            ...prev,
+            contactNumber: appUser.contactNumber
           }));
         }
 
@@ -136,24 +206,22 @@ const ProfileScreen = () => {
     };
 
     initializeProfile();
-  }, [auth0User]);
+  }, [auth0User, appUser]);
 
-  // Fetch customer addresses - Updated to match React version
+  // Fetch customer addresses
   const fetchCustomerAddresses = async (customerId: number) => {
     try {
       const response = await axios.get(
         `https://utils-ndt3.onrender.com/user-settings/${customerId}`
       );
 
-      // API gives an array of documents for this customer
       const data = response.data;
 
       if (Array.isArray(data) && data.length > 0) {
-        // Combine all saved locations from all documents
         const allSavedLocations = data.flatMap(doc => doc.savedLocations || []);
 
         const mappedAddresses: Address[] = allSavedLocations
-          .filter((loc: any) => loc.location?.formatted_address) // only valid
+          .filter((loc: any) => loc.location?.formatted_address)
           .map((loc: any, idx: number) => ({
             id: loc._id || idx.toString(),
             type: loc.name || "Other",
@@ -180,11 +248,9 @@ const ProfileScreen = () => {
     }
   };
 
-  // Fetch service provider data - Updated to match React version
+  // Fetch service provider data
   const fetchServiceProviderData = async (serviceProviderId: string) => {
     try {
-      // This would be replaced with your actual API call
-      // For demo purposes, we'll create mock data
       const mockServiceProviderData: ServiceProvider = {
         serviceproviderId: parseInt(serviceProviderId),
         firstName: userData.firstName,
@@ -192,7 +258,7 @@ const ProfileScreen = () => {
         lastName: userData.lastName,
         mobileNo: parseInt(userData.contactNumber.replace("+", "")) || 1234567890,
         alternateNo: userData.altContactNumber ? parseInt(userData.altContactNumber.replace("+", "")) : null,
-        emailId: auth0User?.email || "",
+        emailId: auth0User?.email || appUser?.email || "",
         gender: "Prefer not to say",
         buildingName: "Office Building",
         locality: "Business District",
@@ -204,14 +270,12 @@ const ProfileScreen = () => {
 
       setServiceProviderData(mockServiceProviderData);
 
-      // Update user data
       setUserData(prev => ({
         ...prev,
         contactNumber: mockServiceProviderData.mobileNo ? mockServiceProviderData.mobileNo.toString() : "",
         altContactNumber: mockServiceProviderData.alternateNo ? mockServiceProviderData.alternateNo.toString() : ""
       }));
 
-      // Create address - Changed from "Office" to "Home" to match React version
       const serviceProviderAddress: Address = {
         id: "1",
         type: "Home",
@@ -240,7 +304,7 @@ const ProfileScreen = () => {
 
     try {
       if (userRole === "SERVICE_PROVIDER" && userId) {
-        const currentAddress = addresses[0]; // only one address for SP
+        const currentAddress = addresses[0];
 
         const payload = {
           serviceproviderId: userId,
@@ -257,15 +321,9 @@ const ProfileScreen = () => {
         };
 
         console.log("Saving service provider data:", payload);
-        
-        // In a real app, you would make an API call here
-        // await axios.put(`/api/serviceproviders/update/serviceprovider/${userId}`, payload);
-        
-        // For demo, just show success message
         Alert.alert("Success", "Profile updated successfully");
       } else {
         console.log("Saving customer data:", { ...userData, addresses });
-        // TODO: Implement customer update API when available
         Alert.alert("Success", "Profile updated successfully");
       }
 
@@ -289,7 +347,7 @@ const ProfileScreen = () => {
     );
   };
 
-  // Add Address functionality - Updated to match React version
+  // Add Address functionality
   const handleAddAddress = async () => {
     if (newAddress.street && newAddress.city && newAddress.country && newAddress.postalCode) {
       const addressToAdd = {
@@ -307,7 +365,6 @@ const ProfileScreen = () => {
 
       setAddresses(updatedAddresses);
 
-      // 🔹 Save to backend if CUSTOMER - Added from React version
       if (userRole === "CUSTOMER" && userId) {
         try {
           const payload = {
@@ -336,7 +393,6 @@ const ProfileScreen = () => {
         }
       }
 
-      // Reset form
       setNewAddress({
         type: userRole === "SERVICE_PROVIDER" ? "Home" : "Home",
         street: "",
@@ -357,10 +413,10 @@ const ProfileScreen = () => {
     }));
   };
 
-  // Get available address types based on user role - Updated to match React version
+  // Get available address types based on user role
   const getAvailableAddressTypes = () => {
     if (userRole === "SERVICE_PROVIDER") {
-      return ["Home"]; // Changed from "Office" to "Home" to match React version
+      return ["Home"];
     }
     return ["Home", "Work", "Other"];
   };
@@ -417,7 +473,7 @@ const ProfileScreen = () => {
     </View>
   );
 
-  // Skeleton Loading Component - Updated to match React version more closely
+  // Skeleton Loading Component
   const SkeletonLoader = () => (
     <View style={styles.container}>
       {/* Header Skeleton */}
@@ -428,26 +484,24 @@ const ProfileScreen = () => {
         style={styles.headerSkeleton}
       >
         <View style={styles.headerContentSkeleton}>
-          <View style={styles.profileSkeleton}>
-            <View style={styles.avatarSkeleton} />
-            <View>
-              <View style={styles.nameSkeleton} />
+          <View style={styles.profileSection}>
+            {renderProfilePicture()}
+            <View style={styles.profileTextContainer}>
+              <View style={styles.greetingSkeleton} />
               <View style={styles.roleSkeleton} />
+              <View style={styles.editButtonSkeleton} />
             </View>
           </View>
-          <View style={styles.buttonSkeleton} />
         </View>
       </LinearGradient>
 
       {/* Main Content Skeleton */}
       <View style={styles.mainContentSkeleton}>
         <View style={styles.cardSkeleton}>
-          {/* Form Header Skeleton */}
           <View style={styles.formHeaderSkeleton}>
             <View style={styles.titleSkeleton} />
           </View>
 
-          {/* User Info Section Skeleton */}
           <View style={styles.sectionSkeleton}>
             <View style={styles.sectionTitleSkeleton} />
             <View style={styles.rowSkeleton}>
@@ -461,25 +515,26 @@ const ProfileScreen = () => {
               </View>
             </View>
 
-            <View style={styles.rowSkeleton}>
-              <View style={styles.inputGroupSkeleton}>
+            {/* First Name and Last Name in one row */}
+            <View style={styles.nameRowSkeleton}>
+              <View style={styles.nameInputSkeleton}>
                 <View style={styles.labelSkeleton} />
                 <View style={styles.inputSkeleton} />
               </View>
-              <View style={styles.inputGroupSkeleton}>
+              <View style={styles.nameInputSkeleton}>
                 <View style={styles.labelSkeleton} />
                 <View style={styles.inputSkeleton} />
               </View>
-              <View style={styles.inputGroupSkeleton}>
-                <View style={styles.labelSkeleton} />
-                <View style={styles.inputSkeleton} />
-              </View>
+            </View>
+
+            <View style={styles.inputGroupSkeleton}>
+              <View style={styles.labelSkeleton} />
+              <View style={styles.inputSkeleton} />
             </View>
           </View>
 
           <View style={styles.dividerSkeleton} />
 
-          {/* Contact Info Section Skeleton */}
           <View style={styles.sectionSkeleton}>
             <View style={styles.sectionTitleSkeleton} />
             <View style={styles.rowSkeleton}>
@@ -494,16 +549,8 @@ const ProfileScreen = () => {
             </View>
           </View>
 
-          {/* Address Section Skeleton */}
           <View style={styles.sectionSkeleton}>
             <View style={styles.labelSkeleton} />
-            <View style={styles.addressCardSkeleton}>
-              <View style={styles.addressHeaderSkeleton}>
-                <View style={styles.addressTitleSkeleton} />
-              </View>
-              <View style={styles.addressLineSkeleton} />
-              <View style={styles.addressLineShortSkeleton} />
-            </View>
             <View style={styles.addressCardSkeleton}>
               <View style={styles.addressHeaderSkeleton}>
                 <View style={styles.addressTitleSkeleton} />
@@ -531,55 +578,52 @@ const ProfileScreen = () => {
         style={styles.header}
       >
         <View style={styles.headerContent}>
-          {/* Profile Left Section */}
+          {/* Profile Section */}
           <View style={styles.profileSection}>
-            <Image
-              source={{
-                uri: auth0User?.picture || "https://via.placeholder.com/80",
-              }}
-              style={styles.profileImage}
-            />
-            <View>
+            {renderProfilePicture()}
+            <View style={styles.profileTextContainer}>
               <Text style={styles.greeting}>
-                Hello, {userName || "User"}
+                Hello, {getDisplayName()}
               </Text>
               <Text style={styles.roleText}>
-                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}
-              </Text>
-            </View>
-          </View>
-
-          {/* Edit Profile Button */}
-          <View style={styles.editButtonContainer}>
-            {isEditing ? (
-              <View style={styles.editButtons}>
-                <TouchableOpacity
-                  style={[styles.button, styles.cancelButton]}
-                  onPress={handleCancel}
-                  disabled={isSaving}
-                >
-                  <Text style={styles.buttonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.button, styles.saveButton]}
-                  onPress={handleSave}
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Text style={styles.buttonText}>Save Changes</Text>
-                  )}
-                </TouchableOpacity>
+                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}  {appUser?.serviceProviderId ||
+     appUser?.customerid ||
+     userId?.toString() ||
+     "ID: N/A"} 
+              </Text>    
+              {/* Edit Profile Button */}
+              <View style={styles.editButtonContainer}>
+                {isEditing ? (
+                  <View style={styles.editButtons}>
+                    <TouchableOpacity
+                      style={[styles.button, styles.cancelButton]}
+                      onPress={handleCancel}
+                      disabled={isSaving}
+                    >
+                      <Text style={styles.buttonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.button, styles.saveButton]}
+                      onPress={handleSave}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <ActivityIndicator size="small" color="white" />
+                      ) : (
+                        <Text style={styles.buttonText}>Save Changes</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.button, styles.editButton]}
+                    onPress={() => setIsEditing(true)}
+                  >
+                    <Text style={styles.buttonText}>Edit Profile</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.button, styles.editButton]}
-                onPress={() => setIsEditing(true)}
-              >
-                <Text style={styles.buttonText}>Edit Profile</Text>
-              </TouchableOpacity>
-            )}
+            </View>
           </View>
         </View>
       </LinearGradient>
@@ -609,31 +653,59 @@ const ProfileScreen = () => {
                 <Text style={styles.inputLabel}>Email address</Text>
                 <TextInput
                   style={[styles.input, styles.readOnlyInput]}
-                  value={appUser?.email || "No email available"}
+                  value={appUser?.email || auth0User?.email || "No email available"}
                   editable={false}
                 />
               </View>
             </View>
 
-            <View style={styles.inputRow}>
-              <View style={styles.inputContainer}>
+            {/* First Name and Last Name in one row */}
+            {/* <View style={styles.nameRow}>
+              <View style={styles.nameInput}>
                 <Text style={styles.inputLabel}>First name</Text>
                 <TextInput
                   style={[styles.input, !isEditing && styles.readOnlyInput]}
                   value={userData.firstName}
                   onChangeText={(value) => handleInputChange("firstName", value)}
                   editable={isEditing}
+                  placeholder="First name"
                 />
               </View>
-              <View style={styles.inputContainer}>
+              <View style={styles.nameInput}>
                 <Text style={styles.inputLabel}>Last name</Text>
                 <TextInput
                   style={[styles.input, !isEditing && styles.readOnlyInput]}
                   value={userData.lastName}
                   onChangeText={(value) => handleInputChange("lastName", value)}
                   editable={isEditing}
+                  placeholder="Last name"
                 />
               </View>
+            </View> */}
+            {/* First Name and Last Name in one row - Ultra Compact */}
+<View style={styles.ultraCompactNameRow}>
+  <View style={styles.ultraCompactNameInput}>
+    <Text style={styles.compactLabel}>First name</Text>
+    <TextInput
+      style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
+      value={userData.firstName}
+      onChangeText={(value) => handleInputChange("firstName", value)}
+      editable={isEditing}
+      placeholder="First"
+    />
+  </View>
+  <View style={styles.ultraCompactNameInput}>
+    <Text style={styles.compactLabel}>Last name</Text>
+    <TextInput
+      style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
+      value={userData.lastName}
+      onChangeText={(value) => handleInputChange("lastName", value)}
+      editable={isEditing}
+      placeholder="Last"
+    />
+  </View>
+</View>
+            {/* <View style={styles.inputRow}>
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>
                   {userRole === "SERVICE_PROVIDER" ? "Provider ID" : "User ID"}
@@ -643,12 +715,13 @@ const ProfileScreen = () => {
                   value={
                     appUser?.serviceProviderId ||
                     appUser?.customerid ||
+                    userId?.toString() ||
                     "N/A"
                   }
                   editable={false}
                 />
               </View>
-            </View>
+            </View> */}
           </View>
 
           <View style={styles.divider} />
@@ -932,7 +1005,7 @@ const ProfileScreen = () => {
                               <TouchableOpacity
                                 onPress={() => removeAddress(address.id)}
                                 style={styles.addressActionButton}
-                              >
+                                >
                                 <Icon name="x" size={20} color="#dc2626" />
                               </TouchableOpacity>
                             </>
@@ -1011,7 +1084,7 @@ const ProfileScreen = () => {
             )}
           </View>
 
-          {/* Service Provider Status Section - Added from React version */}
+          {/* Service Provider Status Section */}
           {userRole === "SERVICE_PROVIDER" && (
             <View style={styles.serviceStatusSection}>
               <View style={styles.divider} />
@@ -1020,7 +1093,6 @@ const ProfileScreen = () => {
               
               <View style={styles.statusCard}>
                 <View style={styles.statusGrid}>
-                  {/* Profile Status */}
                   <View style={styles.statusItem}>
                     <Text style={styles.statusLabel}>Profile Status</Text>
                     <View style={styles.statusValue}>
@@ -1029,7 +1101,6 @@ const ProfileScreen = () => {
                     </View>
                   </View>
                   
-                  {/* Verification */}
                   <View style={styles.statusItem}>
                     <Text style={styles.statusLabel}>Verification</Text>
                     <View style={styles.statusValue}>
@@ -1038,7 +1109,6 @@ const ProfileScreen = () => {
                     </View>
                   </View>
                   
-                  {/* Availability */}
                   <View style={styles.statusItem}>
                     <Text style={styles.statusLabel}>Availability</Text>
                     <View style={styles.statusValue}>
@@ -1048,7 +1118,6 @@ const ProfileScreen = () => {
                   </View>
                 </View>
                 
-                {/* Additional status details */}
                 <View style={styles.statusFooter}>
                   <Text style={styles.statusUpdateText}>
                     Last updated: {new Date().toLocaleDateString()}
@@ -1061,7 +1130,7 @@ const ProfileScreen = () => {
             </View>
           )}
 
-          {/* Submit Button - Only show when editing */}
+          {/* Submit Button */}
           {isEditing && (
             <View style={styles.submitContainer}>
               <TouchableOpacity 
@@ -1145,19 +1214,37 @@ const styles = StyleSheet.create({
     borderColor: "#0a2a66",
     marginRight: 15,
   },
+  avatarFallback: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: "#0a2a66",
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  profileTextContainer: {
+    flex: 1,
+  },
   greeting: {
     fontSize: 22,
     fontWeight: "bold",
     color: "#0a2a66",
-    flexShrink: 1,
   },
   roleText: {
     fontSize: 14,
     color: "#666",
     marginTop: 4,
+    marginBottom: 12,
   },
   editButtonContainer: {
-    alignItems: "center",
+    alignSelf: 'flex-start',
   },
   button: {
     paddingHorizontal: 15,
@@ -1224,6 +1311,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 16,
   },
+  // New styles for name row
+  nameRow: {
+    flexDirection: "column",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 12,
+  },
+  nameInput: {
+    flex: 1,
+    marginBottom: 16,
+  },
   inputRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1246,7 +1344,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e2e8f0",
     borderRadius: 8,
-    fontSize: 16,
+    fontSize: 14,
   },
   readOnlyInput: {
     backgroundColor: "#f7fafc",
@@ -1282,7 +1380,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   addressType: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
   },
   primaryBadge: {
@@ -1327,7 +1425,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: "white",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 14,
   },
   footer: {
     backgroundColor: "#f5f5f5",
@@ -1350,35 +1448,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
   },
-  profileSkeleton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  avatarSkeleton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#ddd",
-  },
-  nameSkeleton: {
-    width: 160,
+  greetingSkeleton: {
+    width: 200,
     height: 28,
     backgroundColor: "#ddd",
     borderRadius: 4,
     marginBottom: 8,
   },
   roleSkeleton: {
-    width: 100,
-    height: 16,
+    width: 120,
+    height: 18,
     backgroundColor: "#ddd",
     borderRadius: 4,
+    marginBottom: 16,
   },
-  buttonSkeleton: {
-    width: 120,
-    height: 40,
+  editButtonSkeleton: {
+    width: 140,
+    height: 44,
     backgroundColor: "#ddd",
-    borderRadius: 6,
+    borderRadius: 8,
   },
   mainContentSkeleton: {
     alignItems: "center",
@@ -1425,6 +1513,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  // New skeleton styles for name row
+  nameRowSkeleton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 12,
+  },
+  nameInputSkeleton: {
+    flex: 1,
     marginBottom: 16,
   },
   inputGroupSkeleton: {
@@ -1481,7 +1580,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#eee",
     borderRadius: 4,
   },
-  // New styles for added features
+  // Rest of the existing styles...
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1500,7 +1599,7 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   countryCodeText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#4a5568',
   },
   phoneInput: {
@@ -1510,7 +1609,7 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderTopRightRadius: 8,
     borderBottomRightRadius: 8,
-    fontSize: 16,
+    fontSize: 14,
   },
   addressesHeader: {
     flexDirection: 'row',
@@ -1542,7 +1641,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   addAddressFormTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1e40af',
   },
@@ -1629,7 +1728,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   pickerTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 16,
     textAlign: 'center',
@@ -1715,6 +1814,35 @@ const styles = StyleSheet.create({
     color: '#0a2a66',
     fontWeight: '600',
   },
+  // Ultra compact styles
+ultraCompactNameRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  marginBottom: 16,
+  gap: 8, // Even smaller gap
+},
+ultraCompactNameInput: {
+  flex: 1,
+  
+},
+ultraCompactInput: {
+  width: "100%",
+  // padding: 8, // Even smaller padding
+   paddingStart: 10,
+  borderWidth: 1,
+  borderColor: "#e2e8f0",
+  borderRadius: 6, // Slightly smaller border radius
+  fontSize: 14,
+  minHeight: 40, // Smaller height
+},
+compactLabel: {
+  fontSize: 14, // Smaller label
+  fontWeight: "600",
+  color: "#4a5568",
+  marginBottom: 6,
+},
+
+
 });
 
 export default ProfileScreen;

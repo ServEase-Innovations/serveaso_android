@@ -11,6 +11,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const Root = () => (
   <Provider store={store}>
+    
     <AppUserProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <App />

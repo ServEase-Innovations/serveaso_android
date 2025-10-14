@@ -942,14 +942,22 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
       />
 
       {/* All Bookings Dialog */}
-      <AllBookingsDialog
+      {/* <AllBookingsDialog
         visible={showAllBookings}
         onClose={() => setShowAllBookings(false)}
         bookings={bookings}
         serviceProviderId={serviceProviderId}
         onContactClient={handleContactClient}
         trigger={undefined}
-      />
+      /> */}
+      <AllBookingsDialog
+  visible={showAllBookings}
+  onClose={() => setShowAllBookings(false)}
+  bookings={bookings}
+  serviceProviderId={serviceProviderId}
+  onContactClient={handleContactClient}
+  trigger={undefined} // Remove trigger since we're controlling visibility via state
+/>
     </SafeAreaView>
   );
 }

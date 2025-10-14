@@ -68,7 +68,7 @@ interface BookingHistoryResponse {
 interface AllBookingsDialogProps {
   bookings: BookingHistoryResponse | null;
   serviceProviderId: number | null;
-  trigger: React.ReactNode;
+  trigger?: React.ReactNode;
   visible: boolean;
   onClose: () => void;
   onContactClient: (booking: Booking) => void;
@@ -82,7 +82,6 @@ export function AllBookingsDialog({
   onClose, 
   onContactClient 
 }: AllBookingsDialogProps) {
-  const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"ongoing" | "future" | "past">("ongoing");
   const [selectedMonth, setSelectedMonth] = useState(dayjs());
   const [data, setData] = useState<Booking[]>([]);
@@ -90,9 +89,23 @@ export function AllBookingsDialog({
   const [totalBookings, setTotalBookings] = useState(0);
   const [initialLoad, setInitialLoad] = useState(true);
 
+  // Sync visible prop with internal state
+  useEffect(() => {
+    if (visible) {
+      setInitialLoad(true);
+    }
+  }, [visible]);
+
+  // Enhanced mapping function
   const mapApiBookingToBooking = (apiBooking: any): Booking => {
     const responsibilities = apiBooking.responsibilities || {};
     const noOfPersons = apiBooking.responsibilities?.tasks?.[0]?.persons || null;
+
+    // Enhanced date formatting
+    const formattedDate = apiBooking.startDate?.split("T")[0] || "";
+    const formattedTime = apiBooking.startTime && apiBooking.endTime 
+      ? `${apiBooking.startTime} - ${apiBooking.endTime}` 
+      : "";
 
     return {
       id: String(apiBooking.id),
@@ -101,9 +114,9 @@ export function AllBookingsDialog({
       start_date: apiBooking.startDate,
       endDate: apiBooking.endDate,
       engagements: "",
-      timeslot: apiBooking.startTime && apiBooking.endTime ? `${apiBooking.startTime} - ${apiBooking.endTime}` : "",
+      timeslot: formattedTime,
       monthlyAmount: Number(apiBooking.monthlyAmount || 0),
-      paymentMode: "",
+      paymentMode: apiBooking.paymentMode || "",
       booking_type: apiBooking.bookingType || "",
       service_type: apiBooking.serviceType || "",
       bookingDate: apiBooking.bookingDate,
@@ -114,46 +127,61 @@ export function AllBookingsDialog({
       experience: null,
       childAge: null,
       customerName: `${apiBooking.firstname || ""} ${apiBooking.lastname || ""}`.trim(),
-      serviceProviderName: "",
-      address: null,
+      serviceProviderName: apiBooking.serviceProviderName || "",
+      address: apiBooking.address || null,
       taskStatus: apiBooking.taskStatus || "",
-      modifiedBy: "",
-      modifiedDate: "",
-      availableTimeSlots: null,
-      customerHolidays: [],
-      serviceProviderLeaves: [],
-      active: true,
+      modifiedBy: apiBooking.modifiedBy || "",
+      modifiedDate: apiBooking.modifiedDate || "",
+      availableTimeSlots: apiBooking.availableTimeSlots || null,
+      customerHolidays: apiBooking.customerHolidays || [],
+      serviceProviderLeaves: apiBooking.serviceProviderLeaves || [],
+      active: apiBooking.active !== false,
       clientName: `${apiBooking.firstname || ""} ${apiBooking.lastname || ""}`.trim(),
       service: apiBooking.serviceType || "",
-      date: apiBooking.startDate?.split("T")[0] || "",
-      time: apiBooking.startTime && apiBooking.endTime ? `${apiBooking.startTime} - ${apiBooking.endTime}` : "",
-      location: "",
+      date: formattedDate,
+      time: formattedTime,
+      location: apiBooking.address || "",
       status: apiBooking.taskStatus || "",
       amount: String(apiBooking.monthlyAmount || "0"),
       bookingData: apiBooking
     };
   };
 
+  // Enhanced fetch method with better error handling
   const fetchBookingsByMonth = async (
     type: "future" | "past",
     month: number,
     year: number
   ) => {
-    if (!serviceProviderId) return [];
+    if (!serviceProviderId) {
+      Alert.alert("Error", "Service Provider ID is required");
+      return [];
+    }
 
     try {
       setLoading(true);
       const formatted = `${year}-${String(month).padStart(2, "0")}`;
+      
       const res = await PaymentInstance.get(
         `/api/service-providers/${serviceProviderId}/engagements?month=${formatted}`
       );
 
       const apiData: BookingHistoryResponse = res.data;
+
       const list = type === "future" ? apiData.upcoming ?? [] : apiData.past ?? [];
+      
       return list.map(mapApiBookingToBooking);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching bookings:", err);
-      Alert.alert("Error", "Failed to fetch bookings");
+      
+      let errorMessage = "Failed to fetch bookings";
+      if (err.response?.status === 404) {
+        errorMessage = "Bookings not found for this period";
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      }
+      
+      Alert.alert("Error", errorMessage);
       return [];
     } finally {
       setLoading(false);
@@ -161,8 +189,9 @@ export function AllBookingsDialog({
     }
   };
 
+  // Enhanced useEffect for data loading
   useEffect(() => {
-    if (!bookings) {
+    if (!visible || !bookings) {
       setData([]);
       setTotalBookings(0);
       setInitialLoad(false);
@@ -204,10 +233,11 @@ export function AllBookingsDialog({
         }
       );
     }
-  }, [tab, bookings]);
+  }, [tab, bookings, visible]);
 
+  // Enhanced useEffect for month changes
   useEffect(() => {
-    if (!selectedMonth || tab === "ongoing") return;
+    if (!visible || !selectedMonth || tab === "ongoing") return;
 
     setLoading(true);
     fetchBookingsByMonth(
@@ -218,22 +248,26 @@ export function AllBookingsDialog({
       setData(res ?? []);
       setTotalBookings(res.length);
     });
-  }, [selectedMonth, tab]);
+  }, [selectedMonth, tab, visible]);
 
+  // Enhanced month name formatting
   const getMonthName = (date: dayjs.Dayjs) => {
     return date.format("MMMM YYYY");
   };
 
+  // Enhanced month navigation with validation
   const handleMonthNavigation = (direction: 'prev' | 'next') => {
     const newMonth = direction === 'next' 
       ? selectedMonth.add(1, 'month')
       : selectedMonth.subtract(1, 'month');
+    
     setSelectedMonth(newMonth);
   };
 
+  // Enhanced badge component
   interface BadgeProps {
     children: React.ReactNode;
-    variant?: "default" | "success" | "warning" | "destructive" | "secondary";
+    variant?: "default" | "success" | "warning" | "destructive" | "secondary" | "outline";
     style?: any;
   }
 
@@ -248,32 +282,48 @@ export function AllBookingsDialog({
           return styles.badgeDestructive;
         case "secondary":
           return styles.badgeSecondary;
+        case "outline":
+          return styles.badgeOutline;
         default:
           return styles.badgeDefault;
       }
     };
 
+    const getTextStyle = () => {
+      switch (variant) {
+        case "outline":
+          return styles.badgeOutlineText;
+        default:
+          return styles.badgeText;
+      }
+    };
+
     return (
       <View style={[styles.badge, getVariantStyle(), style]}>
-        <Text style={styles.badgeText}>{children}</Text>
+        <Text style={[getTextStyle(), styles.badgeText]}>{children}</Text>
       </View>
     );
   };
 
+  // Enhanced button component with disabled state
   interface ButtonProps {
     children: React.ReactNode;
     variant?: "default" | "outline" | "secondary" | "ghost";
     size?: "sm" | "md" | "lg";
     onPress?: () => void;
+    disabled?: boolean;
   }
 
   const Button = ({ 
     children, 
     variant = "default", 
     size = "md", 
-    onPress 
+    onPress,
+    disabled = false
   }: ButtonProps) => {
     const getVariantStyle = () => {
+      if (disabled) return styles.buttonDisabled;
+      
       switch (variant) {
         case "outline":
           return styles.buttonOutline;
@@ -297,16 +347,28 @@ export function AllBookingsDialog({
       }
     };
 
+    const getTextStyle = () => {
+      if (disabled) return styles.buttonDisabledText;
+      
+      switch (variant) {
+        case "outline":
+          return styles.buttonOutlineText;
+        case "secondary":
+          return styles.buttonSecondaryText;
+        case "ghost":
+          return styles.buttonGhostText;
+        default:
+          return styles.buttonDefaultText;
+      }
+    };
+
     return (
       <TouchableOpacity 
         style={[styles.button, getVariantStyle(), getSizeStyle()]}
         onPress={onPress}
+        disabled={disabled}
       >
-        <Text style={[
-          styles.buttonText,
-          variant === "outline" && styles.buttonOutlineText,
-          variant === "secondary" && styles.buttonSecondaryText
-        ]}>
+        <Text style={[styles.buttonText, getTextStyle()]}>
           {children}
         </Text>
       </TouchableOpacity>
@@ -330,21 +392,24 @@ export function AllBookingsDialog({
     </TouchableOpacity>
   );
 
+  // Enhanced MonthSelector with better styling
   const MonthSelector = () => (
     <View style={styles.monthSelector}>
       <TouchableOpacity 
-        style={styles.monthNavButton}
+        style={[styles.monthNavButton, styles.monthNavButtonPrev]}
         onPress={() => handleMonthNavigation('prev')}
       >
         <Text style={styles.monthNavText}>‹</Text>
       </TouchableOpacity>
       
-      <Text style={styles.monthText}>
-        {getMonthName(selectedMonth)}
-      </Text>
+      <View style={styles.monthTextContainer}>
+        <Text style={styles.monthText}>
+          {getMonthName(selectedMonth)}
+        </Text>
+      </View>
       
       <TouchableOpacity 
-        style={styles.monthNavButton}
+        style={[styles.monthNavButton, styles.monthNavButtonNext]}
         onPress={() => handleMonthNavigation('next')}
       >
         <Text style={styles.monthNavText}>›</Text>
@@ -355,12 +420,15 @@ export function AllBookingsDialog({
   interface SkeletonLoaderProps {
     width: DimensionValue;
     height: number;
+    style?: any;
   }
 
-  const SkeletonLoader = ({ width, height }: SkeletonLoaderProps) => (
-    <View style={[styles.skeleton, { width, height }]} />
+  // Enhanced SkeletonLoader with customizable style
+  const SkeletonLoader = ({ width, height, style }: SkeletonLoaderProps) => (
+    <View style={[styles.skeleton, { width, height }, style]} />
   );
 
+  // Enhanced responsibilities rendering
   const renderResponsibilities = (booking: Booking) => {
     if (!booking.responsibilities) return null;
 
@@ -377,6 +445,7 @@ export function AllBookingsDialog({
         <View style={styles.responsibilitiesList}>
           {tasks.map((item: any, index: number) => {
             const { task, isAddon } = item;
+            
             const taskLabel = typeof task === "object" && task !== null
               ? Object.entries(task)
                   .filter(([key]) => key !== "taskType")
@@ -389,11 +458,13 @@ export function AllBookingsDialog({
             return (
               <Badge 
                 key={index} 
-                variant="secondary" 
+                variant="outline" 
                 style={styles.responsibilityBadge}
               >
-                {isAddon ? "Add-ons - " : ""}
-                {taskName} {taskLabel && `- ${taskLabel}`}
+                <Text style={styles.responsibilityText}>
+                  {isAddon ? "Add-ons - " : ""}
+                  {taskName} {taskLabel && `- ${taskLabel}`}
+                </Text>
               </Badge>
             );
           })}
@@ -402,60 +473,72 @@ export function AllBookingsDialog({
     );
   };
 
+  // Enhanced tab label formatting
   const getTabLabel = (tabType: "ongoing" | "future" | "past") => {
-    switch (tabType) {
-      case "ongoing":
-        return `Ongoing (${bookings?.current?.length || 0})`;
-      case "future":
-        return "Future";
-      case "past":
-        return "Past";
-      default:
-        return "";
-    }
+    const baseLabels = {
+      ongoing: `Ongoing (${bookings?.current?.length || 0})`,
+      future: "Future",
+      past: "Past"
+    };
+    
+    return baseLabels[tabType];
   };
 
+  // Enhanced modal title
   const getModalTitle = () => {
-    switch (tab) {
-      case "ongoing":
-        return "Ongoing Bookings";
-      case "future":
-        return "Future Bookings";
-      case "past":
-        return "Past Bookings";
-      default:
-        return "All Bookings";
+    const titles = {
+      ongoing: "Ongoing Bookings",
+      future: "Future Bookings", 
+      past: "Past Bookings"
+    };
+    
+    return titles[tab] || "All Bookings";
+  };
+
+  // Enhanced empty state message
+  const getEmptyStateMessage = () => {
+    if (tab === "ongoing") {
+      return "No ongoing bookings found.";
     }
+    return `No ${tab} bookings found for ${getMonthName(selectedMonth)}.`;
+  };
+
+  const handleClose = () => {
+    onClose();
   };
 
   return (
     <>
-      <TouchableWithoutFeedback onPress={() => setOpen(true)}>
-        <View>{trigger}</View>
-      </TouchableWithoutFeedback>
+      {/* Only render trigger if provided */}
+      {trigger && (
+        <TouchableWithoutFeedback onPress={() => {}}>
+          <View>{trigger}</View>
+        </TouchableWithoutFeedback>
+      )}
 
       <Modal
-        visible={open}
+        visible={visible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setOpen(false)}
+        onRequestClose={handleClose}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* Custom header with close button */}
+            {/* Enhanced header with better styling */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {getModalTitle()}
               </Text>
               <TouchableOpacity 
-                onPress={() => setOpen(false)}
+                onPress={handleClose}
                 style={styles.closeButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <X size={20} color="#6b7280" />
               </TouchableOpacity>
             </View>
 
-            {/* Tabs */}
+            {/* Enhanced tabs with better visual feedback */}
             <View style={styles.tabsContainer}>
               <TabButton 
                 label={getTabLabel("ongoing")}
@@ -474,10 +557,10 @@ export function AllBookingsDialog({
               />
             </View>
 
-            {/* Month Selector and Info */}
+            {/* Enhanced month selector section */}
             <View style={styles.monthInfoContainer}>
               {(tab === "future" || tab === "past") ? (
-                <>
+                <View style={styles.monthSelectorSection}>
                   <MonthSelector />
                   <Text style={styles.bookingCount}>
                     {loading ? (
@@ -486,7 +569,7 @@ export function AllBookingsDialog({
                       `${totalBookings} booking${totalBookings !== 1 ? 's' : ''} in ${getMonthName(selectedMonth)}`
                     )}
                   </Text>
-                </>
+                </View>
               ) : (
                 <Text style={styles.bookingCount}>
                   {loading ? (
@@ -498,21 +581,25 @@ export function AllBookingsDialog({
               )}
             </View>
 
-            <ScrollView style={styles.modalBody}>
+            {/* Enhanced scrollable content */}
+            <ScrollView 
+              style={styles.modalBody}
+              showsVerticalScrollIndicator={false}
+            >
               {loading && initialLoad ? (
                 <View style={styles.loadingContainer}>
                   {[1, 2, 3].map((i) => (
                     <View key={i} style={styles.skeletonCard}>
                       <View style={styles.skeletonHeader}>
-                        <SkeletonLoader width="60%" height={24} />
+                        <SkeletonLoader width="60%" height={24} style={styles.skeletonMargin} />
                         <SkeletonLoader width="40%" height={16} />
                       </View>
                       <View style={styles.skeletonContent}>
                         <View style={styles.skeletonRow}>
-                          <SkeletonLoader width="80%" height={16} />
+                          <SkeletonLoader width="80%" height={16} style={styles.skeletonMargin} />
                           <SkeletonLoader width="60%" height={16} />
                         </View>
-                        <SkeletonLoader width="90%" height={16} />
+                        <SkeletonLoader width="90%" height={16} style={styles.skeletonMargin} />
                         <SkeletonLoader width="100%" height={36} />
                       </View>
                     </View>
@@ -521,10 +608,7 @@ export function AllBookingsDialog({
               ) : data.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyText}>
-                    {tab === "ongoing" 
-                      ? "No ongoing bookings found." 
-                      : `No ${tab} bookings found for ${getMonthName(selectedMonth)}.`
-                    }
+                    {getEmptyStateMessage()}
                   </Text>
                 </View>
               ) : (
@@ -565,11 +649,11 @@ export function AllBookingsDialog({
                         <View style={styles.locationRow}>
                           <MapPin size={16} color="#9ca3af" />
                           <Text style={styles.locationText}>
-                            {booking.location}
+                            {booking.location || "Location not specified"}
                           </Text>
                         </View>
 
-                        {/* Responsibilities Section */}
+                        {/* Enhanced responsibilities section */}
                         {renderResponsibilities(booking)}
 
                         <Button 
@@ -598,11 +682,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
   modalContent: {
     backgroundColor: 'white',
     borderRadius: 12,
-    width: '90%',
+    width: '100%',
     maxWidth: 500,
     maxHeight: '80%',
     shadowColor: '#000',
@@ -651,41 +736,56 @@ const styles = StyleSheet.create({
   },
   tabButtonTextActive: {
     color: '#3b82f6',
+    fontWeight: '600',
   },
   monthInfoContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  monthSelectorSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   monthSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
   monthNavButton: {
     padding: 8,
     borderRadius: 6,
     backgroundColor: '#f3f4f6',
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  monthNavButtonPrev: {
+    marginRight: 8,
+  },
+  monthNavButtonNext: {
+    marginLeft: 8,
   },
   monthNavText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#374151',
   },
+  monthTextContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
   monthText: {
     fontSize: 16,
     fontWeight: '500',
     color: '#374151',
-    minWidth: 120,
     textAlign: 'center',
   },
   bookingCount: {
     fontSize: 14,
     color: '#6b7280',
+    textAlign: 'right',
   },
   modalBody: {
     padding: 16,
@@ -712,6 +812,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
+  skeletonMargin: {
+    marginBottom: 4,
+  },
   skeleton: {
     backgroundColor: '#e5e7eb',
     borderRadius: 4,
@@ -724,6 +827,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 16,
     textAlign: 'center',
+    lineHeight: 24,
   },
   bookingsContainer: {
     gap: 16,
@@ -738,6 +842,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -748,6 +853,7 @@ const styles = StyleSheet.create({
   },
   cardHeaderLeft: {
     flex: 1,
+    marginRight: 12,
   },
   bookingId: {
     fontSize: 12,
@@ -770,6 +876,7 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
+    maxWidth: '40%',
   },
   cardContent: {
     padding: 16,
@@ -785,15 +892,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
   },
   infoText: {
     fontSize: 14,
     color: '#4b5563',
+    flex: 1,
   },
   amountText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1f2937',
+    marginLeft: 8,
   },
   locationRow: {
     flexDirection: 'row',
@@ -805,6 +915,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4b5563',
     flex: 1,
+    lineHeight: 20,
   },
   responsibilitiesSection: {
     marginTop: 8,
@@ -824,7 +935,10 @@ const styles = StyleSheet.create({
   responsibilityBadge: {
     marginBottom: 4,
   },
-  // Badge styles
+  responsibilityText: {
+    fontSize: 10,
+  },
+  // Enhanced Badge styles
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -851,7 +965,15 @@ const styles = StyleSheet.create({
   badgeSecondary: {
     backgroundColor: '#6b7280',
   },
-  // Button styles
+  badgeOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  badgeOutlineText: {
+    color: '#374151',
+  },
+  // Enhanced Button styles
   button: {
     borderRadius: 6,
     alignItems: 'center',
@@ -859,6 +981,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontWeight: '500',
+    fontSize: 14,
   },
   buttonSm: {
     paddingHorizontal: 12,
@@ -875,21 +998,33 @@ const styles = StyleSheet.create({
   buttonDefault: {
     backgroundColor: '#3b82f6',
   },
+  buttonDefaultText: {
+    color: 'white',
+  },
   buttonOutline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#d1d5db',
   },
+  buttonOutlineText: {
+    color: '#374151',
+  },
   buttonSecondary: {
     backgroundColor: '#6b7280',
+  },
+  buttonSecondaryText: {
+    color: 'white',
   },
   buttonGhost: {
     backgroundColor: 'transparent',
   },
-  buttonOutlineText: {
+  buttonGhostText: {
     color: '#374151',
   },
-  buttonSecondaryText: {
-    color: 'white',
+  buttonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  buttonDisabledText: {
+    color: '#6b7280',
   },
 });

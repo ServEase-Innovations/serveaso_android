@@ -18,15 +18,10 @@ import { remove } from "./features/userSlice";
 import {
   ADMIN,
   BOOKINGS,
-  CHECKOUT,
   DASHBOARD,
-  LOGIN,
   PROFILE,
-  WALLET,
 } from "./Constants/pagesConstants";
 import { useAuth0 } from "react-native-auth0";
-import { selectCartItems } from "./features/addToSlice";
-import { CartDialog } from "./CartDialog";
 import LinearGradient from "react-native-linear-gradient";
 import WalletDialog from "./WalletDialog";
 import TnC from "./TermsAndConditions/TnC";
@@ -36,9 +31,11 @@ import LocationSelector from "./LocationSelector";
 import axios from "axios";
 import Snackbar from "react-native-snackbar";
 import { useAppUser } from "./context/AppUserContext";
+import NotificationsDialog from "./Notifications/NotificationsPage";
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
+  
 }
 
 const { width } = Dimensions.get("window");
@@ -53,24 +50,22 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   } = useAuth0();
 
   const dispatch = useDispatch();
-  const cart = useSelector((state: any) => state.cart?.value);
   const dropdownRef = useRef<View>(null);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const cartItems = useSelector(selectCartItems);
   const [currentPage, setCurrentPage] = useState("");
   const [userPreference, setUserPreference] = useState<any>([]);
   const [isWalletOpen, setIsWalletOpen] = useState(false);
   const [showTnC, setShowTnC] = useState(false);
   const [showAboutUs, setShowAboutUs] = useState(false);
   const [showContactUs, setShowContactUs] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Snackbar helper functions
   const showSuccessSnackbar = (message: string) => {
     Snackbar.show({
       text: message,
       duration: Snackbar.LENGTH_SHORT,
-      backgroundColor: "#10b981", // Green color
+      backgroundColor: "#10b981",
       textColor: "#ffffff",
     });
   };
@@ -79,7 +74,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     Snackbar.show({
       text: message,
       duration: Snackbar.LENGTH_LONG,
-      backgroundColor: "#ef4444", // Red color
+      backgroundColor: "#ef4444",
       textColor: "#ffffff",
     });
   };
@@ -88,9 +83,18 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     Snackbar.show({
       text: message,
       duration: Snackbar.LENGTH_SHORT,
-      backgroundColor: "#3b82f6", // Blue color
+      backgroundColor: "#3b82f6",
       textColor: "#ffffff",
     });
+  };
+
+  const handleNotificationClick = () => {
+    setMenuVisible(false);
+    setShowNotifications(true);
+  };
+
+  const handleCloseNotifications = () => {
+    setShowNotifications(false);
   };
 
   const handleContactUsClick = () => {
@@ -108,7 +112,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     setShowTnC(true);
   };
 
-  const { setAppUser } = useAppUser();
+  const { setAppUser, appUser } = useAppUser();
 
   useEffect(() => {
     const run = async () => {
@@ -134,15 +138,11 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
         if (!response.data.user_role) {
           await createUser(auth0User);
         } else if (response.data.user_role === "SERVICE_PROVIDER") {
-          auth0User.role = "SERVICE_PROVIDER";
-          auth0User.serviceProviderId = response.data.id;
-
           setAppUser({
             ...auth0User,
             role: "SERVICE_PROVIDER",
             serviceProviderId: response.data.id,
           });
-
         } else {
           setAppUser({
             ...auth0User,
@@ -212,14 +212,12 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
         console.log("Customer preferences fetched successfully:", response.data);
         setUserPreference(response.data);
         if (auth0User) {
-          auth0User.customerid = customerId;
           setAppUser({
             ...auth0User,
             role: "CUSTOMER",
             customerid: customerId,
           });
         }
-        // Show success message only if we just logged in
         if (auth0User) {
           showSuccessSnackbar(`Welcome back, ${auth0User.name || auth0User.email}!`);
         }
@@ -235,9 +233,6 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   };
 
   const createUserPreferences = async (customerId: number) => {
-    if (auth0User) {
-      auth0User.customerid = customerId;
-    }
     try {
       const payload: any = {
         customerId,
@@ -253,7 +248,6 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
 
       if (response.status === 200 || response.status === 201) {
         setUserPreference(payload);
-        // Show welcome message for new users
         if (auth0User) {
           showSuccessSnackbar(`Welcome to Serveaso, ${auth0User.name || auth0User.email}!`);
         }
@@ -303,8 +297,6 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
       });
 
       const credentials = await getCredentials();
-      // Note: We don't show success here because the useEffect will handle it
-      // when auth0User becomes available
     } catch (e) {
       console.log("Login error:", e);
       showErrorSnackbar("Login failed. Please try again.");
@@ -341,7 +333,207 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
 
   const handleLocationChange = (location: string) => {
     console.log("Location changed to:", location);
-    // You can add any additional logic here when location changes
+  };
+
+  // Render menu items based on user authentication and role
+  const renderMenuItems = () => {
+    // Not logged in
+    if (!auth0User) {
+      return (
+        <>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleLoginClick}
+          >
+            <Icon
+              name="sign-in"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Login / Signup</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleTnCClick}
+          >
+            <Icon
+              name="file-text"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Terms & Conditions</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleContactUsClick}
+          >
+            <Icon
+              name="phone"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Contact Us</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleAboutUsClick}
+          >
+            <Icon
+              name="info-circle"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>About Us</Text>
+          </TouchableOpacity>
+        </>
+      );
+    }
+
+    // Logged in as CUSTOMER
+    if (appUser?.role === "CUSTOMER") {
+      return (
+        <>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleProfileClick}
+          >
+            <Icon
+              name="user"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Profile</Text>
+          </TouchableOpacity>
+         
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleBookingHistoryClick}
+          >
+            <Icon
+              name="history"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>My Bookings</Text>
+          </TouchableOpacity>
+           <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleWalletClick}
+          >
+            <MaterialIcon
+              name="account-balance-wallet"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Wallet</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleSignOut}
+          >
+            <Icon
+              name="sign-out"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Sign Out</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleContactUsClick}
+          >
+            <Icon
+              name="phone"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Contact Us</Text>
+          </TouchableOpacity>
+        </>
+      );
+    }
+
+    // Logged in as SERVICE_PROVIDER
+    if (appUser?.role === "SERVICE_PROVIDER") {
+      return (
+        <>
+        <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleProfileClick}
+          >
+            <Icon
+              name="user"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleDashboardClick}
+          >
+            <Icon
+              name="dashboard"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Dashboard</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleContactUsClick}
+          >
+            <Icon
+              name="phone"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Contact Us</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleSignOut}
+          >
+            <Icon
+              name="sign-out"
+              size={18}
+              color="#fff"
+              style={styles.menuIcon}
+            />
+            <Text style={styles.menuItemText}>Sign Out</Text>
+          </TouchableOpacity>
+        </>
+      );
+    }
+
+    // Fallback for other roles or unexpected states
+    return (
+      <TouchableOpacity
+        style={styles.menuItem}
+        onPress={handleSignOut}
+      >
+        <Icon
+          name="sign-out"
+          size={18}
+          color="#fff"
+          style={styles.menuIcon}
+        />
+        <Text style={styles.menuItemText}>Sign Out</Text>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -377,17 +569,14 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
           onLocationChange={handleLocationChange}
         />
 
-        {/* Right Actions - Cart and Menu */}
+        {/* Right Actions - Notification and Menu */}
         <View style={styles.rightActionsContainer}>
-          {/* Cart Icon */}
+          {/* Notification Icon */}
           <TouchableOpacity
-            style={styles.cartButton}
-            onPress={() => setIsCartOpen(true)}
+            style={styles.notificationButton}
+            onPress={handleNotificationClick}
           >
-            <View style={styles.cartBadge}>
-              <Text style={styles.badgeText}>{cartItems?.length || 0}</Text>
-            </View>
-            <FeatherIcon name="shopping-cart" size={22} color="#fff" />
+            <FeatherIcon name="bell" size={22} color="#fff" />
           </TouchableOpacity>
 
           {/* Menu Icon */}
@@ -406,171 +595,15 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
         {/* Menu Dropdown */}
         {menuVisible && (
           <View style={styles.menuDropdown} ref={dropdownRef}>
-            {!auth0User ? (
-              <>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleLoginClick}
-                >
-                  <Icon
-                    name="sign-in"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>Login / Signup</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleTnCClick}
-                >
-                  <Icon
-                    name="file-text"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>Terms & Conditions</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleContactUsClick}
-                >
-                  <Icon
-                    name="phone"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>Contact Us</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleAboutUsClick}
-                >
-                  <Icon
-                    name="info-circle"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>About Us</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                {auth0User?.role === "admin" && (
-                  <TouchableOpacity
-                    style={styles.menuItem}
-                    onPress={handleDashboardClick}
-                  >
-                    <Icon
-                      name="dashboard"
-                      size={18}
-                      color="#fff"
-                      style={styles.menuIcon}
-                    />
-                    <Text style={styles.menuItemText}>Dashboard</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleProfileClick}
-                >
-                  <Icon
-                    name="user"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>Profile</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleBookingHistoryClick}
-                >
-                  <Icon
-                    name="history"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>My Bookings</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleDashboardClick}
-                >
-                  <Icon
-                    name="dashboard"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>Dashboard</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleWalletClick}
-                >
-                  <MaterialIcon
-                    name="account-balance-wallet"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>Wallet</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleAboutUsClick}
-                >
-                  <Icon
-                    name="info-circle"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>About Us</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleContactUsClick}
-                >
-                  <Icon
-                    name="phone"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>Contact Us</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleSignOut}
-                >
-                  <Icon
-                    name="sign-out"
-                    size={18}
-                    color="#fff"
-                    style={styles.menuIcon}
-                  />
-                  <Text style={styles.menuItemText}>Sign Out</Text>
-                </TouchableOpacity>
-              </>
-            )}
+            {renderMenuItems()}
           </View>
         )}
       </LinearGradient>
 
-      <CartDialog
-        open={isCartOpen}
-        handleClose={() => setIsCartOpen(false)}
-        handleCheckout={() => {
-          setIsCartOpen(false);
-          handleClick(CHECKOUT);
-        }}
+      {/* Notifications Dialog */}
+      <NotificationsDialog 
+        visible={showNotifications} 
+        onClose={handleCloseNotifications} 
       />
 
       <WalletDialog
@@ -649,31 +682,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 16,
   },
-  cartButton: {
+  notificationButton: {
     padding: 8,
-    position: "relative",
   },
   menuButton: {
     padding: 8,
-  },
-  cartBadge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    backgroundColor: "white",
-    borderRadius: 10,
-    width: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-    borderWidth: 1,
-    borderColor: "#3b82f6",
-  },
-  badgeText: {
-    color: "#3b82f6",
-    fontSize: 10,
-    fontWeight: "bold",
   },
   userAvatar: {
     width: 32,
