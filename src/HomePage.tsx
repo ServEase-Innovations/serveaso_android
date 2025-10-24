@@ -37,6 +37,7 @@ const heroImage1 = require("../assets/images/CookLand.png");
 const heroImage2 = require("../assets/images/MaidLand.png");
 const heroImage3 = require("../assets/images/NannyLand.png");
 
+
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
   bookingType: (data: string) => void;
@@ -250,36 +251,39 @@ const HomePage: React.FC<ChildComponentProps> = ({
   };
 
   const handleSave = () => {
-    const booking = {
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
-      startTime: startTime?.toISOString(),
-      endTime: endTime?.toISOString(),
-      bookingPreference: selectedRadioButtonValue,
-      serviceType: selectedType,
-    };
-
-    if (selectedRadioButtonValue === "Date") {
-      switch (selectedType) {
-        case "COOK":
-          setShowCookDialog(true);
-          break;
-        case "MAID":
-          setShowMaidServiceDialog(true);
-          break;
-        case "NANNY":
-          setShowNannyServicesDialog(true);
-          break;
-        default:
-          sendDataToParent(DETAILS);
-      }
-    } else {
-      sendDataToParent(DETAILS);
-    }
-
-    setOpen(false);
-    dispatch(add(booking));
+  const booking = {
+    startDate: startDate?.toISOString(),
+    endDate: endDate?.toISOString(),
+    startTime: startTime?.toISOString(),
+    endTime: endTime?.toISOString(),
+    bookingPreference: selectedRadioButtonValue,
+    serviceType: selectedType,
+    housekeepingRole: selectedType, // THIS IS THE KEY FIX
   };
+
+  console.log("Dispatching booking:", booking); // For debugging
+
+  if (selectedRadioButtonValue === "Date") {
+    switch (selectedType) {
+      case "COOK":
+        setShowCookDialog(true);
+        break;
+      case "MAID":
+        setShowMaidServiceDialog(true);
+        break;
+      case "NANNY":
+        setShowNannyServicesDialog(true);
+        break;
+      default:
+        sendDataToParent(DETAILS);
+    }
+  } else {
+    sendDataToParent(DETAILS);
+  }
+
+  setOpen(false);
+  dispatch(add(booking));
+};
 
   const isConfirmDisabled = () => {
     if (!startDate) return true;
@@ -713,8 +717,63 @@ const HomePage: React.FC<ChildComponentProps> = ({
           minimumDate={new Date()}
         />
       )}
-
       {showCookDialog && (
+  <View style={styles.dialogOverlay}>
+    <View style={styles.dialogBox}>
+      <DemoCook
+        onClose={() => setShowCookDialog(false)}
+        sendDataToParent={sendDataToParent}
+        bookingType={{
+          startDate: startDate?.toISOString(),
+          endDate: endDate?.toISOString(),
+          timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+          bookingPreference: selectedRadioButtonValue,
+          housekeepingRole: selectedType // ADD THIS
+        }}
+      />
+    </View>
+  </View>
+)}
+
+{showNannyServicesDialog && (
+  <View style={styles.dialogOverlay}>
+    <View style={styles.dialogBox}>
+      <NannyServicesDialog
+        open={showNannyServicesDialog}
+        handleClose={() => setShowNannyServicesDialog(false)}
+        sendDataToParent={sendDataToParent}
+        bookingType={{
+          startDate: startDate?.toISOString(),
+          endDate: endDate?.toISOString(),
+          timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+          bookingPreference: selectedRadioButtonValue,
+          housekeepingRole: selectedType // ADD THIS
+        }}
+      />
+    </View>
+  </View>
+)}
+
+{showMaidServiceDialog && (
+  <View style={styles.dialogOverlay}>
+    <View style={styles.dialogBox}>
+      <MaidServiceDialog
+        open={showMaidServiceDialog}
+        handleClose={() => setShowMaidServiceDialog(false)}
+        sendDataToParent={sendDataToParent}
+        bookingType={{
+          startDate: startDate?.toISOString(),
+          endDate: endDate?.toISOString(),
+          timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+          bookingPreference: selectedRadioButtonValue,
+          housekeepingRole: selectedType // ADD THIS
+        }}
+      />
+    </View>
+  </View>
+)}
+
+      {/* {showCookDialog && (
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogBox}>
             <DemoCook
@@ -753,7 +812,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
             />
           </View>
         </View>
-      )}
+      )} */}
 
       <ServiceDetailsDialog
         open={serviceDetailsOpen}

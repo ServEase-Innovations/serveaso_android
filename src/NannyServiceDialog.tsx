@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,27 +23,74 @@ import axiosInstance from './axiosInstance';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Dimensions } from 'react-native';
 import { useAuth0 } from 'react-native-auth0';
+import { usePricingFilterService } from './utils/PricingFilter';
+
+// Type definitions
+type PackageType = 'day' | 'night' | 'fullTime';
+type CareType = 'baby' | 'elderly';
+
+interface PackagePrices {
+  day: number;
+  night: number;
+  fullTime: number;
+}
+
+interface NannyPackages {
+  baby: PackagePrices;
+  elderly: PackagePrices;
+}
+
+interface PackageDescriptions {
+  day: string;
+  night: string;
+  fullTime: string;
+}
+
+interface BabyPackageState {
+  day: { age: number; selected: boolean };
+  night: { age: number; selected: boolean };
+  fullTime: { age: number; selected: boolean };
+}
+
+interface ElderlyPackageState {
+  day: { age: number; selected: boolean };
+  night: { age: number; selected: boolean };
+  fullTime: { age: number; selected: boolean };
+}
+
+interface CartItems {
+  babyDay: boolean;
+  babyNight: boolean;
+  babyFullTime: boolean;
+  elderlyDay: boolean;
+  elderlyNight: boolean;
+  elderlyFullTime: boolean;
+}
 
 interface NannyServicesDialogProps {
   open: boolean;
   handleClose: () => void;
   providerDetails?: EnhancedProviderDetails;
   sendDataToParent?: (data: string) => void;
+  user?: any;
+  bookingType?: any;
 }
 
 const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({ 
   open, 
   handleClose, 
   providerDetails,
-  sendDataToParent
+  sendDataToParent,
+  user,
+  bookingType
 }) => {
-  const [activeTab, setActiveTab] = useState<'baby' | 'elderly'>('baby');
-  const [babyPackages, setBabyPackages] = useState({
+  const [activeTab, setActiveTab] = useState<CareType>('baby');
+  const [babyPackages, setBabyPackages] = useState<BabyPackageState>({
     day: { age: 3, selected: false },
     night: { age: 3, selected: false },
     fullTime: { age: 3, selected: false }
   });
-  const [elderlyPackages, setElderlyPackages] = useState({
+  const [elderlyPackages, setElderlyPackages] = useState<ElderlyPackageState>({
     day: { age: 65, selected: false },
     night: { age: 65, selected: false },
     fullTime: { age: 65, selected: false }
@@ -51,19 +98,35 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
-  const { user } = useAuth0();
+  const { user: auth0User } = useAuth0();
+  
+  // Get pricing filter service
+  const { getFilteredPricing } = usePricingFilterService();
+  const nannyPricing = getFilteredPricing('nanny');
+  
+  console.log('Nanny Pricing Data:', nannyPricing);
   
   // Get screen dimensions
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-  const bookingType = useSelector((state: any) => state.bookingType?.value);
+  const bookingTypeFromRedux = useSelector((state: any) => state.bookingType?.value);
   const allCartItems = useSelector(selectCartItems);
   const nannyCartItems = allCartItems.filter(isNannyCartItem);
   const dispatch = useDispatch();
 
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
-  const [cartItems, setCartItems] = useState<Record<string, boolean>>(() => {
-    const initialCartItems = {
+  const [cartItems, setCartItems] = useState<CartItems>({
+    babyDay: false,
+    babyNight: false,
+    babyFullTime: false,
+    elderlyDay: false,
+    elderlyNight: false,
+    elderlyFullTime: false
+  });
+
+  // Initialize cart items from Redux
+  useEffect(() => {
+    const initialCartItems: CartItems = {
       babyDay: false,
       babyNight: false,
       babyFullTime: false,
@@ -73,14 +136,114 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     };
     
     nannyCartItems.forEach(item => {
-      const key = `${item.careType}${item.packageType.charAt(0).toUpperCase() + item.packageType.slice(1)}`;
-      initialCartItems[key as keyof typeof initialCartItems] = true;
+      const key = `${item.careType}${item.packageType.charAt(0).toUpperCase() + item.packageType.slice(1)}` as keyof CartItems;
+      initialCartItems[key] = true;
     });
 
-    return initialCartItems;
-  });
+    setCartItems(initialCartItems);
+  }, []);
+
+  // Get nanny packages from pricing data with proper mapping
+  const getNannyPackages = useMemo((): NannyPackages => {
+    console.log('Processing nanny pricing data:', nannyPricing);
+    
+    // Default fallback prices
+    const defaultPackages: NannyPackages = {
+      baby: {
+        day: 16000,
+        night: 20000,
+        fullTime: 23000
+      },
+      elderly: {
+        day: 16000,
+        night: 20000,
+        fullTime: 23000
+      }
+    };
+
+    // If no nanny pricing data, return defaults
+    if (!nannyPricing || nannyPricing.length === 0) {
+      console.log('No nanny pricing data found, using defaults');
+      return defaultPackages;
+    }
+
+    const packages: NannyPackages = {
+      baby: {
+        day: 16000,
+        night: 20000,
+        fullTime: 23000
+      },
+      elderly: {
+        day: 16000,
+        night: 20000,
+        fullTime: 23000
+      }
+    };
+
+    // Map pricing data to packages
+    nannyPricing.forEach((item: any) => {
+      const serviceName = item.ServiceName?.toLowerCase() || '';
+      const price = bookingType?.bookingPreference?.toLowerCase() === "date" 
+        ? item["Price /Day (INR)"] 
+        : item["Price /Month (INR)"];
+
+      console.log(`Processing service: ${serviceName}, price: ${price}`);
+
+      // Map service names to package types
+      if (serviceName.includes('baby') || serviceName.includes('child')) {
+        if (serviceName.includes('day') || serviceName.includes('daycare')) {
+          packages.baby.day = price || packages.baby.day;
+        } else if (serviceName.includes('night') || serviceName.includes('overnight')) {
+          packages.baby.night = price || packages.baby.night;
+        } else if (serviceName.includes('full') || serviceName.includes('time') || serviceName.includes('live')) {
+          packages.baby.fullTime = price || packages.baby.fullTime;
+        }
+      } else if (serviceName.includes('elderly') || serviceName.includes('senior') || serviceName.includes('old')) {
+        if (serviceName.includes('day') || serviceName.includes('daycare')) {
+          packages.elderly.day = price || packages.elderly.day;
+        } else if (serviceName.includes('night') || serviceName.includes('overnight')) {
+          packages.elderly.night = price || packages.elderly.night;
+        } else if (serviceName.includes('full') || serviceName.includes('time') || serviceName.includes('live')) {
+          packages.elderly.fullTime = price || packages.elderly.fullTime;
+        }
+      }
+    });
+
+    console.log('Final nanny packages:', packages);
+    return packages;
+  }, [nannyPricing, bookingType?.bookingPreference]);
+
+  // Get booking type from preference
+  const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
+    if (!bookingPreference) return 'MONTHLY';
+    const pref = bookingPreference.toLowerCase();
+    if (pref === 'date') return 'ON_DEMAND';
+    if (pref === 'short term') return 'SHORT_TERM';
+    return 'MONTHLY';
+  };
+
+  // Booking details using passed props
+  const bookingDetails: BookingDetails = {
+    serviceProviderId: Number(providerDetails?.serviceproviderId) || 0,
+    serviceProviderName: providerFullName,
+    customerId: user?.customerid || auth0User?.customerid || 19,
+    customerName: `${user?.customerDetails?.firstName || auth0User?.name || "Customer"}`.trim(),
+    startDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
+    endDate: bookingType?.endDate || "",
+    engagements: "",
+    address: user?.customerDetails?.currentLocation || "",
+    timeslot: bookingType?.timeRange || "",
+    monthlyAmount: 0,
+    paymentMode: "UPI",
+    bookingType: getBookingTypeFromPreference(bookingType?.bookingPreference),
+    taskStatus: "NOT_STARTED",
+    responsibilities: [],
+    serviceType: "NANNY",
+  };
 
   useEffect(() => {
+    if (!open) return;
+
     const backAction = () => {
       handleClose();
       return true;
@@ -92,23 +255,23 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     );
 
     return () => backHandler.remove();
-  }, []);
+  }, [open, handleClose]);
 
   useEffect(() => {
-    const updatedCartItems = { ...cartItems };
+    const updatedCartItems: CartItems = { ...cartItems };
     
-    Object.keys(cartItems).forEach(key => {
-      if (key.startsWith('baby') || key.startsWith('elderly')) {
-        updatedCartItems[key] = false;
-      }
+    // Reset all cart items
+    (Object.keys(updatedCartItems) as Array<keyof CartItems>).forEach(key => {
+      updatedCartItems[key] = false;
     });
 
+    // Set cart items from Redux
     nannyCartItems.forEach(item => {
-      const packageKey = `${item.careType}${item.packageType.charAt(0).toUpperCase() + item.packageType.slice(1)}`;
-      updatedCartItems[packageKey as keyof typeof updatedCartItems] = true;
+      const packageKey = `${item.careType}${item.packageType.charAt(0).toUpperCase() + item.packageType.slice(1)}` as keyof CartItems;
+      updatedCartItems[packageKey] = true;
     });
 
-    const hasChanges = Object.keys(updatedCartItems).some(
+    const hasChanges = (Object.keys(updatedCartItems) as Array<keyof CartItems>).some(
       key => updatedCartItems[key] !== cartItems[key]
     );
 
@@ -117,7 +280,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }
   }, [nannyCartItems]);
 
-  const handleBabyAgeChange = (packageType: keyof typeof babyPackages, value: number) => {
+  const handleBabyAgeChange = (packageType: PackageType, value: number) => {
     setBabyPackages(prev => ({
       ...prev,
       [packageType]: {
@@ -127,7 +290,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }));
   };
 
-  const handleElderlyAgeChange = (packageType: keyof typeof elderlyPackages, value: number) => {
+  const handleElderlyAgeChange = (packageType: PackageType, value: number) => {
     setElderlyPackages(prev => ({
       ...prev,
       [packageType]: {
@@ -137,26 +300,50 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }));
   };
 
-  const handleAddToCart = (packageKey: string) => {
+  const getPackagePrice = (type: CareType, packageType: PackageType): number => {
+    const packages = getNannyPackages[type];
+    return packages[packageType] || 0;
+  };
+
+  const getPackageDescription = (type: CareType, packageType: PackageType): string => {
+    const descriptions: Record<CareType, PackageDescriptions> = {
+      baby: {
+        day: 'Professional daytime baby care',
+        night: 'Professional overnight baby care',
+        fullTime: 'Round-the-clock professional baby care'
+      },
+      elderly: {
+        day: 'Professional daytime elderly care',
+        night: 'Professional overnight elderly care',
+        fullTime: 'Round-the-clock professional elderly care'
+      }
+    };
+    
+    return descriptions[type][packageType];
+  };
+
+  const handleAddToCart = (packageKey: keyof CartItems) => {
     try {
-      let type: 'baby' | 'elderly';
-      let packageType: 'day' | 'night' | 'fullTime';
+      let type: CareType;
+      let packageType: PackageType;
 
       if (packageKey.startsWith('baby')) {
         type = 'baby';
-        packageType = packageKey.replace('baby', '').charAt(0).toLowerCase() + 
-                     packageKey.replace('baby', '').slice(1) as 'day' | 'night' | 'fullTime';
+        const extractedType = packageKey.replace('baby', '').charAt(0).toLowerCase() + 
+                           packageKey.replace('baby', '').slice(1);
+        packageType = extractedType as PackageType;
       } else if (packageKey.startsWith('elderly')) {
         type = 'elderly';
-        packageType = packageKey.replace('elderly', '').charAt(0).toLowerCase() + 
-                     packageKey.replace('elderly', '').slice(1) as 'day' | 'night' | 'fullTime';
+        const extractedType = packageKey.replace('elderly', '').charAt(0).toLowerCase() + 
+                           packageKey.replace('elderly', '').slice(1);
+        packageType = extractedType as PackageType;
       } else {
         console.error('Invalid package key:', packageKey);
         return;
       }
 
       const packages = type === 'baby' ? babyPackages : elderlyPackages;
-      const packageDetails = packages[packageType as keyof typeof packages];
+      const packageDetails = packages[packageType];
 
       if (!packageDetails) {
         console.error('Package details not found for:', packageKey);
@@ -195,54 +382,20 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }
   };
 
-  const getPackagePrice = (type: 'baby' | 'elderly', packageType: string): number => {
-    const prices = {
-      baby: {
-        day: 16000,
-        night: 20000,
-        fullTime: 23000
-      },
-      elderly: {
-        day: 16000,
-        night: 20000,
-        fullTime: 23000
-      }
-    };
-
-    return prices[type]?.[packageType] || 0;
-  };
-
-  const getPackageDescription = (type: 'baby' | 'elderly', packageType: string): string => {
-    const descriptions = {
-      baby: {
-        day: 'Professional daytime baby care',
-        night: 'Professional overnight baby care',
-        fullTime: 'Round-the-clock professional baby care'
-      },
-      elderly: {
-        day: 'Professional daytime elderly care',
-        night: 'Professional overnight elderly care',
-        fullTime: 'Round-the-clock professional elderly care'
-      }
-    };
-
-    return descriptions[type]?.[packageType] || '';
-  };
-
-  const calculateTotal = () => {
+  const calculateTotal = (): number => {
     let total = 0;
-    Object.keys(cartItems).forEach(key => {
+    (Object.keys(cartItems) as Array<keyof CartItems>).forEach(key => {
       if (cartItems[key]) {
         const type = key.startsWith('baby') ? 'baby' : 'elderly';
         const packageType = key.replace(type, '').charAt(0).toLowerCase() + 
-                          key.replace(type, '').slice(1);
+                          key.replace(type, '').slice(1) as PackageType;
         total += getPackagePrice(type, packageType);
       }
     });
     return total;
   };
 
-  const getSelectedPackagesCount = () => {
+  const getSelectedPackagesCount = (): number => {
     return Object.values(cartItems).filter(item => item).length;
   };
 
@@ -254,19 +407,21 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     try {
       setLoading(true);
       
-      const selectedPackages = Object.keys(cartItems)
-        .filter(key => cartItems[key])
-        .map(key => {
+      const selectedPackages: Array<{type: CareType; packageType: PackageType; price: number; description: string}> = [];
+      
+      (Object.keys(cartItems) as Array<keyof CartItems>).forEach(key => {
+        if (cartItems[key]) {
           const type = key.startsWith('baby') ? 'baby' : 'elderly';
           const packageType = key.replace(type, '').charAt(0).toLowerCase() + 
-                            key.replace(type, '').slice(1);
-          return {
+                            key.replace(type, '').slice(1) as PackageType;
+          selectedPackages.push({
             type,
             packageType,
             price: getPackagePrice(type, packageType),
             description: getPackageDescription(type, packageType)
-          };
-        });
+          });
+        }
+      });
 
       if (selectedPackages.length === 0) {
         Alert.alert("Please add at least one package to cart");
@@ -276,6 +431,13 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
 
       const totalAmount = selectedPackages.reduce((sum, pkg) => sum + pkg.price, 0);
       
+      // Update booking details with selected items and total amount
+      const updatedBookingDetails = {
+        ...bookingDetails,
+        engagements: selectedPackages.map(p => `${p.type} ${p.packageType}`).join(', '),
+        monthlyAmount: totalAmount
+      };
+
       // Create Razorpay order
       const response = await axios.post(
         "https://utils-ndt3.onrender.com/create-order",
@@ -284,7 +446,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           headers: { "Content-Type": "application/json" },
         }
       );
-    
+
       if (response.status === 200) {
         const { id: orderId, currency, amount } = response.data;
     
@@ -296,35 +458,16 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           description: "Nanny Services Booking",
           order_id: orderId,
           prefill: {
-            name: user?.name || "",
-            email: user?.email || "",
-            contact: user?.mobileNo || "",
+            name: user?.customerDetails?.firstName || auth0User?.name || "",
+            email: user?.customerDetails?.email || auth0User?.email || "",
+            contact: user?.customerDetails?.mobileNo || auth0User?.mobileNo || "",
           },
           theme: { color: "#3399cc" },
         };
     
         RazorpayCheckout.open(options)
           .then((razorpayResponse) => {
-            // Handle successful payment
-            const bookingDetails: BookingDetails = {
-              serviceProviderId: providerDetails?.serviceproviderId || 1,
-              serviceProviderName: providerFullName,
-              customerId: user?.customerid || 19, // Default to 19 if not available
-              customerName: user?.name || "Demo User",
-              startDate: new Date().toISOString().split('T')[0],
-              endDate: '',
-              engagements: selectedPackages.map(p => `${p.type} ${p.packageType}`).join(', '),
-              address: 'Demo Address',
-              timeslot: '10:00 AM - 2:00 PM',
-              monthlyAmount: totalAmount,
-              paymentMode: 'UPI',
-              bookingType: bookingType?.bookingPreference || 'DEMO',
-              taskStatus: 'COMPLETED',
-              serviceType: 'NANNY',
-              responsibilities: []
-            };
-            
-            handleSuccessfulPayment(razorpayResponse, bookingDetails);
+            handleSuccessfulPayment(razorpayResponse, updatedBookingDetails);
           })
           .catch((error) => {
             Alert.alert("Payment Failed", error.description || "Unknown error");
@@ -339,11 +482,11 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }
   };
 
-  const handleSuccessfulPayment = async (razorpayResponse: any, bookingDetails: BookingDetails) => {
+  const handleSuccessfulPayment = async (razorpayResponse: any, updatedBookingDetails: BookingDetails) => {
     try {
       const bookingResponse = await axiosInstance.post(
         "/api/serviceproviders/engagement/add",
-        bookingDetails,
+        updatedBookingDetails,
         {
           headers: {
             "Content-Type": "application/json",
@@ -353,11 +496,11 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
 
       if (bookingResponse.status === 201) {
         // Clear cart items after successful booking
-        Object.keys(cartItems).forEach(key => {
+        (Object.keys(cartItems) as Array<keyof CartItems>).forEach(key => {
           if (cartItems[key]) {
             const type = key.startsWith('baby') ? 'baby' : 'elderly';
             const packageType = key.replace(type, '').charAt(0).toLowerCase() + 
-                              key.replace(type, '').slice(1);
+                              key.replace(type, '').slice(1) as PackageType;
             const id = `${type}_${packageType}_${providerDetails?.serviceproviderId || 'default'}`;
             
             dispatch(removeFromCart({ id, type: 'nanny' }));
@@ -365,6 +508,9 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         });
 
         Alert.alert('Success', 'Booking confirmed successfully!');
+        if (sendDataToParent) {
+          sendDataToParent('BOOKINGS');
+        }
         handleClose();
       }
     } catch (error) {
@@ -375,10 +521,10 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }
   };
 
-  const renderBabyPackage = (packageType: 'day' | 'night' | 'fullTime') => {
+  const renderBabyPackage = (packageType: PackageType) => {
     const packageData = babyPackages[packageType];
-    const packageKey = `baby${packageType.charAt(0).toUpperCase() + packageType.slice(1)}`;
-    const color = '#3399cc'; // Unified blue color
+    const packageKey = `baby${packageType.charAt(0).toUpperCase() + packageType.slice(1)}` as keyof CartItems;
+    const color = '#3399cc';
     const price = `₹${getPackagePrice('baby', packageType).toLocaleString()}`;
     const reviews = packageType === 'day' ? '(1.5M reviews)' : 
                    packageType === 'night' ? '(1.2M reviews)' : '(980K reviews)';
@@ -412,6 +558,9 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
               <Text style={[styles.ratingValue, { color }]}>{rating}</Text>
               <Text style={styles.reviewsText}>{reviews}</Text>
             </View>
+            <Text style={styles.bookingTypeText}>
+              {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
+            </Text>
           </View>
           <View style={styles.priceContainer}>
             <Text style={[styles.priceValue, { color }]}>{price}</Text>
@@ -473,10 +622,10 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     );
   };
 
-  const renderElderlyPackage = (packageType: 'day' | 'night' | 'fullTime') => {
+  const renderElderlyPackage = (packageType: PackageType) => {
     const packageData = elderlyPackages[packageType];
-    const packageKey = `elderly${packageType.charAt(0).toUpperCase() + packageType.slice(1)}`;
-    const color = '#3399cc'; // Unified blue color
+    const packageKey = `elderly${packageType.charAt(0).toUpperCase() + packageType.slice(1)}` as keyof CartItems;
+    const color = '#3399cc';
     const price = `₹${getPackagePrice('elderly', packageType).toLocaleString()}`;
     const reviews = packageType === 'day' ? '(1.1M reviews)' : 
                    packageType === 'night' ? '(950K reviews)' : '(850K reviews)';
@@ -510,6 +659,9 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
               <Text style={[styles.ratingValue, { color }]}>{rating}</Text>
               <Text style={styles.reviewsText}>{reviews}</Text>
             </View>
+            <Text style={styles.bookingTypeText}>
+              {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
+            </Text>
           </View>
           <View style={styles.priceContainer}>
             <Text style={[styles.priceValue, { color }]}>{price}</Text>
@@ -579,13 +731,12 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       onRequestClose={handleClose}
     >
       <View style={[styles.modalOverlay, { 
-        paddingTop: SCREEN_HEIGHT * 0.15,  // Reduced from top
-        paddingBottom: SCREEN_HEIGHT * 0.15 // Reduced from bottom
+        paddingTop: SCREEN_HEIGHT * 0.15,
+        paddingBottom: SCREEN_HEIGHT * 0.15
       }]}>
-         {/* Smaller dialog container */}
         <View style={[styles.modalContainer, { 
-          maxHeight: SCREEN_HEIGHT * 0.7,  // Reduced height
-          paddingVertical: 10              // Tighter padding
+          maxHeight: SCREEN_HEIGHT * 0.7,
+          paddingVertical: 10
         }]}>
           <View style={styles.header}>
              <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
@@ -689,11 +840,16 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
 };
 
 const styles = StyleSheet.create({
+  bookingTypeText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 3,
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)', // Semi-transparent black
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    paddingHorizontal: 10, // Side padding
+    paddingHorizontal: 10,
   },
   modalContainer: {
     backgroundColor: 'white',
@@ -714,7 +870,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-   backIcon: {
+  backIcon: {
     padding: 5,
     marginRight: 10,
   },

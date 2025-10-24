@@ -626,8 +626,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
           <TnC />
         </View>
       </Modal>
-
-      <AboutPage visible={showAboutUs} onClose={() => setShowAboutUs(false)} />
+      <AboutPage visible={showAboutUs} onBack={() => setShowAboutUs(false)} />
 
       <Modal
         visible={showContactUs}

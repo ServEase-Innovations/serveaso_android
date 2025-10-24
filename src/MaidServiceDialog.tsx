@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,24 +22,34 @@ import axiosInstance from './axiosInstance';
 import { addToCart, removeFromCart, selectCartItems } from './features/addToSlice';
 import { isMaidCartItem } from './types/cartSlice';
 import RazorpayCheckout from 'react-native-razorpay';
+import { usePricingFilterService } from './utils/PricingFilter';
 
 interface MaidServiceDialogProps {
   open: boolean;
   handleClose: () => void;
   providerDetails?: EnhancedProviderDetails;
   sendDataToParent?: (data: string) => void;
+  user?: any;
+  bookingType?: any;
 }
 
 const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({ 
   open, 
   handleClose, 
   providerDetails,
-  sendDataToParent
+  sendDataToParent,
+  user,
+  bookingType
 }) => {
   const [activeTab, setActiveTab] = useState('regular');
   const allCartItems = useSelector(selectCartItems);
   const maidCartItems = allCartItems.filter(isMaidCartItem);
   const [loading, setLoading] = useState(false);
+  
+  // Use the pricing filter service
+  const { getFilteredPricing } = usePricingFilterService();
+  const maidPricing = getFilteredPricing('MAID');
+
   const [cartItems, setCartItems] = useState<Record<string, boolean>>(() => {
     const initialCartItems = {
       utensilCleaning: false,
@@ -70,11 +80,11 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   });
   
   const dispatch = useDispatch();
-  const bookingType = useSelector((state: any) => state.bookingType?.value);
   const users = useSelector((state: any) => state.user?.value);
   const currentLocation = users?.customerDetails?.currentLocation;
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
 
+  // Get booking type from preference
   const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
     if (!bookingPreference) return 'MONTHLY';
     const pref = bookingPreference.toLowerCase();
@@ -83,15 +93,16 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     return 'MONTHLY';
   };
 
+  // Booking details using passed props
   const bookingDetails: BookingDetails = {
-    serviceProviderId: providerDetails?.serviceproviderId || 0,
+    serviceProviderId: Number(providerDetails?.serviceproviderId) || 0,
     serviceProviderName: providerFullName,
-    customerId: 19, // Hardcoded customer ID as per requirement
-    customerName: `${users?.customerDetails?.firstName} ${users?.customerDetails?.lastName}` || "",
+    customerId: user?.customerid || users?.customerid || 19,
+    customerName: `${user?.customerDetails?.firstName || users?.customerDetails?.firstName} ${user?.customerDetails?.lastName || users?.customerDetails?.lastName}`.trim() || "Customer",
     startDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
     endDate: bookingType?.endDate || "",
     engagements: "",
-    address: currentLocation || "",
+    address: currentLocation || user?.customerDetails?.currentLocation || "",
     timeslot: bookingType?.timeRange || "",
     monthlyAmount: 0,
     paymentMode: "UPI",
@@ -99,6 +110,150 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     taskStatus: "NOT_STARTED",
     responsibilities: [],
     serviceType: "MAID",
+  };
+
+  // Get pricing for specific services with proper matching
+  const getPackagePrice = (packageName: string): number => {
+    if (!maidPricing || maidPricing.length === 0) {
+      console.log('No maid pricing data available');
+      // Fallback prices if no pricing data available
+      switch(packageName) {
+        case 'utensilCleaning': return 1200;
+        case 'sweepingMopping': return 1200;
+        case 'bathroomCleaning': return 600;
+        default: return 0;
+      }
+    }
+
+    console.log('Available maid pricing:', maidPricing);
+    
+    // Map package names to service name patterns
+    const servicePatterns: Record<string, string[]> = {
+      utensilCleaning: ['utensil', 'cleaning', 'utensils'],
+      sweepingMopping: ['sweeping', 'mopping', 'floor'],
+      bathroomCleaning: ['bathroom', 'cleaning', 'toilet']
+    };
+
+    const patterns = servicePatterns[packageName] || [];
+    
+    const service = maidPricing.find((item: any) => {
+      const serviceName = item.ServiceName?.toLowerCase();
+      return patterns.some(pattern => serviceName?.includes(pattern));
+    });
+
+    console.log(`Found service for ${packageName}:`, service);
+
+    if (service) {
+      // Use appropriate price based on booking type
+      const isOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
+      const price = isOnDemand ? service['Price /Day (INR)'] : service['Price /Month (INR)'];
+      console.log(`Price for ${packageName}:`, price);
+      return price || 0;
+    }
+
+    console.log(`No matching service found for ${packageName}, using fallback`);
+    
+    // Fallback prices
+    switch(packageName) {
+      case 'utensilCleaning': return 1200;
+      case 'sweepingMopping': return 1200;
+      case 'bathroomCleaning': return 600;
+      default: return 0;
+    }
+  };
+
+  const getAddOnPrice = (addOnName: string): number => {
+    if (!maidPricing || maidPricing.length === 0) {
+      console.log('No maid pricing data available for addons');
+      // Fallback prices if no pricing data available
+      switch(addOnName) {
+        case 'bathroomDeepCleaning': return 1000;
+        case 'normalDusting': return 1000;
+        case 'deepDusting': return 1500;
+        case 'utensilDrying': return 1000;
+        case 'clothesDrying': return 1000;
+        default: return 0;
+      }
+    }
+
+    console.log('Available maid pricing for addons:', maidPricing);
+    
+    // Map addon names to service name patterns
+    const addOnPatterns: Record<string, string[]> = {
+      bathroomDeepCleaning: ['deep', 'bathroom', 'deep cleaning'],
+      normalDusting: ['dusting', 'normal dusting', 'furniture'],
+      deepDusting: ['deep dusting', 'chemical', 'décor'],
+      utensilDrying: ['utensil drying', 'drying', 'utensils'],
+      clothesDrying: ['clothes', 'drying', 'laundry']
+    };
+
+    const patterns = addOnPatterns[addOnName] || [];
+    
+    const service = maidPricing.find((item: any) => {
+      const serviceName = item.ServiceName?.toLowerCase();
+      return patterns.some(pattern => serviceName?.includes(pattern));
+    });
+
+    console.log(`Found service for addon ${addOnName}:`, service);
+
+    if (service) {
+      const isOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
+      const price = isOnDemand ? service['Price /Day (INR)'] : service['Price /Month (INR)'];
+      console.log(`Price for addon ${addOnName}:`, price);
+      return price || 0;
+    }
+
+    console.log(`No matching service found for addon ${addOnName}, using fallback`);
+    
+    // Fallback prices
+    switch(addOnName) {
+      case 'bathroomDeepCleaning': return 1000;
+      case 'normalDusting': return 1000;
+      case 'deepDusting': return 1500;
+      case 'utensilDrying': return 1000;
+      case 'clothesDrying': return 1000;
+      default: return 0;
+    }
+  };
+
+  const getPackageDescription = (packageName: string): string => {
+    switch(packageName) {
+      case 'utensilCleaning': 
+        return 'All kind of daily utensil cleaning\nParty used type utensil cleaning';
+      case 'sweepingMopping':
+        return 'Daily sweeping and mopping';
+      case 'bathroomCleaning':
+        return 'Weekly cleaning of bathrooms';
+      default: return '';
+    }
+  };
+
+  const getPackageDetails = (packageName: string) => {
+    switch(packageName) {
+      case 'utensilCleaning':
+        return { persons: packageStates.utensilCleaning.persons };
+      case 'sweepingMopping':
+        return { houseSize: packageStates.sweepingMopping.houseSize };
+      case 'bathroomCleaning':
+        return { bathrooms: packageStates.bathroomCleaning.bathrooms };
+      default: return {};
+    }
+  };
+
+  const getAddOnDescription = (addOnName: string): string => {
+    switch(addOnName) {
+      case 'bathroomDeepCleaning':
+        return 'Weekly cleaning of bathrooms, all bathroom walls cleaned';
+      case 'normalDusting':
+        return 'Daily furniture dusting, doors, carpet, bed making';
+      case 'deepDusting':
+        return 'Includes chemical agents cleaning: décor items, furniture';
+      case 'utensilDrying':
+        return 'Househelp will dry and make proper arrangements';
+      case 'clothesDrying':
+        return 'Househelp will get clothes from/to drying place';
+      default: return '';
+    }
   };
 
   useEffect(() => {
@@ -156,66 +311,6 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
           : Math.max(prev.bathroomCleaning.bathrooms - 1, 1)
       }
     }));
-  };
-
-  const getPackagePrice = (packageName: string): number => {
-    switch(packageName) {
-      case 'utensilCleaning': return 1200;
-      case 'sweepingMopping': return 1200;
-      case 'bathroomCleaning': return 600;
-      default: return 0;
-    }
-  };
-
-  const getPackageDescription = (packageName: string): string => {
-    switch(packageName) {
-      case 'utensilCleaning': 
-        return 'All kind of daily utensil cleaning\nParty used type utensil cleaning';
-      case 'sweepingMopping':
-        return 'Daily sweeping and mopping';
-      case 'bathroomCleaning':
-        return 'Weekly cleaning of bathrooms';
-      default: return '';
-    }
-  };
-
-  const getPackageDetails = (packageName: string) => {
-    switch(packageName) {
-      case 'utensilCleaning':
-        return { persons: packageStates.utensilCleaning.persons };
-      case 'sweepingMopping':
-        return { houseSize: packageStates.sweepingMopping.houseSize };
-      case 'bathroomCleaning':
-        return { bathrooms: packageStates.bathroomCleaning.bathrooms };
-      default: return {};
-    }
-  };
-
-  const getAddOnPrice = (addOnName: string): number => {
-    switch(addOnName) {
-      case 'bathroomDeepCleaning': return 1000;
-      case 'normalDusting': return 1000;
-      case 'deepDusting': return 1500;
-      case 'utensilDrying': return 1000;
-      case 'clothesDrying': return 1000;
-      default: return 0;
-    }
-  };
-
-  const getAddOnDescription = (addOnName: string): string => {
-    switch(addOnName) {
-      case 'bathroomDeepCleaning':
-        return 'Weekly cleaning of bathrooms, all bathroom walls cleaned';
-      case 'normalDusting':
-        return 'Daily furniture dusting, doors, carpet, bed making';
-      case 'deepDusting':
-        return 'Includes chemical agents cleaning: décor items, furniture';
-      case 'utensilDrying':
-        return 'Househelp will dry and make proper arrangements';
-      case 'clothesDrying':
-        return 'Househelp will get clothes from/to drying place';
-      default: return '';
-    }
   };
 
   const handleAddPackageToCart = (packageName: string) => {
@@ -285,11 +380,11 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     return Object.values(cartItems).filter(item => item).length;
   };
 
-  const handleSuccessfulPayment = async (razorpayResponse: any, bookingDetails: BookingDetails) => {
+  const handleSuccessfulPayment = async (razorpayResponse: any, updatedBookingDetails: BookingDetails) => {
     try {
       const bookingResponse = await axiosInstance.post(
         "/api/serviceproviders/engagement/add",
-        bookingDetails,
+        updatedBookingDetails,
         {
           headers: {
             "Content-Type": "application/json",
@@ -335,8 +430,11 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
       const totalAmount = calculateTotal();
       
       // Update booking details with selected items and total amount
-      bookingDetails.engagements = selectedItems.join(', ');
-      bookingDetails.monthlyAmount = totalAmount;
+      const updatedBookingDetails = {
+        ...bookingDetails,
+        engagements: selectedItems.join(', '),
+        monthlyAmount: totalAmount
+      };
 
       // Create Razorpay order
       const response = await axios.post(
@@ -358,16 +456,16 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
           description: "Maid Service Booking",
           order_id: orderId,
           prefill: {
-            name: users?.customerDetails?.firstName || "",
-            email: users?.customerDetails?.email || "",
-            contact: users?.customerDetails?.mobileNo || "",
+            name: users?.customerDetails?.firstName || user?.customerDetails?.firstName || "",
+            email: users?.customerDetails?.email || user?.customerDetails?.email || "",
+            contact: users?.customerDetails?.mobileNo || user?.customerDetails?.mobileNo || "",
           },
           theme: { color: "#3399cc" },
         };
     
         RazorpayCheckout.open(options)
           .then((razorpayResponse) => {
-            handleSuccessfulPayment(razorpayResponse, bookingDetails);
+            handleSuccessfulPayment(razorpayResponse, updatedBookingDetails);
           })
           .catch((error) => {
             Alert.alert("Payment Failed", error.description || "Unknown error");
@@ -394,7 +492,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <View style={styles.header}>
-             <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
+            <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
               <Icon name="arrow-back" size={24} color="#333" />
             </TouchableOpacity>
             <Text style={styles.dialogTitle}>MAID SERVICE PACKAGES</Text>
@@ -439,8 +537,10 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                     </View>
                   </View>
                   <View style={styles.priceContainer}>
-                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹1,200</Text>
-                    <Text style={styles.preparationTime}>Monthly service</Text>
+                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹{getPackagePrice('utensilCleaning').toLocaleString('en-IN')}</Text>
+                    <Text style={styles.preparationTime}>
+                      {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
+                    </Text>
                   </View>
                 </View>
                 
@@ -512,8 +612,10 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                     </View>
                   </View>
                   <View style={styles.priceContainer}>
-                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹1,200</Text>
-                    <Text style={styles.preparationTime}>Monthly service</Text>
+                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹{getPackagePrice('sweepingMopping').toLocaleString('en-IN')}</Text>
+                    <Text style={styles.preparationTime}>
+                      {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
+                    </Text>
                   </View>
                 </View>
                 
@@ -581,8 +683,10 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                     </View>
                   </View>
                   <View style={styles.priceContainer}>
-                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹600</Text>
-                    <Text style={styles.preparationTime}>Monthly service</Text>
+                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹{getPackagePrice('bathroomCleaning').toLocaleString('en-IN')}</Text>
+                    <Text style={styles.preparationTime}>
+                      {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
+                    </Text>
                   </View>
                 </View>
                 
@@ -647,7 +751,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Bathroom Deep Cleaning</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,000</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('bathroomDeepCleaning').toLocaleString('en-IN')}</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Weekly cleaning of bathrooms, all bathroom walls cleaned
@@ -676,7 +780,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Normal Dusting</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,000</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('normalDusting').toLocaleString('en-IN')}</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Daily furniture dusting, doors, carpet, bed making
@@ -705,7 +809,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Deep Dusting</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,500</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('deepDusting').toLocaleString('en-IN')}</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Includes chemical agents cleaning: décor items, furniture
@@ -734,7 +838,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Utensil Drying</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,000</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('utensilDrying').toLocaleString('en-IN')}</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Househelp will dry and make proper arrangements
@@ -763,7 +867,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Clothes Drying</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹1,000</Text>
+                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('clothesDrying').toLocaleString('en-IN')}</Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Househelp will get clothes from/to drying place
@@ -790,16 +894,16 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
           
           {/* Footer with Checkout */}
           <View style={styles.footerContainer}>
-             <View style={styles.voucherContainer}>
-            <TextInput
-              style={styles.voucherInput}
-              placeholder="Enter voucher code"
-              placeholderTextColor="#999"
-            />
-            <TouchableOpacity style={styles.voucherButton}>
-              <Text style={styles.voucherButtonText}>Apply Voucher</Text>
-            </TouchableOpacity>
-          </View>
+            <View style={styles.voucherContainer}>
+              <TextInput
+                style={styles.voucherInput}
+                placeholder="Enter voucher code"
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity style={styles.voucherButton}>
+                <Text style={styles.voucherButtonText}>Apply Voucher</Text>
+              </TouchableOpacity>
+            </View>
           
             <View style={styles.totalContainer}>
               <Text style={styles.footerText}>
@@ -858,7 +962,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-   header: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

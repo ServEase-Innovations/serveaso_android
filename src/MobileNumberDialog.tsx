@@ -1,5 +1,4 @@
-// MobileNumberDialog.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +8,7 @@ import {
   Alert,
   StyleSheet,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import axiosInstance from './axiosInstance'; 
 import { useAppUser } from './context/AppUserContext';
@@ -19,7 +19,12 @@ interface ValidationState {
   isAvailable: boolean | null;
 }
 
-const MobileNumberDialog = () => {
+interface MobileNumberDialogProps {
+  onSuccess?: () => void;
+  onClose?: () => void;
+}
+
+const MobileNumberDialog: React.FC<MobileNumberDialogProps> = ({ onSuccess, onClose }) => {
   const [open, setOpen] = useState(false);
   const [contactNumber, setContactNumber] = useState('');
   const [altContactNumber, setAltContactNumber] = useState('');
@@ -38,6 +43,10 @@ const MobileNumberDialog = () => {
   });
 
   const { appUser } = useAppUser();
+
+  // Refs for debounced validation timeouts
+  const contactTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const altContactTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setOpen(true);
@@ -104,26 +113,19 @@ const MobileNumberDialog = () => {
   };
 
   // Debounced validation for mobile numbers
-  const useDebouncedValidation = () => {
-    const timeouts = {
-      contact: null as NodeJS.Timeout | null,
-      alternate: null as NodeJS.Timeout | null,
-    };
+  const debouncedValidation = (number: string, isAlternate: boolean = false) => {
+    const timeoutRef = isAlternate ? altContactTimeoutRef : contactTimeoutRef;
+    
+    // Clear existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
 
-    return (number: string, isAlternate: boolean = false) => {
-      const timeoutKey = isAlternate ? 'alternate' : 'contact';
-
-      if (timeouts[timeoutKey]) {
-        clearTimeout(timeouts[timeoutKey]!);
-      }
-
-      timeouts[timeoutKey] = setTimeout(() => {
-        checkMobileAvailability(number, isAlternate);
-      }, 500);
-    };
+    // Set new timeout
+    timeoutRef.current = setTimeout(() => {
+      checkMobileAvailability(number, isAlternate);
+    }, 500);
   };
-
-  const debouncedValidation = useDebouncedValidation();
 
   // Handle contact number change
   const handleContactNumberChange = (value: string) => {
@@ -235,6 +237,9 @@ const MobileNumberDialog = () => {
   };
 
   const handleSubmit = async () => {
+    // Dismiss keyboard before submission
+    Keyboard.dismiss();
+
     // Validate all fields before submission
     const isValid = await validateAllFields();
     if (!isValid) {
@@ -258,18 +263,55 @@ const MobileNumberDialog = () => {
 
       console.log(' Sending update payload:', payload);
 
-      // Real PUT API call
-      const response = await axiosInstance.put(
-        `/api/customer/update-customer/${appUser.customerid}`,
-        payload
-      );
+      // Try to update customer first
+      let response;
+      try {
+        response = await axiosInstance.put(
+          `/api/customer/update-customer/${appUser.customerid}`,
+          payload
+        );
+        console.log('✅ Customer updated successfully:', response.data);
+      } catch (updateError: any) {
+        // If update fails with 404, try to create the customer
+        if (updateError.response?.status === 404) {
+          console.log('🆕 Customer not found, creating new customer...');
+          
+          // Create new customer with the provided data
+          const createPayload = {
+            customerId: appUser.customerid,
+            email: appUser.email,
+            name: appUser.name,
+            ...payload
+          };
+          
+          response = await axiosInstance.post(
+            '/api/customer/create-customer',
+            createPayload
+          );
+          console.log('✅ Customer created successfully:', response.data);
+        } else {
+          throw updateError;
+        }
+      }
 
-      console.log('✅ API Response:', response.data);
       Alert.alert('Success', 'Mobile number(s) updated successfully!');
       setOpen(false);
-    } catch (error) {
+      
+      // Call success callback
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error: any) {
       console.error('❌ Error updating mobile numbers:', error);
-      Alert.alert('Error', 'Something went wrong while updating!');
+      let errorMessage = 'Something went wrong while updating!';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -304,12 +346,33 @@ const MobileNumberDialog = () => {
     return null;
   };
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (contactTimeoutRef.current) {
+        clearTimeout(contactTimeoutRef.current);
+      }
+      if (altContactTimeoutRef.current) {
+        clearTimeout(altContactTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleClose = () => {
+    // Dismiss keyboard when closing
+    Keyboard.dismiss();
+    setOpen(false);
+    if (onClose) {
+      onClose();
+    }
+  };
+
   return (
     <Modal
       visible={open}
       animationType="slide"
       transparent={true}
-      onRequestClose={() => setOpen(false)}
+      onRequestClose={handleClose}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
@@ -317,8 +380,9 @@ const MobileNumberDialog = () => {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Update Contact Numbers</Text>
             <TouchableOpacity
-              onPress={() => setOpen(false)}
+              onPress={handleClose}
               style={styles.closeButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={styles.closeButtonText}>×</Text>
             </TouchableOpacity>
@@ -340,10 +404,13 @@ const MobileNumberDialog = () => {
                     styles.inputError,
                   ]}
                   placeholder="10-digit mobile number"
+                  placeholderTextColor="#999"
                   value={contactNumber}
                   onChangeText={handleContactNumberChange}
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   maxLength={10}
+                  returnKeyType="next"
+                  autoFocus={true}
                 />
                 <View style={styles.validationIcon}>
                   {renderValidationIcon(contactValidation)}
@@ -368,10 +435,13 @@ const MobileNumberDialog = () => {
                     styles.inputError,
                   ]}
                   placeholder="10-digit mobile number"
+                  placeholderTextColor="#999"
                   value={altContactNumber}
                   onChangeText={handleAltContactNumberChange}
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   maxLength={10}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
                 />
                 <View style={styles.validationIcon}>
                   {renderValidationIcon(altContactValidation)}
@@ -399,7 +469,8 @@ const MobileNumberDialog = () => {
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
-              onPress={() => setOpen(false)}
+              onPress={handleClose}
+              disabled={loading}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -412,9 +483,11 @@ const MobileNumberDialog = () => {
               onPress={handleSubmit}
               disabled={loading || !isFormValid()}
             >
-              <Text style={styles.submitButtonText}>
-                {loading ? 'Updating...' : 'Submit'}
-              </Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitButtonText}>Submit</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -451,7 +524,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#2563eb',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
@@ -467,6 +540,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: 'white',
     fontWeight: '300',
+    lineHeight: 24,
   },
   content: {
     padding: 24,
@@ -474,14 +548,16 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     color: '#6b7280',
-    marginBottom: 16,
+    marginBottom: 20,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
   },
@@ -495,9 +571,10 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: 16,
     backgroundColor: 'white',
+    color: '#333',
   },
   inputError: {
     borderColor: '#ef4444',
@@ -506,16 +583,19 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     width: 20,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   errorText: {
     color: '#ef4444',
     fontSize: 12,
     marginTop: 4,
+    fontWeight: '500',
   },
   successText: {
     color: '#10b981',
     fontSize: 12,
     marginTop: 4,
+    fontWeight: '500',
   },
   successIcon: {
     color: '#10b981',
@@ -538,6 +618,7 @@ const styles = StyleSheet.create({
   warningText: {
     color: '#dc2626',
     fontSize: 12,
+    fontWeight: '500',
   },
   actions: {
     flexDirection: 'row',
@@ -549,17 +630,20 @@ const styles = StyleSheet.create({
   },
   button: {
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
     minWidth: 80,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
   },
   cancelButton: {
     backgroundColor: '#e5e7eb',
   },
   cancelButtonText: {
     color: '#374151',
-    fontWeight: '500',
+    fontWeight: '600',
+    fontSize: 14,
   },
   submitButton: {
     backgroundColor: '#2563eb',
@@ -569,7 +653,8 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: 'white',
-    fontWeight: '500',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
 
