@@ -1,15 +1,15 @@
-import React from 'react';
+/* eslint-disable */
+import React from "react";
 import {
   Modal,
   View,
   Text,
+  StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StyleSheet,
-  FlatList,
-} from 'react-native';
-import { Button, Divider, List } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+} from "react-native";
+import Icon from "react-native-vector-icons/Feather";
+import MaterialIcon from "react-native-vector-icons/MaterialIcons";
 
 type ServiceFeature = {
   title?: string;
@@ -20,13 +20,13 @@ type ServiceDetails = {
   title: string;
   description: string;
   features: ServiceFeature[];
-  icon?: string;
+  icon?: string | React.ReactNode;
 };
 
 interface ServiceDetailsDialogProps {
   open: boolean;
   onClose: () => void;
-  serviceType: 'cook' | 'maid' | 'babycare' | null;
+  serviceType: "cook" | "maid" | "babycare" | null;
 }
 
 const ServiceDetailsDialog: React.FC<ServiceDetailsDialogProps> = ({
@@ -34,202 +34,199 @@ const ServiceDetailsDialog: React.FC<ServiceDetailsDialogProps> = ({
   onClose,
   serviceType,
 }) => {
-  const serviceData: Record<'cook' | 'maid' | 'babycare', ServiceDetails> = {
+  const serviceData: Record<"cook" | "maid" | "babycare", ServiceDetails> = {
     maid: {
-      title: 'ServEaso Maid Services',
-      description: 'Professional cleaning and household services',
-      icon: '🧹',
+      title: "ServEaso Maid Services",
+      description: "Professional cleaning and household services",
+      icon: "🧹",
       features: [
         {
-          title: 'Cleaning',
+          title: "Cleaning",
           items: [
-            'Utensils cleaning',
-            'Dusting',
-            'Vacuuming',
-            'Mopping',
-            'Sweeping',
-            'Cleaning bathrooms and kitchens',
+            "Utensils cleaning",
+            "Dusting",
+            "Vacuuming",
+            "Mopping",
+            "Sweeping",
+            "Cleaning bathrooms and kitchens",
           ],
         },
         {
-          title: 'Laundry',
+          title: "Laundry",
           items: [
-            'Washing clothes',
-            'Drying clothes',
-            'Folding clothes',
-            'Ironing clothes',
+            "Washing clothes",
+            "Drying clothes",
+            "Folding clothes",
+            "Ironing clothes",
           ],
         },
         {
-          title: 'Errands',
+          title: "Errands",
           items: [
-            'Running errands for customers',
-            'Picking up groceries',
-            'Dry cleaning pickup/dropoff',
+            "Running errands for customers",
+            "Picking up groceries",
+            "Dry cleaning pickup/dropoff",
           ],
         },
         {
           items: [
-            'Respectful of customer\'s property',
-            'Punctual and reliable',
-            'Professional and courteous',
-            'Discreet and respectful of privacy',
+            "Respectful of customer's property",
+            "Punctual and reliable",
+            "Professional and courteous",
+            "Discreet and respectful of privacy",
           ],
         },
       ],
     },
     cook: {
-      title: 'ServEaso Cook Services',
-      description: 'Professional cooking services with strict standards',
-      icon: '👩‍🍳',
+      title: "ServEaso Cook Services",
+      description: "Professional cooking services with strict standards",
+      icon: "👩‍🍳",
       features: [
         {
-          title: 'Hygiene',
+          title: "Hygiene",
           items: [
-            'Adhere to strict hygiene standards',
-            'Frequent handwashing',
-            'Wear clean uniforms and hairnets',
-            'Maintain spotless work environment',
+            "Adhere to strict hygiene standards",
+            "Frequent handwashing",
+            "Wear clean uniforms and hairnets",
+            "Maintain spotless work environment",
           ],
         },
         {
-          title: 'Temperature Control',
+          title: "Temperature Control",
           items: [
-            'Meticulously monitor food temperatures',
-            'Prevent bacterial growth',
-            'Ensure proper cooking, storage, and reheating',
+            "Meticulously monitor food temperatures",
+            "Prevent bacterial growth",
+            "Ensure proper cooking, storage, and reheating",
           ],
         },
         {
-          title: 'Allergen Awareness',
+          title: "Allergen Awareness",
           items: [
-            'Handle allergens carefully',
-            'Prevent cross-contamination',
-            'Provide accurate allergen information',
+            "Handle allergens carefully",
+            "Prevent cross-contamination",
+            "Provide accurate allergen information",
           ],
         },
         {
-          title: 'Safe Food Handling',
+          title: "Safe Food Handling",
           items: [
-            'Follow proper procedures for raw and cooked foods',
-            'Minimize contamination risk',
+            "Follow proper procedures for raw and cooked foods",
+            "Minimize contamination risk",
           ],
         },
         {
-          title: 'Freshness',
+          title: "Freshness",
           items: [
-            'Use fresh, high-quality ingredients',
-            'Select best produce, meats, and components',
+            "Use fresh, high-quality ingredients",
+            "Select best produce, meats, and components",
           ],
         },
         {
-          title: 'Proper Techniques',
+          title: "Proper Techniques",
           items: [
-            'Employ proper cooking techniques',
-            'Maximize flavor, texture, and nutritional value',
-            'Ensure highest preparation standards',
+            "Employ proper cooking techniques",
+            "Maximize flavor, texture, and nutritional value",
+            "Ensure highest preparation standards",
           ],
         },
         {
-          title: 'Attention to Detail',
+          title: "Attention to Detail",
           items: [
-            'Pay close attention to every step',
-            'From chopping vegetables to final plating',
-            'Ensure consistency and visual appeal',
+            "Pay close attention to every step",
+            "From chopping vegetables to final plating",
+            "Ensure consistency and visual appeal",
           ],
         },
         {
-          title: 'Dietary Restrictions',
+          title: "Dietary Restrictions",
           items: [
-            'Accommodate gluten-free needs',
-            'Prepare vegetarian and vegan meals',
-            'Tailor to specific allergies/intolerances',
+            "Accommodate gluten-free needs",
+            "Prepare vegetarian and vegan meals",
+            "Tailor to specific allergies/intolerances",
           ],
         },
         {
-          title: 'Customization',
+          title: "Customization",
           items: [
-            'Adjust spice levels',
-            'Modify ingredients',
-            'Customize portion sizes',
+            "Adjust spice levels",
+            "Modify ingredients",
+            "Customize portion sizes",
           ],
         },
       ],
     },
     babycare: {
-      title: 'ServEaso Caregiver Services',
-      description: 'Professional care services',
-      icon: '👶',
+      title: "ServEaso Caregiver Services",
+      description: "Professional child care services",
+      icon: "👶",
       features: [
         {
-          title: 'Nurture and Safe Environment',
+          title: "Nurture and Safe Environment",
           items: [
-            'Provide loving and supportive environment',
-            'Children feel safe, secure, and understood',
-            'Offer comfort and encouragement',
-            'Build strong emotional connection',
+            "Provide loving and supportive environment",
+            "Children feel safe, secure, and understood",
+            "Offer comfort and encouragement",
+            "Build strong emotional connection",
           ],
         },
         {
-          title: 'Physical Safety',
+          title: "Physical Safety",
           items: [
-            'Ensure hazard-free environment',
-            'Supervise all activities',
-            'Prepare for emergencies',
+            "Ensure hazard-free environment",
+            "Supervise all activities",
+            "Prepare for emergencies",
           ],
         },
         {
-          title: 'Medical Safety',
+          title: "Medical Safety",
+          items: ["Trained in CPR", "First aid certified for medical emergencies"],
+        },
+        {
+          title: "Cognitive Development",
           items: [
-            'Trained in CPR',
-            'First aid certified for medical emergencies',
+            "Engage in age-appropriate activities",
+            "Reading and educational games",
+            "Explore children's interests",
+            "Help with homework",
+            "Encourage learning",
           ],
         },
         {
-          title: 'Cognitive Development',
+          title: "Social/Emotional Development",
           items: [
-            'Engage in age-appropriate activities',
-            'Reading and educational games',
-            'Explore children\'s interests',
-            'Help with homework',
-            'Encourage learning',
+            "Teach sharing and empathy",
+            "Conflict resolution skills",
+            "Develop self-confidence",
+            "Build emotional intelligence",
           ],
         },
         {
-          title: 'Social/Emotional Development',
+          title: "Physical Development",
           items: [
-            'Teach sharing and empathy',
-            'Conflict resolution skills',
-            'Develop self-confidence',
-            'Build emotional intelligence',
+            "Encourage physical activity",
+            "Outdoor adventures",
+            "Age-appropriate sports",
+            "Prepare healthy meals and snacks",
           ],
         },
         {
-          title: 'Physical Development',
+          title: "Communication",
           items: [
-            'Encourage physical activity',
-            'Outdoor adventures',
-            'Age-appropriate sports',
-            'Prepare healthy meals and snacks',
+            "Maintain open communication with parents",
+            "Share daily updates",
+            "Discuss development progress",
+            "Listen attentively to child",
+            "Respond with empathy",
           ],
         },
         {
-          title: 'Communication',
+          title: "Collaboration",
           items: [
-            'Maintain open communication with parents',
-            'Share daily updates',
-            'Discuss development progress',
-            'Listen attentively to child',
-            'Respond with empathy',
-          ],
-        },
-        {
-          title: 'Collaboration',
-          items: [
-            'Work in partnership with parents',
-            'Ensure consistency in care',
-            'Respect parents\' values',
-            'Follow parenting styles',
+            "Work in partnership with parents",
+            "Ensure consistency in care",
+            "Respect parents' values",
+            "Follow parenting styles",
           ],
         },
       ],
@@ -240,48 +237,18 @@ const ServiceDetailsDialog: React.FC<ServiceDetailsDialogProps> = ({
 
   const { title, description, features, icon } = serviceData[serviceType];
 
-  const renderFeatureItem = ({ item }: { item: string }) => (
-    <List.Item
-      title={item}
-      left={() => <Icon name="check" size={20} color="#1976d2" />}
-      titleStyle={styles.listItemText}
-    />
-  );
-
-  const renderFeatureSection = (feature: ServiceFeature, index: number) => (
-    <View key={index} style={styles.featureSection}>
-      {feature.title && (
-        <Text style={styles.featureTitle}>{feature.title}</Text>
-      )}
-      <FlatList
-        data={feature.items}
-        renderItem={renderFeatureItem}
-        keyExtractor={(item, itemIndex) => itemIndex.toString()}
-        scrollEnabled={false}
-      />
-      {index < features.length - 1 && (
-        <Divider style={styles.divider} />
-      )}
-    </View>
-  );
-
-return (
-    <Modal
-      visible={open}
-      onRequestClose={onClose}
-      animationType="fade"
-      transparent={true}
-    >
+  return (
+    <Modal visible={open} transparent animationType="fade">
       <View style={styles.overlay}>
-        <View style={styles.dialogContainer}>
+        <View style={styles.dialog}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerText}>
-              {icon && <Text style={styles.icon}>{icon}</Text>}
-              {title}
-            </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Icon name="close" size={24} color="#666" />
+            <View style={styles.headerLeft}>
+              <Text style={styles.icon}>{icon}</Text>
+              <Text style={styles.headerText}>{title}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose}>
+              <Icon name="x" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
 
@@ -290,34 +257,27 @@ return (
             <Text style={styles.description}>{description}</Text>
 
             {features.map((feature, index) => (
-              <View key={index} style={styles.featureSection}>
+              <View key={index} style={styles.featureBlock}>
                 {feature.title && (
                   <Text style={styles.featureTitle}>{feature.title}</Text>
                 )}
-                {feature.items.map((item, itemIndex) => (
-                  <View key={itemIndex} style={styles.featureItem}>
-                    <Icon name="check" size={20} color="#1976d2" style={styles.checkIcon} />
-                    <Text style={styles.featureText}>{item}</Text>
+                {feature.items.map((item, i) => (
+                  <View key={i} style={styles.listItem}>
+                    <MaterialIcon
+                      name="check"
+                      size={16}
+                      color="#1d4ed8"
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={styles.listText}>{item}</Text>
                   </View>
                 ))}
                 {index < features.length - 1 && (
-                  <Divider style={styles.divider} />
+                  <View style={styles.divider} />
                 )}
               </View>
             ))}
           </ScrollView>
-
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Button
-              mode="contained"
-              onPress={onClose}
-              style={styles.closeBtn}
-              labelStyle={styles.closeBtnText}
-            >
-              Close
-            </Button>
-          </View>
         </View>
       </View>
     </Modal>
@@ -327,101 +287,70 @@ return (
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 20,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  dialogContainer: {
-    width: '90%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    backgroundColor: 'white',
+  dialog: {
+    backgroundColor: "#fff",
     borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    width: 340,
+    maxHeight: "80%",
+    overflow: "hidden",
+    elevation: 10,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f5f5f5',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    backgroundColor: "#1d4ed8",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  headerText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    flex: 1,
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   icon: {
     fontSize: 20,
     marginRight: 8,
   },
-  closeButton: {
-    padding: 4,
+  headerText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
   },
   content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    maxHeight: '70%',
+    padding: 16,
   },
   description: {
     fontSize: 14,
+    color: "#333",
     marginBottom: 16,
-    lineHeight: 20,
-    color: '#333',
   },
-  featureSection: {
-    marginBottom: 16,
+  featureBlock: {
+    marginBottom: 20,
   },
   featureTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#1976d2',
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    fontWeight: "bold",
+    color: "#1d4ed8",
     marginBottom: 8,
   },
-  checkIcon: {
-    marginRight: 8,
+  listItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 6,
   },
-  featureText: {
-    fontSize: 14,
-    flex: 1,
-    color: '#333',
+  listText: {
+    fontSize: 13,
+    color: "#444",
+    flexShrink: 1,
   },
   divider: {
-    marginVertical: 12,
-    backgroundColor: '#e0e0e0',
     height: 1,
+    backgroundColor: "rgba(0,0,0,0.08)",
+    marginTop: 10,
   },
-  footer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  closeBtn: {
-    borderRadius: 6,
-    backgroundColor: '#1976d2',
-  },
-  closeBtnText: {
-    color: 'white',
-    fontSize: 14,
-  },
-//    listItemText: {
-//     fontSize: 14,
-//   },
 });
 
 export default ServiceDetailsDialog;

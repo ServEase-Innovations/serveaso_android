@@ -13,7 +13,8 @@ import {
   ViewStyle,
   ImageStyle,
   Animated,
-  Dimensions
+  Dimensions,
+  Alert
 } from "react-native";
 import { useDispatch } from "react-redux";
 import { add } from "./features/bookingTypeSlice";
@@ -36,7 +37,6 @@ const nannyImage = require("../assets/images/Nannynew.png");
 const heroImage1 = require("../assets/images/CookLand.png");
 const heroImage2 = require("../assets/images/MaidLand.png");
 const heroImage3 = require("../assets/images/NannyLand.png");
-
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
@@ -80,14 +80,13 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [open, setOpen] = useState(false);
   const [selectedType, setSelectedtype] = useState("");
   const [selectedRadioButtonValue, setSelectedRadioButtonValue] = useState("");
-  const [openServiceDialog, setOpenServiceDialog] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [currentPicker, setCurrentPicker] = useState<"start" | "end">("start");
+  const [currentPicker, setCurrentPicker] = useState<"date" | "time">("date");
   const [showRegistration, setShowRegistration] = useState(false);
   const [serviceDetailsOpen, setServiceDetailsOpen] = useState(false);
   const [selectedServiceType, setSelectedServiceType] = useState<"cook" | "maid" | "babycare" | null>(null);
@@ -100,12 +99,12 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [showAgentRegistration, setShowAgentRegistration] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [duration, setDuration] = useState(1); // Default 1 hour duration
 
   // Auth0 authentication
   const { user: auth0User, authorize, clearSession } = useAuth0();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [role, setRole] = useState<string | null>(null);
-  const [notificationPermission, setNotificationPermission] = useState<string>('default');
 
   // Check authentication status
   useEffect(() => {
@@ -244,75 +243,108 @@ const HomePage: React.FC<ChildComponentProps> = ({
     setEndDate(null);
     setStartTime(null);
     setEndTime(null);
+    setDuration(1);
   };
 
   const handleClose = () => {
     setOpen(false);
   };
 
-  const handleSave = () => {
-  const booking = {
-    startDate: startDate?.toISOString(),
-    endDate: endDate?.toISOString(),
-    startTime: startTime?.toISOString(),
-    endTime: endTime?.toISOString(),
-    bookingPreference: selectedRadioButtonValue,
-    serviceType: selectedType,
-    housekeepingRole: selectedType, // THIS IS THE KEY FIX
+  // Check if time is within allowed booking hours (5 AM - 10 PM)
+  const isBookingValid = (time: Date | null) => {
+    if (!time) return false;
+    const now = new Date();
+    const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60000);
+    
+    // Allow times that are at least 30 minutes ahead
+    if (time < thirtyMinutesFromNow) return false;
+    
+    const hour = time.getHours();
+    return hour >= 5 && hour < 22; // 5 AM–10 PM
   };
 
-  console.log("Dispatching booking:", booking); // For debugging
-
-  if (selectedRadioButtonValue === "Date") {
-    switch (selectedType) {
-      case "COOK":
-        setShowCookDialog(true);
-        break;
-      case "MAID":
-        setShowMaidServiceDialog(true);
-        break;
-      case "NANNY":
-        setShowNannyServicesDialog(true);
-        break;
-      default:
-        sendDataToParent(DETAILS);
+  const handleSave = () => {
+    if (startTime && !isBookingValid(startTime)) {
+      Alert.alert(
+        "Invalid Time",
+        "Please select a time between 5 AM and 10 PM, at least 30 minutes from now"
+      );
+      return;
     }
-  } else {
-    sendDataToParent(DETAILS);
-  }
 
-  setOpen(false);
-  dispatch(add(booking));
-};
+    const booking = {
+      startDate: startDate?.toISOString(),
+      endDate: startDate?.toISOString(),
+      startTime: startTime?.toISOString(),
+      endTime: endTime?.toISOString(),
+      bookingPreference: selectedRadioButtonValue,
+      serviceType: selectedType,
+      housekeepingRole: selectedType,
+      duration: duration
+    };
+
+    console.log("Dispatching booking:", booking);
+
+    if (selectedRadioButtonValue === "Date") {
+      switch (selectedType) {
+        case "COOK":
+          setShowCookDialog(true);
+          break;
+        case "MAID":
+          setShowMaidServiceDialog(true);
+          break;
+        case "NANNY":
+          setShowNannyServicesDialog(true);
+          break;
+        default:
+          sendDataToParent(DETAILS);
+      }
+    } else {
+      sendDataToParent(DETAILS);
+    }
+
+    setOpen(false);
+    dispatch(add(booking));
+  };
 
   const isConfirmDisabled = () => {
     if (!startDate) return true;
-    if (selectedRadioButtonValue !== "Monthly" && !endDate) return true;
     if (!startTime) return true;
-    if (selectedRadioButtonValue !== "Monthly" && !endTime) return true;
     return false;
   };
 
-  const showDatepicker = (type: "start" | "end") => {
+  const showPicker = (type: "date" | "time") => {
     setCurrentPicker(type);
-    setShowDatePicker(true);
-  };
-
-  const showTimepicker = (type: "start" | "end") => {
-    setCurrentPicker(type);
-    setShowTimePicker(true);
+    if (type === "date") {
+      setShowDatePicker(true);
+      setShowTimePicker(false);
+    } else {
+      setShowTimePicker(true);
+      setShowDatePicker(false);
+    }
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
     if (selectedDate) {
-      if (currentPicker === "start") {
-        setStartDate(selectedDate);
-        if (selectedRadioButtonValue === "Date") {
-          setEndDate(selectedDate);
+      setStartDate(selectedDate);
+      setEndDate(selectedDate);
+      
+      // If no time is selected yet, set a default time
+      if (!startTime) {
+        const defaultTime = new Date(selectedDate);
+        const now = new Date();
+        
+        // If selected date is today, set time to 30 minutes from now
+        if (selectedDate.toDateString() === now.toDateString()) {
+          defaultTime.setTime(now.getTime() + 30 * 60000);
+        } else {
+          // For future dates, set default time to 8:00 AM
+          defaultTime.setHours(8, 0, 0, 0);
         }
-      } else {
-        setEndDate(selectedDate);
+        setStartTime(defaultTime);
+        const calculatedEndTime = new Date(defaultTime.getTime() + duration * 60 * 60000);
+        setEndTime(calculatedEndTime);
       }
     }
   };
@@ -320,22 +352,71 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const onTimeChange = (event: any, selectedTime?: Date) => {
     setShowTimePicker(false);
     if (selectedTime) {
-      if (currentPicker === "start") {
-        setStartTime(selectedTime);
-      } else {
-        setEndTime(selectedTime);
+      setStartTime(selectedTime);
+      const calculatedEndTime = new Date(selectedTime.getTime() + duration * 60 * 60000);
+      setEndTime(calculatedEndTime);
+      
+      // If no date is selected, set today's date
+      if (!startDate) {
+        const today = new Date();
+        setStartDate(today);
+        setEndDate(today);
       }
     }
   };
 
   const formatDate = (date: Date | null) => {
     if (!date) return "";
-    return date.toLocaleDateString();
+    return date.toLocaleDateString('en-US', { 
+      month: '2-digit', 
+      day: '2-digit', 
+      year: 'numeric' 
+    });
   };
 
   const formatTime = (time: Date | null) => {
     if (!time) return "";
-    return time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return time.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  // Calculate maximum date
+  const getMaxDate = () => {
+    const today = new Date();
+    if (selectedRadioButtonValue === "Monthly") {
+      return new Date(today.getTime() + 89 * 24 * 60 * 60000); // 90 days
+    }
+    return new Date(today.getTime() + 21 * 24 * 60 * 60000); // 21 days
+  };
+
+  // Handle duration changes
+  const increaseDuration = () => {
+    if (startTime) {
+      const newDuration = duration + 1;
+      const newEndTime = new Date(startTime.getTime() + newDuration * 60 * 60000);
+      
+      // Check if new end time would exceed 10 PM
+      if (newEndTime.getHours() < 22) {
+        setDuration(newDuration);
+        setEndTime(newEndTime);
+      } else {
+        Alert.alert("Time Limit", "Service cannot extend beyond 10 PM");
+      }
+    }
+  };
+
+  const decreaseDuration = () => {
+    if (duration > 1) {
+      const newDuration = duration - 1;
+      setDuration(newDuration);
+      if (startTime) {
+        const newEndTime = new Date(startTime.getTime() + newDuration * 60 * 60000);
+        setEndTime(newEndTime);
+      }
+    }
   };
   
   const handleLearnMore = (service: string) => {
@@ -354,6 +435,11 @@ const HomePage: React.FC<ChildComponentProps> = ({
     }
     setServiceDetailsOpen(true);
   };
+
+  // Fix for disabled props - convert null to false
+  const isServiceDisabled = role === "SERVICE_PROVIDER";
+  const isDecreaseDisabled = duration <= 1;
+  const isIncreaseDisabled = !!(endTime && endTime.getHours() >= 22);
 
   return (
     <ScrollView style={styles.container}>
@@ -384,18 +470,18 @@ const HomePage: React.FC<ChildComponentProps> = ({
                   styles.serviceIconContainerRectangular,
                   hoveredService === "COOK" && styles.serviceIconContainerRectangularHover,
                 ]}
-                onPress={() => role !== "SERVICE_PROVIDER" && handleClick("COOK")}
+                onPress={() => !isServiceDisabled && handleClick("COOK")}
                 onPressIn={() => setHoveredService("COOK")}
                 onPressOut={() => setHoveredService(null)}
-                disabled={role === "SERVICE_PROVIDER"}
+                disabled={isServiceDisabled}
               >
                 <Image source={cookImage} style={[
                   styles.serviceImageRectangular,
-                  role === "SERVICE_PROVIDER" && styles.disabledService
+                  isServiceDisabled && styles.disabledService
                 ]} />
                 <View style={styles.serviceOverlay}>
                   <Text style={styles.serviceLabelRectangular}>Home Cook</Text>
-                  {role === "SERVICE_PROVIDER" && (
+                  {isServiceDisabled && (
                     <Text style={styles.disabledText}>Not available</Text>
                   )}
                 </View>
@@ -409,18 +495,18 @@ const HomePage: React.FC<ChildComponentProps> = ({
                   styles.serviceIconContainerRectangular,
                   hoveredService === "MAID" && styles.serviceIconContainerRectangularHover,
                 ]}
-                onPress={() => role !== "SERVICE_PROVIDER" && handleClick("MAID")}
+                onPress={() => !isServiceDisabled && handleClick("MAID")}
                 onPressIn={() => setHoveredService("MAID")}
                 onPressOut={() => setHoveredService(null)}
-                disabled={role === "SERVICE_PROVIDER"}
+                disabled={isServiceDisabled}
               >
                 <Image source={maidImage} style={[
                   styles.serviceImageRectangular,
-                  role === "SERVICE_PROVIDER" && styles.disabledService
+                  isServiceDisabled && styles.disabledService
                 ]} />
                 <View style={styles.serviceOverlay}>
                   <Text style={styles.serviceLabelRectangular}>Cleaning Help</Text>
-                  {role === "SERVICE_PROVIDER" && (
+                  {isServiceDisabled && (
                     <Text style={styles.disabledText}>Not available</Text>
                   )}
                 </View>
@@ -434,18 +520,18 @@ const HomePage: React.FC<ChildComponentProps> = ({
                   styles.serviceIconContainerRectangular,
                   hoveredService === "NANNY" && styles.serviceIconContainerRectangularHover,
                 ]}
-                onPress={() => role !== "SERVICE_PROVIDER" && handleClick("NANNY")}
+                onPress={() => !isServiceDisabled && handleClick("NANNY")}
                 onPressIn={() => setHoveredService("NANNY")}
                 onPressOut={() => setHoveredService(null)}
-                disabled={role === "SERVICE_PROVIDER"}
+                disabled={isServiceDisabled}
               >
                 <Image source={nannyImage} style={[
                   styles.serviceImageRectangular,
-                  role === "SERVICE_PROVIDER" && styles.disabledService
+                  isServiceDisabled && styles.disabledService
                 ]} />
                 <View style={styles.serviceOverlay}>
                   <Text style={styles.serviceLabelRectangular}>Caregiver</Text>
-                  {role === "SERVICE_PROVIDER" && (
+                  {isServiceDisabled && (
                     <Text style={styles.disabledText}>Not available</Text>
                   )}
                 </View>
@@ -592,10 +678,11 @@ const HomePage: React.FC<ChildComponentProps> = ({
       {/* How it works */}
       <HowItWorksSection />
 
-      {/* Booking Dialog */}
+      {/* Enhanced Booking Dialog */}
       <Modal visible={open} animationType="slide" transparent={true}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
+            
             <Text style={styles.modalTitle}>Book a {selectedType.toLowerCase()}</Text>
 
             <View style={styles.radioGroup}>
@@ -631,66 +718,106 @@ const HomePage: React.FC<ChildComponentProps> = ({
                 {/* Date Selection */}
                 <View style={styles.dateContainer}>
                   <Text style={styles.label}>
-                    {selectedRadioButtonValue === "Monthly" ? "Select Month" : "Select Date"}
+                    {selectedRadioButtonValue === "Monthly" ? "Select Start Date" : "Select Date"}
                   </Text>
                   <TouchableOpacity
                     style={styles.dateInput}
-                    onPress={() => showDatepicker("start")}
+                    onPress={() => showPicker("date")}
                   >
                     <Text style={styles.dateInputText}>
-                      {formatDate(startDate) || "Select date"}
+                      {startDate ? formatDate(startDate) : "Select date"}
                     </Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* End date for non-monthly bookings */}
-                {(selectedRadioButtonValue === "Date" || selectedRadioButtonValue === "Short term") && (
-                  <View style={styles.dateContainer}>
-                    <Text style={styles.label}>End Date</Text>
-                    <TouchableOpacity
-                      style={[styles.dateInput, !startDate && styles.disabledInput]}
-                      onPress={() => showDatepicker("end")}
-                      disabled={!startDate}
-                    >
-                      <Text style={styles.dateInputText}>
-                        {formatDate(endDate) || "Select date"}
-                      </Text>
-                    </TouchableOpacity>
+                {/* Time Selection */}
+                <View style={styles.dateContainer}>
+                  <Text style={styles.label}>Select Start Time</Text>
+                  <TouchableOpacity
+                    style={styles.dateInput}
+                    onPress={() => showPicker("time")}
+                  >
+                    <Text style={styles.dateInputText}>
+                      {startTime ? formatTime(startTime) : "Select time"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Duration Selector for Date Option */}
+                {selectedRadioButtonValue === "Date" && startDate && startTime && (
+                  <View style={styles.durationContainer}>
+                    <Text style={styles.durationTitle}>Service Duration</Text>
+                    <View style={styles.durationSelector}>
+                      <TouchableOpacity 
+                        style={[
+                          styles.durationButton,
+                          isDecreaseDisabled && styles.durationButtonDisabled
+                        ]}
+                        onPress={decreaseDuration}
+                        disabled={isDecreaseDisabled}
+                      >
+                        <Text style={[
+                          styles.durationButtonText,
+                          isDecreaseDisabled && styles.durationButtonTextDisabled
+                        ]}>-</Text>
+                      </TouchableOpacity>
+                      
+                      <View style={styles.durationDisplay}>
+                        <Text style={styles.durationText}>
+                          {duration} hour{duration > 1 ? 's' : ''}
+                        </Text>
+                      </View>
+                      
+                      <TouchableOpacity 
+                        style={[
+                          styles.durationButton,
+                          isIncreaseDisabled && styles.durationButtonDisabled
+                        ]}
+                        onPress={increaseDuration}
+                        disabled={isIncreaseDisabled}
+                      >
+                        <Text style={[
+                          styles.durationButtonText,
+                          isIncreaseDisabled && styles.durationButtonTextDisabled
+                        ]}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                    
+                    <Text style={styles.durationNote}>
+                      Service will end at: {endTime ? formatTime(endTime) : 'Calculating...'}
+                    </Text>
                   </View>
                 )}
 
-                {/* Time Selection */}
-                <View style={styles.timeInputContainer}>
-                  <View style={styles.timeInputWrapper}>
-                    <Text style={styles.label}>Start Time</Text>
-                    <TouchableOpacity
-                      style={styles.timeInput}
-                      onPress={() => showTimepicker("start")}
-                    >
-                      <Text style={styles.timeInputText}>
-                        {formatTime(startTime) || "Select time"}
+                {/* Booking Summary */}
+                {startDate && startTime && (
+                  <View style={styles.bookingSummary}>
+                    <Text style={styles.summaryTitle}>Booking Summary</Text>
+                    <Text style={styles.summaryText}>
+                      Date: {formatDate(startDate)}
+                    </Text>
+                    <Text style={styles.summaryText}>
+                      Start Time: {formatTime(startTime)}
+                    </Text>
+                    {selectedRadioButtonValue === "Date" && (
+                      <Text style={styles.summaryText}>
+                        Duration: {duration} hour{duration > 1 ? 's' : ''}
                       </Text>
-                    </TouchableOpacity>
+                    )}
+                    <Text style={styles.summaryNote}>
+                      Your service is scheduled for {formatDate(startDate)} at {formatTime(startTime)}
+                    </Text>
                   </View>
-                  
-                  {/* End time for non-monthly bookings */}
-                  {(selectedRadioButtonValue === "Date" || selectedRadioButtonValue === "Short term") && (
-                    <View style={styles.timeInputWrapper}>
-                      <Text style={styles.label}>End Time</Text>
-                      <TouchableOpacity
-                        style={[styles.timeInput, !startTime && styles.disabledInput]}
-                        onPress={() => showTimepicker("end")}
-                        disabled={!startTime}
-                      >
-                        <Text style={styles.timeInputText}>
-                          {formatTime(endTime) || "Select time"}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
+                )}
               </View>
             )}
+
+            {/* Relax Message */}
+            <View style={styles.relaxMessage}>
+              <Text style={styles.relaxText}>
+                Relax, we'll handle the rest. Our verified professionals ensure your peace of mind.
+              </Text>
+            </View>
 
             <View style={styles.modalButtons}>
               <Button title="Cancel" onPress={handleClose} />
@@ -704,76 +831,20 @@ const HomePage: React.FC<ChildComponentProps> = ({
         </View>
       </Modal>
 
+      {/* Date/Time Pickers */}
       {(showDatePicker || showTimePicker) && (
         <DateTimePicker
-          value={
-            currentPicker === "start"
-              ? startDate || new Date()
-              : endDate || new Date()
-          }
-          mode={showDatePicker ? "date" : "time"}
+          value={startDate || new Date()}
+          mode={currentPicker}
           display="default"
-          onChange={showDatePicker ? onDateChange : onTimeChange}
+          onChange={currentPicker === "date" ? onDateChange : onTimeChange}
           minimumDate={new Date()}
+          maximumDate={getMaxDate()}
         />
       )}
+
+      {/* Service Dialogs */}
       {showCookDialog && (
-  <View style={styles.dialogOverlay}>
-    <View style={styles.dialogBox}>
-      <DemoCook
-        onClose={() => setShowCookDialog(false)}
-        sendDataToParent={sendDataToParent}
-        bookingType={{
-          startDate: startDate?.toISOString(),
-          endDate: endDate?.toISOString(),
-          timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
-          bookingPreference: selectedRadioButtonValue,
-          housekeepingRole: selectedType // ADD THIS
-        }}
-      />
-    </View>
-  </View>
-)}
-
-{showNannyServicesDialog && (
-  <View style={styles.dialogOverlay}>
-    <View style={styles.dialogBox}>
-      <NannyServicesDialog
-        open={showNannyServicesDialog}
-        handleClose={() => setShowNannyServicesDialog(false)}
-        sendDataToParent={sendDataToParent}
-        bookingType={{
-          startDate: startDate?.toISOString(),
-          endDate: endDate?.toISOString(),
-          timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
-          bookingPreference: selectedRadioButtonValue,
-          housekeepingRole: selectedType // ADD THIS
-        }}
-      />
-    </View>
-  </View>
-)}
-
-{showMaidServiceDialog && (
-  <View style={styles.dialogOverlay}>
-    <View style={styles.dialogBox}>
-      <MaidServiceDialog
-        open={showMaidServiceDialog}
-        handleClose={() => setShowMaidServiceDialog(false)}
-        sendDataToParent={sendDataToParent}
-        bookingType={{
-          startDate: startDate?.toISOString(),
-          endDate: endDate?.toISOString(),
-          timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
-          bookingPreference: selectedRadioButtonValue,
-          housekeepingRole: selectedType // ADD THIS
-        }}
-      />
-    </View>
-  </View>
-)}
-
-      {/* {showCookDialog && (
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogBox}>
             <DemoCook
@@ -781,9 +852,11 @@ const HomePage: React.FC<ChildComponentProps> = ({
               sendDataToParent={sendDataToParent}
               bookingType={{
                 startDate: startDate?.toISOString(),
-                endDate: endDate?.toISOString(),
+                endDate: startDate?.toISOString(),
                 timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
-                bookingPreference: selectedRadioButtonValue
+                bookingPreference: selectedRadioButtonValue,
+                housekeepingRole: selectedType,
+                duration: duration
               }}
             />
           </View>
@@ -797,6 +870,14 @@ const HomePage: React.FC<ChildComponentProps> = ({
               open={showNannyServicesDialog}
               handleClose={() => setShowNannyServicesDialog(false)}
               sendDataToParent={sendDataToParent}
+              bookingType={{
+                startDate: startDate?.toISOString(),
+                endDate: startDate?.toISOString(),
+                timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+                bookingPreference: selectedRadioButtonValue,
+                housekeepingRole: selectedType,
+                duration: duration
+              }}
             />
           </View>
         </View>
@@ -809,10 +890,18 @@ const HomePage: React.FC<ChildComponentProps> = ({
               open={showMaidServiceDialog}
               handleClose={() => setShowMaidServiceDialog(false)}
               sendDataToParent={sendDataToParent}
+              bookingType={{
+                startDate: startDate?.toISOString(),
+                endDate: startDate?.toISOString(),
+                timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+                bookingPreference: selectedRadioButtonValue,
+                housekeepingRole: selectedType,
+                duration: duration
+              }}
             />
           </View>
         </View>
-      )} */}
+      )}
 
       <ServiceDetailsDialog
         open={serviceDetailsOpen}
@@ -1142,11 +1231,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     width: "90%",
     maxWidth: 400,
+    maxHeight: "80%",
+    overflow: 'hidden', 
   },
+  modalScrollView: {
+  flex: 1,
+},
+modalScrollContent: {
+  padding: 20,
+  paddingBottom: 10, // Add some bottom padding for the buttons
+},
   modalTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 16,
+    textAlign: 'center',
   },
   radioGroup: {
     marginBottom: 16,
@@ -1154,6 +1253,7 @@ const styles = StyleSheet.create({
   radioLabel: {
     fontSize: 16,
     marginBottom: 8,
+    fontWeight: '500',
   },
   radioOptions: {
     flexDirection: "row",
@@ -1165,12 +1265,13 @@ const styles = StyleSheet.create({
   },
   radioText: {
     marginLeft: 8,
+    fontSize: 14,
   },
   dateTimeContainer: {
     gap: 16,
   },
   dateContainer: {
-    gap: 16,
+    gap: 8,
   },
   monthlyContainer: {
     gap: 16,
@@ -1178,12 +1279,14 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     marginBottom: 4,
+    fontWeight: '500',
   },
   dateInput: {
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 4,
     padding: 12,
+    backgroundColor: '#f9f9f9',
   },
   timeInputContainer: {
     flexDirection: "row",
@@ -1210,6 +1313,7 @@ const styles = StyleSheet.create({
   },
   dateInputText: {
     color: '#000',
+    fontSize: 14,
   },
   timeInputText: {
     color: '#000',
@@ -1291,6 +1395,104 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
     fontSize: 10,
     marginTop: 2,
+  },
+  // New styles for enhanced date-time picker
+  durationContainer: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    backgroundColor: '#fafafa',
+  },
+  durationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  durationSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  durationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1976d2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  durationButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  durationButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  durationButtonTextDisabled: {
+    color: '#666',
+  },
+  durationDisplay: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  durationText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  durationNote: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  estimatedCost: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1976d2',
+    textAlign: 'center',
+  },
+  bookingSummary: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    backgroundColor: '#f0f8ff',
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#1976d2',
+  },
+  summaryText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  summaryNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 8,
+  },
+  relaxMessage: {
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  relaxText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });
 
