@@ -10,8 +10,9 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import axiosInstance from './axiosInstance'; 
+import axios from 'axios'; // Or use your axiosInstance
 import { useAppUser } from './context/AppUserContext';
+import axiosInstance from './axiosInstance';
 
 interface ValidationState {
   loading: boolean;
@@ -19,8 +20,17 @@ interface ValidationState {
   isAvailable: boolean | null;
 }
 
-const MobileNumberDialog = () => {
-  const [open, setOpen] = useState(false);
+interface MobileNumberDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const MobileNumberDialog: React.FC<MobileNumberDialogProps> = ({ 
+  open, 
+  onClose, 
+  onSuccess 
+}) => {
   const [contactNumber, setContactNumber] = useState('');
   const [altContactNumber, setAltContactNumber] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,9 +49,16 @@ const MobileNumberDialog = () => {
 
   const { appUser } = useAppUser();
 
+  // Reset form when dialog opens/closes
   useEffect(() => {
-    setOpen(true);
-  }, []);
+    if (open) {
+      // Reset form state when dialog opens
+      setContactNumber('');
+      setAltContactNumber('');
+      setContactValidation({ loading: false, error: '', isAvailable: null });
+      setAltContactValidation({ loading: false, error: '', isAvailable: null });
+    }
+  }, [open]);
 
   // Validate mobile number format
   const validateMobileFormat = (number: string): boolean => {
@@ -254,7 +271,7 @@ const MobileNumberDialog = () => {
       // Prepare payload conditionally
       const payload: any = {};
       if (contactNumber) payload.mobileNo = contactNumber;
-      if (altContactNumber) payload.alternateNo = altContactNumber;
+      if (altContactNumber) payload.altMobileNo = altContactNumber;
 
       console.log(' Sending update payload:', payload);
 
@@ -266,7 +283,8 @@ const MobileNumberDialog = () => {
 
       console.log('✅ API Response:', response.data);
       Alert.alert('Success', 'Mobile number(s) updated successfully!');
-      setOpen(false);
+      onSuccess(); // Call the success callback
+      onClose(); // Close the dialog
     } catch (error) {
       console.error('❌ Error updating mobile numbers:', error);
       Alert.alert('Error', 'Something went wrong while updating!');
@@ -309,7 +327,7 @@ const MobileNumberDialog = () => {
       visible={open}
       animationType="slide"
       transparent={true}
-      onRequestClose={() => setOpen(false)}
+      onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
@@ -317,7 +335,7 @@ const MobileNumberDialog = () => {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Update Contact Numbers</Text>
             <TouchableOpacity
-              onPress={() => setOpen(false)}
+              onPress={onClose}
               style={styles.closeButton}
             >
               <Text style={styles.closeButtonText}>×</Text>
@@ -399,7 +417,7 @@ const MobileNumberDialog = () => {
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
-              onPress={() => setOpen(false)}
+              onPress={onClose}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>

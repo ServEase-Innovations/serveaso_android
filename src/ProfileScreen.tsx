@@ -18,10 +18,12 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from "react-native-vector-icons/Feather";
 import axios from "axios";
 import { useAppUser } from "./context/AppUserContext";
+import MobileNumberDialog from "./MobileNumberDialog";
+import axiosInstance from "./axiosInstance";
 
 const { width } = Dimensions.get('window');
 
-// Interfaces
+// Updated Interfaces to match web version
 interface Address {
   id: string;
   type: string;
@@ -30,6 +32,30 @@ interface Address {
   country: string;
   postalCode: string;
   isPrimary: boolean;
+  rawData?: {
+    formattedAddress: string;
+    latitude: number;
+    longitude: number;
+    placeId: string;
+  };
+}
+
+interface PermanentAddress {
+  field1: string;
+  field2: string;
+  ctArea: string;
+  pinNo: string;
+  state: string;
+  country: string;
+}
+
+interface CorrespondenceAddress {
+  field1: string;
+  field2: string;
+  ctArea: string;
+  pinNo: string;
+  state: string;
+  country: string;
 }
 
 interface UserData {
@@ -55,13 +81,25 @@ interface ServiceProvider {
   pincode: number;
   currentLocation: string;
   nearbyLocation: string;
+  permanentAddress: PermanentAddress;
+  correspondenceAddress: CorrespondenceAddress;
 }
+
+interface CustomerDetails {
+  customerid: number;
+  firstName: string;
+  lastName: string;
+  mobileNo: string | null;
+  altMobileNo: string | null;
+  email: string;
+}
+
+// Mobile Number Dialog Component
+
 
 const ProfileScreen = () => {
   const { user: auth0User, isLoading: auth0Loading } = useAuth0();
   const { appUser } = useAppUser();
-
-  console.log("App User from Context:", appUser);
 
   const [userName, setUserName] = useState<string | null>(null);
   const [userId, setUserId] = useState<number | null>(null);
@@ -69,8 +107,10 @@ const ProfileScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [userRole, setUserRole] = useState<string>("CUSTOMER");
   const [serviceProviderData, setServiceProviderData] = useState<ServiceProvider | null>(null);
+  const [customerData, setCustomerData] = useState<CustomerDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedAddressIds, setExpandedAddressIds] = useState<string[]>([]);
+  const [showMobileDialog, setShowMobileDialog] = useState(false);
 
   const [userData, setUserData] = useState<UserData>({
     firstName: "",
@@ -112,7 +152,7 @@ const ProfileScreen = () => {
 
   // Function to render profile picture with fallback
   const renderProfilePicture = () => {
-    const profilePictureUri = auth0User?.picture;
+    const profilePictureUri = appUser?.picture || auth0User?.picture;
     
     if (profilePictureUri) {
       return (
@@ -138,61 +178,91 @@ const ProfileScreen = () => {
     return userName || appUser?.nickname || "User";
   };
 
+  // Check if customer has valid mobile numbers
+  const hasValidMobileNumbers = () => {
+    if (userRole !== "CUSTOMER") return true;
+    
+    return customerData?.mobileNo && 
+           customerData.mobileNo !== null && 
+           customerData.mobileNo !== "" &&
+           customerData.mobileNo !== "null";
+  };
+
+  // Format mobile number for display
+  const formatMobileNumber = (number: string | null) => {
+    if (!number || number === "null" || number === "undefined") return "";
+    return number;
+  };
+
+  // Fetch customer details (NEW METHOD)
+  const fetchCustomerDetails = async (customerId: number) => {
+  try {
+    console.log("Fetching customer details for ID:", customerId);
+    const response = await axiosInstance.get(`/api/customer/get-customer-by-id/${customerId}`);
+    console.log("API Response:", response.data);
+    
+    const customer = response.data;
+
+    // Enhanced field mapping with fallbacks
+    const mobileNo = customer?.mobileNo ?? 
+                    customer?.mobileNumber ?? 
+                    customer?.phoneNumber ?? 
+                    customer?.contactNumber ?? 
+                    customer?.phone ?? 
+                    "";
+    
+    const altMobileNo = customer?.altMobileNo ?? 
+                       customer?.alternateMobileNo ?? 
+                       customer?.altPhoneNumber ?? 
+                       customer?.alternateContactNumber ?? 
+                       "";
+
+    console.log("Mapped mobile numbers:", { mobileNo, altMobileNo });
+
+    setCustomerData(customer);
+    setUserData(prev => ({
+      ...prev,
+      contactNumber: mobileNo ? mobileNo.toString() : "",
+      altContactNumber: altMobileNo ? altMobileNo.toString() : ""
+    }));
+
+    return customer;
+  } catch (error) {
+    console.error("Error fetching customer details:", error);
+    return null;
+  }
+};
+
   useEffect(() => {
     const initializeProfile = async () => {
       setIsLoading(true);
 
-      if (auth0User || appUser) {
-        // Priority for name: Use auth0User.name (full name) first, then appUser nickname
-        const name = auth0User?.name || appUser?.nickname || null;
-        
-        // Get role from appUser context first, then fallback to auth0User
-        const role = appUser?.role || 
-                    auth0User?.role || 
-                    auth0User?.["https://yourdomain.com/roles"]?.[0] || 
-                    "CUSTOMER";
-        
+      if (appUser) {
+        const name = appUser.name || null;
+        const role = appUser.role || "CUSTOMER";
         setUserRole(role);
 
-        // Get user ID from multiple possible sources
-        const id = appUser?.serviceProviderId ||
-                  appUser?.customerid ||
-                  auth0User?.serviceproviderId || 
-                  auth0User?.["https://yourdomain.com/serviceProviderId"] || 
-                  auth0User?.customerid || 
-                  null;
+        const id = role === "SERVICE_PROVIDER" 
+          ? appUser.serviceProviderId 
+          : appUser.customerid;
         
         setUserName(name);
         setUserId(id ? Number(id) : null);
 
-        // Set first name and last name from available data
-        if (auth0User?.name) {
-          const nameParts = auth0User.name.split(" ");
+        if (name) {
+          const nameParts = name.split(" ");
           setUserData(prev => ({
             ...prev,
             firstName: nameParts[0] || "",
             lastName: nameParts.slice(1).join(" ") || ""
           }));
-        } else if (appUser?.nickname) {
-          setUserData(prev => ({
-            ...prev,
-            firstName: appUser.nickname || "",
-            lastName: ""
-          }));
-        }
-
-        // Set contact info if available in appUser
-        if (appUser?.contactNumber) {
-          setUserData(prev => ({
-            ...prev,
-            contactNumber: appUser.contactNumber
-          }));
         }
 
         try {
           if (role === "SERVICE_PROVIDER" && id) {
-            await fetchServiceProviderData(id.toString());
+            await fetchServiceProviderData(Number(id));
           } else if (role === "CUSTOMER" && id) {
+            await fetchCustomerDetails(Number(id));
             await fetchCustomerAddresses(Number(id));
           }
         } catch (err) {
@@ -206,53 +276,135 @@ const ProfileScreen = () => {
     };
 
     initializeProfile();
-  }, [auth0User, appUser]);
+  }, [appUser]);
 
-  // Fetch customer addresses
+  // Fetch customer addresses (UPDATED to match web version)
   const fetchCustomerAddresses = async (customerId: number) => {
     try {
       const response = await axios.get(
         `https://utils-ndt3.onrender.com/user-settings/${customerId}`
       );
-
       const data = response.data;
 
       if (Array.isArray(data) && data.length > 0) {
         const allSavedLocations = data.flatMap(doc => doc.savedLocations || []);
 
         const mappedAddresses: Address[] = allSavedLocations
-          .filter((loc: any) => loc.location?.formatted_address)
-          .map((loc: any, idx: number) => ({
-            id: loc._id || idx.toString(),
-            type: loc.name || "Other",
-            street: loc.location.formatted_address,
-            city:
-              loc.location.address_components?.find((c: any) =>
-                c.types.includes("locality")
-              )?.long_name || "",
-            country:
-              loc.location.address_components?.find((c: any) =>
-                c.types.includes("country")
-              )?.long_name || "",
-            postalCode:
-              loc.location.address_components?.find((c: any) =>
-                c.types.includes("postal_code")
-              )?.long_name || "",
-            isPrimary: loc.isPrimary || idx === 0
-          }));
+          .filter((loc: any) => loc.location?.address?.[0]?.formatted_address)
+          .map((loc: any, idx: number) => {
+            const primaryAddress = loc.location.address[0];
+            const addressComponents = primaryAddress.address_components || [];
+            
+            const getComponent = (type: string) => {
+              const component = addressComponents.find((c: any) => c.types.includes(type));
+              return component?.long_name || "";
+            };
+
+            return {
+              id: loc._id || idx.toString(),
+              type: loc.name || "Other",
+              street: primaryAddress.formatted_address,
+              city: getComponent("locality") || 
+                    getComponent("administrative_area_level_3") || 
+                    getComponent("administrative_area_level_4") || 
+                    "",
+              country: getComponent("country") || "",
+              postalCode: getComponent("postal_code") || "",
+              isPrimary: loc.isPrimary || idx === 0,
+              rawData: {
+                formattedAddress: primaryAddress.formatted_address,
+                latitude: loc.location.lat,
+                longitude: loc.location.lng,
+                placeId: primaryAddress.place_id
+              }
+            };
+          });
 
         setAddresses(mappedAddresses);
+        console.log("Mapped addresses:", mappedAddresses);
+      } else {
+        console.log("No address data found");
+        setAddresses([]);
       }
     } catch (err) {
       console.error("Failed to fetch customer addresses:", err);
+      setAddresses([]);
     }
   };
-
-  // Fetch service provider data
-  const fetchServiceProviderData = async (serviceProviderId: string) => {
+  
+  // Fetch service provider data (UPDATED to match web version)
+  const fetchServiceProviderData = async (serviceProviderId: number) => {
     try {
+      const response = await axiosInstance.get(
+        `/api/serviceproviders/get/serviceprovider/${serviceProviderId}`
+      );
+
+      const data = response.data;
+      setServiceProviderData(data);
+
+      setUserData(prev => ({
+        ...prev,
+        contactNumber: data.mobileNo ? data.mobileNo.toString() : "",
+        altContactNumber: data.alternateNo ? data.alternateNo.toString() : ""
+      }));
+
+      const addresses: Address[] = [];
+
+      if (data.permanentAddress) {
+        const permAddr = data.permanentAddress;
+        const streetAddress = `${permAddr.field1 || ""} ${permAddr.field2 || ""}`.trim() || 
+                             data.street || 
+                             data.buildingName || 
+                             "";
+        
+        addresses.push({
+          id: "permanent",
+          type: "Permanent",
+          street: streetAddress || "Address not specified",
+          city: permAddr.ctArea || data.locality || data.currentLocation || "",
+          country: permAddr.country || "India",
+          postalCode: permAddr.pinNo || (data.pincode ? data.pincode.toString() : ""),
+          isPrimary: true,
+        });
+      }
+
+      if (data.correspondenceAddress) {
+        const corrAddr = data.correspondenceAddress;
+        const streetAddress = `${corrAddr.field1 || ""} ${corrAddr.field2 || ""}`.trim() || 
+                             data.street || 
+                             data.buildingName || 
+                             "";
+        
+        addresses.push({
+          id: "correspondence",
+          type: "Correspondence",
+          street: streetAddress || "Address not specified",
+          city: corrAddr.ctArea || data.locality || data.currentLocation || "",
+          country: corrAddr.country || "India",
+          postalCode: corrAddr.pinNo || (data.pincode ? data.pincode.toString() : ""),
+          isPrimary: false,
+        });
+      }
+
+      if (addresses.length === 0) {
+        const serviceProviderAddress: Address = {
+          id: "1",
+          type: "Home",
+          street: `${data.buildingName || ""} ${data.street || ""} ${data.locality || ""}`.trim(),
+          city: data.nearbyLocation || data.currentLocation || "",
+          country: "India",
+          postalCode: data.pincode ? data.pincode.toString() : "",
+          isPrimary: true,
+        };
+        addresses.push(serviceProviderAddress);
+      }
+
+      setAddresses(addresses);
+    } catch (error) {
+      console.error("Failed to fetch service provider data:", error);
+      // Fallback to mock data if API fails
       const mockServiceProviderData: ServiceProvider = {
-        serviceproviderId: parseInt(serviceProviderId),
+        serviceproviderId: serviceProviderId,
         firstName: userData.firstName,
         middleName: null,
         lastName: userData.lastName,
@@ -265,30 +417,26 @@ const ProfileScreen = () => {
         street: "Main Street",
         pincode: 123456,
         currentLocation: "City Center",
-        nearbyLocation: "Downtown"
+        nearbyLocation: "Downtown",
+        permanentAddress: {
+          field1: "Building",
+          field2: "Street",
+          ctArea: "City",
+          pinNo: "123456",
+          state: "West Bengal",
+          country: "India"
+        },
+        correspondenceAddress: {
+          field1: "Building",
+          field2: "Street",
+          ctArea: "City",
+          pinNo: "123456",
+          state: "West Bengal",
+          country: "India"
+        }
       };
 
       setServiceProviderData(mockServiceProviderData);
-
-      setUserData(prev => ({
-        ...prev,
-        contactNumber: mockServiceProviderData.mobileNo ? mockServiceProviderData.mobileNo.toString() : "",
-        altContactNumber: mockServiceProviderData.alternateNo ? mockServiceProviderData.alternateNo.toString() : ""
-      }));
-
-      const serviceProviderAddress: Address = {
-        id: "1",
-        type: "Home",
-        street: `${mockServiceProviderData.buildingName || ""} ${mockServiceProviderData.street || ""} ${mockServiceProviderData.locality || ""}`.trim(),
-        city: mockServiceProviderData.nearbyLocation || mockServiceProviderData.currentLocation || "",
-        country: "India",
-        postalCode: mockServiceProviderData.pincode ? mockServiceProviderData.pincode.toString() : "",
-        isPrimary: true,
-      };
-
-      setAddresses([serviceProviderAddress]);
-    } catch (error) {
-      console.error("Failed to fetch service provider data:", error);
     }
   };
 
@@ -299,12 +447,20 @@ const ProfileScreen = () => {
     }));
   };
 
+  // Get available address types based on user role
+  const getAvailableAddressTypes = () => {
+    if (userRole === "SERVICE_PROVIDER") return ["Permanent", "Correspondence"];
+    return ["Home", "Work", "Other"];
+  };
+
+  // Handle Save (UPDATED to match web version)
   const handleSave = async () => {
     setIsSaving(true);
 
     try {
       if (userRole === "SERVICE_PROVIDER" && userId) {
-        const currentAddress = addresses[0];
+        const permanentAddress = addresses.find(addr => addr.type === "Permanent");
+        const correspondenceAddress = addresses.find(addr => addr.type === "Correspondence");
 
         const payload = {
           serviceproviderId: userId,
@@ -312,22 +468,55 @@ const ProfileScreen = () => {
           lastName: userData.lastName,
           mobileNo: userData.contactNumber?.replace("+", "") || null,
           alternateNo: userData.altContactNumber?.replace("+", "") || null,
-          buildingName: currentAddress.street || "",
-          street: currentAddress.street || "",
-          locality: currentAddress.city || "",
-          pincode: currentAddress.postalCode || null,
-          currentLocation: currentAddress.city || "",
-          nearbyLocation: currentAddress.city || "",
+          buildingName: permanentAddress?.street || "",
+          street: permanentAddress?.street || "",
+          locality: permanentAddress?.city || "",
+          pincode: permanentAddress?.postalCode || null,
+          currentLocation: permanentAddress?.city || "",
+          nearbyLocation: permanentAddress?.city || "",
+          permanentAddress: permanentAddress ? {
+            field1: permanentAddress.street.split(' ')[0] || "",
+            field2: permanentAddress.street || "",
+            ctArea: permanentAddress.city || "",
+            pinNo: permanentAddress.postalCode || "",
+            state: "West Bengal",
+            country: permanentAddress.country || "India"
+          } : null,
+          correspondenceAddress: correspondenceAddress ? {
+            field1: correspondenceAddress.street.split(' ')[0] || "",
+            field2: correspondenceAddress.street || "",
+            ctArea: correspondenceAddress.city || "",
+            pinNo: correspondenceAddress.postalCode || "",
+            state: "West Bengal",
+            country: correspondenceAddress.country || "India"
+          } : null
         };
 
-        console.log("Saving service provider data:", payload);
-        Alert.alert("Success", "Profile updated successfully");
-      } else {
-        console.log("Saving customer data:", { ...userData, addresses });
-        Alert.alert("Success", "Profile updated successfully");
-      }
+        await axiosInstance.put(
+          `/api/serviceproviders/update/serviceprovider/${userId}`,
+          payload
+        );
+        await fetchServiceProviderData(userId);
+      } else if (userRole === "CUSTOMER" && userId) {
+        const payload = {
+          customerid: userId,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          mobileNo: userData.contactNumber?.replace("+", "") || null,
+          altMobileNo: userData.altContactNumber?.replace("+", "") || null,
+          email: appUser?.email || auth0User?.email || "",
+        };
 
+        await axiosInstance.put(
+          `/api/customer/update-customer/${userId}`,
+          payload
+        );
+        
+        await fetchCustomerDetails(userId);
+      }
+      
       setIsEditing(false);
+      Alert.alert("Success", "Profile updated successfully");
     } catch (error) {
       console.error("Failed to save data:", error);
       Alert.alert("Error", "Failed to save changes. Please try again.");
@@ -339,6 +528,13 @@ const ProfileScreen = () => {
   const handleCancel = () => {
     setIsEditing(false);
     setShowAddAddress(false);
+    
+    if (userRole === "SERVICE_PROVIDER" && appUser?.serviceProviderId) {
+      fetchServiceProviderData(appUser.serviceProviderId);
+    } else if (userRole === "CUSTOMER" && appUser?.customerid) {
+      fetchCustomerDetails(appUser.customerid);
+      fetchCustomerAddresses(appUser.customerid);
+    }
   };
 
   const toggleAddress = (id: string) => {
@@ -347,7 +543,7 @@ const ProfileScreen = () => {
     );
   };
 
-  // Add Address functionality
+  // Add Address functionality (UPDATED to match web version)
   const handleAddAddress = async () => {
     if (newAddress.street && newAddress.city && newAddress.country && newAddress.postalCode) {
       const addressToAdd = {
@@ -369,24 +565,32 @@ const ProfileScreen = () => {
         try {
           const payload = {
             customerId: userId,
-            savedLocations: [
-              {
-                name: addressToAdd.type,
-                location: {
-                  formatted_address: `${addressToAdd.street}, ${addressToAdd.city}, ${addressToAdd.country} - ${addressToAdd.postalCode}`,
+            savedLocations: [{
+              name: addressToAdd.type,
+              location: {
+                address: [{
+                  formatted_address: addressToAdd.street,
                   address_components: [
                     { long_name: addressToAdd.city, types: ["locality"] },
                     { long_name: addressToAdd.country, types: ["country"] },
                     { long_name: addressToAdd.postalCode, types: ["postal_code"] },
                   ],
-                },
-                isPrimary: addressToAdd.isPrimary,
+                  geometry: {
+                    location: {
+                      lat: 0,
+                      lng: 0
+                    }
+                  }
+                }],
+                lat: 0,
+                lng: 0
               },
-            ],
+              isPrimary: addressToAdd.isPrimary,
+            }],
           };
 
           await axios.post("https://utils-ndt3.onrender.com/user-settings", payload);
-          console.log("✅ Address saved successfully:", payload);
+          console.log("✅ Address saved successfully");
         } catch (err) {
           console.error("❌ Failed to save new address:", err);
           Alert.alert("Error", "Could not save address. Try again.");
@@ -394,7 +598,7 @@ const ProfileScreen = () => {
       }
 
       setNewAddress({
-        type: userRole === "SERVICE_PROVIDER" ? "Home" : "Home",
+        type: "Home",
         street: "",
         city: "",
         country: "",
@@ -405,6 +609,11 @@ const ProfileScreen = () => {
     }
   };
 
+  const handleMobileNumberUpdateSuccess = () => {
+    if (userId) {
+      fetchCustomerDetails(userId); // Refresh customer data
+    }
+  };
   // Handle address input changes
   const handleAddressInputChange = (name: keyof typeof newAddress, value: string | boolean) => {
     setNewAddress(prev => ({
@@ -413,13 +622,6 @@ const ProfileScreen = () => {
     }));
   };
 
-  // Get available address types based on user role
-  const getAvailableAddressTypes = () => {
-    if (userRole === "SERVICE_PROVIDER") {
-      return ["Home"];
-    }
-    return ["Home", "Work", "Other"];
-  };
 
   // Handle editing addresses
   const handleEditAddress = (id: string, field: keyof Address, value: string) => {
@@ -462,6 +664,15 @@ const ProfileScreen = () => {
     { label: "+971 (UAE)", value: "+971" },
   ];
 
+  // Get user ID for display
+  const getUserIdDisplay = () => {
+    if (userRole === "SERVICE_PROVIDER") {
+      return appUser?.serviceProviderId || "N/A";
+    } else {
+      return appUser?.customerid || "N/A";
+    }
+  };
+
   // Loading Screen Component
   const LoadingScreen = () => (
     <View style={styles.loadingContainer}>
@@ -473,7 +684,7 @@ const ProfileScreen = () => {
     </View>
   );
 
-  // Skeleton Loading Component
+  // Skeleton Loading Component (simplified version)
   const SkeletonLoader = () => (
     <View style={styles.container}>
       {/* Header Skeleton */}
@@ -485,7 +696,7 @@ const ProfileScreen = () => {
       >
         <View style={styles.headerContentSkeleton}>
           <View style={styles.profileSection}>
-            {renderProfilePicture()}
+            <View style={[styles.avatarFallback, { backgroundColor: '#ddd' }]} />
             <View style={styles.profileTextContainer}>
               <View style={styles.greetingSkeleton} />
               <View style={styles.roleSkeleton} />
@@ -498,10 +709,6 @@ const ProfileScreen = () => {
       {/* Main Content Skeleton */}
       <View style={styles.mainContentSkeleton}>
         <View style={styles.cardSkeleton}>
-          <View style={styles.formHeaderSkeleton}>
-            <View style={styles.titleSkeleton} />
-          </View>
-
           <View style={styles.sectionSkeleton}>
             <View style={styles.sectionTitleSkeleton} />
             <View style={styles.rowSkeleton}>
@@ -513,50 +720,6 @@ const ProfileScreen = () => {
                 <View style={styles.labelSkeleton} />
                 <View style={styles.inputSkeleton} />
               </View>
-            </View>
-
-            {/* First Name and Last Name in one row */}
-            <View style={styles.nameRowSkeleton}>
-              <View style={styles.nameInputSkeleton}>
-                <View style={styles.labelSkeleton} />
-                <View style={styles.inputSkeleton} />
-              </View>
-              <View style={styles.nameInputSkeleton}>
-                <View style={styles.labelSkeleton} />
-                <View style={styles.inputSkeleton} />
-              </View>
-            </View>
-
-            <View style={styles.inputGroupSkeleton}>
-              <View style={styles.labelSkeleton} />
-              <View style={styles.inputSkeleton} />
-            </View>
-          </View>
-
-          <View style={styles.dividerSkeleton} />
-
-          <View style={styles.sectionSkeleton}>
-            <View style={styles.sectionTitleSkeleton} />
-            <View style={styles.rowSkeleton}>
-              <View style={styles.inputGroupSkeleton}>
-                <View style={styles.labelSkeleton} />
-                <View style={styles.inputSkeleton} />
-              </View>
-              <View style={styles.inputGroupSkeleton}>
-                <View style={styles.labelSkeleton} />
-                <View style={styles.inputSkeleton} />
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.sectionSkeleton}>
-            <View style={styles.labelSkeleton} />
-            <View style={styles.addressCardSkeleton}>
-              <View style={styles.addressHeaderSkeleton}>
-                <View style={styles.addressTitleSkeleton} />
-              </View>
-              <View style={styles.addressLineSkeleton} />
-              <View style={styles.addressLineShortSkeleton} />
             </View>
           </View>
         </View>
@@ -570,6 +733,13 @@ const ProfileScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Mobile Number Dialog */}
+      <MobileNumberDialog 
+        open={showMobileDialog}
+        onClose={() => setShowMobileDialog(false)}
+        onSuccess={handleMobileNumberUpdateSuccess}
+      />
+
       {/* Header with Linear Gradient */}
       <LinearGradient
         colors={['rgba(177, 213, 232, 0.8)', 'rgba(255, 255, 255, 1)']}
@@ -586,24 +756,24 @@ const ProfileScreen = () => {
                 Hello, {getDisplayName()}
               </Text>
               <Text style={styles.roleText}>
-                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}  {appUser?.serviceProviderId ||
-     appUser?.customerid ||
-     userId?.toString() ||
-     "ID: N/A"} 
+                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}
+                {userRole === "CUSTOMER" && !hasValidMobileNumbers() && (
+                  <Text style={styles.mobileWarning}> ⚠️ Mobile required</Text>
+                )}
               </Text>    
               {/* Edit Profile Button */}
               <View style={styles.editButtonContainer}>
                 {isEditing ? (
                   <View style={styles.editButtons}>
                     <TouchableOpacity
-                      style={[styles.button, styles.cancelButton]}
+                      style={[styles.button, styles.cancelEditButton]}
                       onPress={handleCancel}
                       disabled={isSaving}
                     >
                       <Text style={styles.buttonText}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.button, styles.saveButton]}
+                      style={[styles.button, styles.saveEditButton]}
                       onPress={handleSave}
                       disabled={isSaving}
                     >
@@ -634,6 +804,14 @@ const ProfileScreen = () => {
           {/* Form Header */}
           <View style={styles.formHeader}>
             <Text style={styles.formTitle}>My account</Text>
+            {userRole === "CUSTOMER" && !hasValidMobileNumbers() && (
+              <TouchableOpacity
+                onPress={() => setShowMobileDialog(true)}
+                style={styles.addMobileButton}
+              >
+                <Text style={styles.addMobileButtonText}>Add Mobile Number</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* User Info Section */}
@@ -659,69 +837,42 @@ const ProfileScreen = () => {
               </View>
             </View>
 
-            {/* First Name and Last Name in one row */}
-            {/* <View style={styles.nameRow}>
-              <View style={styles.nameInput}>
-                <Text style={styles.inputLabel}>First name</Text>
+            {/* First Name and Last Name */}
+            <View style={styles.ultraCompactNameRow}>
+              <View style={styles.ultraCompactNameInput}>
+                <Text style={styles.compactLabel}>First name</Text>
                 <TextInput
-                  style={[styles.input, !isEditing && styles.readOnlyInput]}
+                  style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
                   value={userData.firstName}
                   onChangeText={(value) => handleInputChange("firstName", value)}
                   editable={isEditing}
-                  placeholder="First name"
+                  placeholder="First"
                 />
               </View>
-              <View style={styles.nameInput}>
-                <Text style={styles.inputLabel}>Last name</Text>
+              <View style={styles.ultraCompactNameInput}>
+                <Text style={styles.compactLabel}>Last name</Text>
                 <TextInput
-                  style={[styles.input, !isEditing && styles.readOnlyInput]}
+                  style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
                   value={userData.lastName}
                   onChangeText={(value) => handleInputChange("lastName", value)}
                   editable={isEditing}
-                  placeholder="Last name"
+                  placeholder="Last"
                 />
               </View>
-            </View> */}
-            {/* First Name and Last Name in one row - Ultra Compact */}
-<View style={styles.ultraCompactNameRow}>
-  <View style={styles.ultraCompactNameInput}>
-    <Text style={styles.compactLabel}>First name</Text>
-    <TextInput
-      style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
-      value={userData.firstName}
-      onChangeText={(value) => handleInputChange("firstName", value)}
-      editable={isEditing}
-      placeholder="First"
-    />
-  </View>
-  <View style={styles.ultraCompactNameInput}>
-    <Text style={styles.compactLabel}>Last name</Text>
-    <TextInput
-      style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
-      value={userData.lastName}
-      onChangeText={(value) => handleInputChange("lastName", value)}
-      editable={isEditing}
-      placeholder="Last"
-    />
-  </View>
-</View>
-            {/* <View style={styles.inputRow}>
+            </View>
+
+            <View style={styles.inputRow}>
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>
                   {userRole === "SERVICE_PROVIDER" ? "Provider ID" : "User ID"}
                 </Text>
                 <TextInput
                   style={[styles.input, styles.readOnlyInput]}
-                  value={
-                    appUser?.serviceProviderId ||
-                    appUser?.customerid ||
-                    userId?.toString() ||
-                    "N/A"
-                  }
+                  value={getUserIdDisplay()}
                   editable={false}
                 />
               </View>
-            </View> */}
+            </View>
           </View>
 
           <View style={styles.divider} />
@@ -732,7 +883,14 @@ const ProfileScreen = () => {
           <View style={styles.inputRow}>
             {/* Contact Number */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Contact Number</Text>
+              <Text style={styles.inputLabel}>
+                Contact Number
+                {userRole === "CUSTOMER" && (
+                  <Text style={!hasValidMobileNumbers() ? styles.mobileWarningSmall : styles.mobileSuccess}>
+                    {!hasValidMobileNumbers() ? ' ⚠️' : ' ✓'}
+                  </Text>
+                )}
+              </Text>
               <View style={styles.phoneInputContainer}>
                 {isEditing ? (
                   <TouchableOpacity
@@ -748,14 +906,23 @@ const ProfileScreen = () => {
                   </View>
                 )}
                 <TextInput
-                  style={[styles.phoneInput, !isEditing && styles.readOnlyInput]}
-                  value={userData.contactNumber || ""}
+                  style={[
+                    styles.phoneInput, 
+                    !isEditing && styles.readOnlyInput,
+                    !hasValidMobileNumbers() && userRole === "CUSTOMER" && styles.invalidInput
+                  ]}
+                  value={formatMobileNumber(userData.contactNumber)}
                   onChangeText={(value) => handleInputChange("contactNumber", value)}
                   placeholder="No contact number provided"
                   editable={isEditing}
                   keyboardType="phone-pad"
                 />
               </View>
+              {userRole === "CUSTOMER" && !hasValidMobileNumbers() && (
+                <Text style={styles.mobileRequiredText}>
+                  Mobile number is required for bookings and notifications
+                </Text>
+              )}
             </View>
 
             {/* Alternative Contact Number */}
@@ -777,7 +944,7 @@ const ProfileScreen = () => {
                 )}
                 <TextInput
                   style={[styles.phoneInput, !isEditing && styles.readOnlyInput]}
-                  value={userData.altContactNumber || ""}
+                  value={formatMobileNumber(userData.altContactNumber)}
                   onChangeText={(value) => handleInputChange("altContactNumber", value)}
                   placeholder="No alternative number"
                   editable={isEditing}
@@ -953,9 +1120,12 @@ const ProfileScreen = () => {
             {addresses.length === 0 ? (
               <Text style={styles.noAddressText}>No addresses saved yet</Text>
             ) : (
-              <View style={styles.addressesList}>
-                {addresses.map((address, idx) => {
-                  const isExpanded = idx === 0 || expandedAddressIds.includes(address.id);
+              <View style={[
+                styles.addressesList,
+                userRole === "SERVICE_PROVIDER" && styles.serviceProviderAddressList
+              ]}>
+                {addresses.map((address) => {
+                  const isExpanded = userRole === "SERVICE_PROVIDER" || expandedAddressIds.includes(address.id);
 
                   return (
                     <View
@@ -969,7 +1139,7 @@ const ProfileScreen = () => {
                       {/* Header */}
                       <View style={styles.addressHeader}>
                         <View style={styles.addressTitleContainer}>
-                          {isEditing ? (
+                          {isEditing && userRole === "CUSTOMER" ? (
                             <View style={styles.pickerContainer}>
                               <Picker
                                 selectedValue={address.type}
@@ -982,7 +1152,7 @@ const ProfileScreen = () => {
                               </Picker>
                             </View>
                           ) : (
-                            <Text style={styles.addressType}>{address.type} Address</Text>
+                            <Text style={styles.addressType}>{address.type}</Text>
                           )}
                           {address.isPrimary && (
                             <View style={styles.primaryBadge}>
@@ -992,7 +1162,7 @@ const ProfileScreen = () => {
                         </View>
 
                         <View style={styles.addressActions}>
-                          {isEditing && addresses.length > 1 && (
+                          {isEditing && userRole === "CUSTOMER" && addresses.length > 1 && (
                             <>
                               {!address.isPrimary && (
                                 <TouchableOpacity
@@ -1010,7 +1180,7 @@ const ProfileScreen = () => {
                               </TouchableOpacity>
                             </>
                           )}
-                          {idx !== 0 && (
+                          {userRole === "CUSTOMER" && (
                             <TouchableOpacity
                               onPress={() => toggleAddress(address.id)}
                               style={styles.addressActionButton}
@@ -1028,7 +1198,7 @@ const ProfileScreen = () => {
                       {/* Body (only show when expanded) */}
                       {isExpanded && (
                         <View style={styles.addressDetails}>
-                          {isEditing ? (
+                          {isEditing && userRole === "CUSTOMER" ? (
                             <>
                               <View style={styles.addressFormInput}>
                                 <Text style={styles.inputLabel}>Street Address</Text>
@@ -1069,12 +1239,18 @@ const ProfileScreen = () => {
                             <>
                               <Text style={styles.addressText}>{address.street}</Text>
                               <Text style={styles.addressText}>
-                                {(address.city || "No city")},{" "}
-                                {(address.country || "No country")}{" "}
-                                {address.postalCode || ""}
+                                {address.city}, {address.country} {address.postalCode}
                               </Text>
                             </>
                           )}
+                        </View>
+                      )}
+
+                      {userRole === "CUSTOMER" && !isExpanded && (
+                        <View style={styles.collapsedAddress}>
+                          <Text style={styles.addressText} numberOfLines={1}>
+                            {address.street}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -1092,39 +1268,12 @@ const ProfileScreen = () => {
               <Text style={styles.sectionTitle}>Service Status</Text>
               
               <View style={styles.statusCard}>
-                <View style={styles.statusGrid}>
-                  <View style={styles.statusItem}>
-                    <Text style={styles.statusLabel}>Profile Status</Text>
-                    <View style={styles.statusValue}>
-                      <View style={[styles.statusIndicator, styles.statusActive]} />
-                      <Text style={styles.statusText}>Active</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.statusItem}>
-                    <Text style={styles.statusLabel}>Verification</Text>
-                    <View style={styles.statusValue}>
-                      <View style={[styles.statusIndicator, styles.statusActive]} />
-                      <Text style={styles.statusText}>Verified</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.statusItem}>
-                    <Text style={styles.statusLabel}>Availability</Text>
-                    <View style={styles.statusValue}>
-                      <View style={[styles.statusIndicator, styles.statusActive]} />
-                      <Text style={styles.statusText}>Available</Text>
-                    </View>
-                  </View>
+                <View style={styles.statusContent}>
+                  <Text style={styles.statusTitle}>Account Status</Text>
+                  <Text style={styles.statusSubtitle}>Active Service Provider</Text>
                 </View>
-                
-                <View style={styles.statusFooter}>
-                  <Text style={styles.statusUpdateText}>
-                    Last updated: {new Date().toLocaleDateString()}
-                  </Text>
-                  <TouchableOpacity>
-                    <Text style={styles.statusDetailsLink}>View complete status details</Text>
-                  </TouchableOpacity>
+                <View style={styles.verifiedBadge}>
+                  <Text style={styles.verifiedBadgeText}>Verified</Text>
                 </View>
               </View>
             </View>
@@ -1156,6 +1305,8 @@ const ProfileScreen = () => {
     </ScrollView>
   );
 };
+
+// ... rest of your imports and interfaces ...
 
 const styles = StyleSheet.create({
   container: {
@@ -1243,6 +1394,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 12,
   },
+  mobileWarning: {
+    color: "#dc2626",
+    fontSize: 12,
+  },
+  mobileWarningSmall: {
+    color: "#dc2626",
+    fontSize: 12,
+  },
+  mobileSuccess: {
+    color: "#16a34a",
+    fontSize: 12,
+  },
+  mobileRequiredText: {
+    color: "#dc2626",
+    fontSize: 12,
+    marginTop: 4,
+  },
   editButtonContainer: {
     alignSelf: 'flex-start',
   },
@@ -1259,10 +1427,10 @@ const styles = StyleSheet.create({
   editButton: {
     backgroundColor: "#0a2a66",
   },
-  cancelButton: {
+  cancelEditButton: { // Renamed from cancelButton
     backgroundColor: "#6c757d",
   },
-  saveButton: {
+  saveEditButton: { // Renamed from saveButton
     backgroundColor: "#0a2a66",
   },
   buttonText: {
@@ -1293,6 +1461,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   formHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
     paddingBottom: 12,
@@ -1303,6 +1474,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2d3748",
   },
+  addMobileButton: {
+    backgroundColor: "#fee2e2",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  addMobileButtonText: {
+    color: "#dc2626",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   sectionTitle: {
     fontSize: 14,
     fontWeight: "600",
@@ -1311,16 +1493,29 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 16,
   },
-  // New styles for name row
-  nameRow: {
-    flexDirection: "column",
+  ultraCompactNameRow: {
+    flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 16,
-    gap: 12,
+    gap: 8,
   },
-  nameInput: {
+  ultraCompactNameInput: {
     flex: 1,
-    marginBottom: 16,
+  },
+  ultraCompactInput: {
+    width: "100%",
+    paddingStart: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 6,
+    fontSize: 14,
+    minHeight: 40,
+  },
+  compactLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4a5568",
+    marginBottom: 6,
   },
   inputRow: {
     flexDirection: "row",
@@ -1349,12 +1544,14 @@ const styles = StyleSheet.create({
   readOnlyInput: {
     backgroundColor: "#f7fafc",
   },
+  invalidInput: {
+    borderColor: "#dc2626",
+  },
   divider: {
     height: 1,
     backgroundColor: "#e2e8f0",
     marginVertical: 20,
   },
-  // Address section styles
   addressesSection: {
     marginBottom: 20,
   },
@@ -1365,6 +1562,10 @@ const styles = StyleSheet.create({
   addressesList: {
     gap: 12,
   },
+  serviceProviderAddressList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
   addressCard: {
     borderWidth: 1,
     borderColor: "#e2e8f0",
@@ -1374,26 +1575,47 @@ const styles = StyleSheet.create({
   expandedAddressCard: {
     padding: 16,
   },
+  primaryAddressCard: {
+    borderColor: "#93c5fd",
+    backgroundColor: "#dbeafe",
+  },
   addressHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+  addressTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   addressType: {
     fontSize: 14,
     fontWeight: "600",
+    color: "#2d3748",
   },
   primaryBadge: {
     backgroundColor: "#dbeafe",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    alignSelf: "flex-start",
-    marginTop: 4,
+    marginLeft: 8,
   },
   primaryBadgeText: {
     color: "#1e40af",
     fontSize: 12,
+    fontWeight: "600",
+  },
+  addressActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  addressActionButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  setPrimaryText: {
+    color: "#0a2a66",
+    fontSize: 14,
     fontWeight: "600",
   },
   addressDetails: {
@@ -1403,6 +1625,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginBottom: 4,
+  },
+  collapsedAddress: {
+    marginTop: 8,
   },
   submitContainer: {
     alignItems: "center",
@@ -1437,150 +1662,7 @@ const styles = StyleSheet.create({
     color: "#718096",
     fontSize: 12,
   },
-  // Skeleton styles
-  headerSkeleton: {
-    paddingTop: 60,
-    paddingBottom: 30,
-  },
-  headerContentSkeleton: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-  },
-  greetingSkeleton: {
-    width: 200,
-    height: 28,
-    backgroundColor: "#ddd",
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  roleSkeleton: {
-    width: 120,
-    height: 18,
-    backgroundColor: "#ddd",
-    borderRadius: 4,
-    marginBottom: 16,
-  },
-  editButtonSkeleton: {
-    width: 140,
-    height: 44,
-    backgroundColor: "#ddd",
-    borderRadius: 8,
-  },
-  mainContentSkeleton: {
-    alignItems: "center",
-    padding: 16,
-    marginTop: -20,
-  },
-  cardSkeleton: {
-    width: width - 32,
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  formHeaderSkeleton: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-    paddingBottom: 12,
-    marginBottom: 16,
-  },
-  titleSkeleton: {
-    width: 100,
-    height: 24,
-    backgroundColor: "#ddd",
-    borderRadius: 4,
-  },
-  sectionSkeleton: {
-    marginBottom: 20,
-  },
-  sectionTitleSkeleton: {
-    width: 160,
-    height: 20,
-    backgroundColor: "#ddd",
-    borderRadius: 4,
-    marginBottom: 16,
-  },
-  rowSkeleton: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  // New skeleton styles for name row
-  nameRowSkeleton: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    gap: 12,
-  },
-  nameInputSkeleton: {
-    flex: 1,
-    marginBottom: 16,
-  },
-  inputGroupSkeleton: {
-    width: width > 500 ? "48%" : "100%",
-    marginBottom: 16,
-  },
-  labelSkeleton: {
-    width: 80,
-    height: 16,
-    backgroundColor: "#ddd",
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  inputSkeleton: {
-    width: "100%",
-    height: 40,
-    backgroundColor: "#eee",
-    borderRadius: 8,
-  },
-  dividerSkeleton: {
-    height: 1,
-    backgroundColor: "#e2e8f0",
-    marginVertical: 20,
-  },
-  addressCardSkeleton: {
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-  },
-  addressHeaderSkeleton: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  addressTitleSkeleton: {
-    width: 120,
-    height: 20,
-    backgroundColor: "#ddd",
-    borderRadius: 4,
-  },
-  addressLineSkeleton: {
-    width: "100%",
-    height: 16,
-    backgroundColor: "#eee",
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  addressLineShortSkeleton: {
-    width: "75%",
-    height: 16,
-    backgroundColor: "#eee",
-    borderRadius: 4,
-  },
-  // Rest of the existing styles...
+  // Phone input styles
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1611,6 +1693,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
     fontSize: 14,
   },
+  // Address management styles
   addressesHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1694,27 +1777,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
   },
-  primaryAddressCard: {
-    borderColor: '#93c5fd',
-    backgroundColor: '#dbeafe',
-  },
-  addressTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addressActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addressActionButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  setPrimaryText: {
-    color: '#0a2a66',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   // Modal styles for country code picker
   modalContainer: {
     flex: 1,
@@ -1754,95 +1816,179 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 8,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  statusGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statusItem: {
     alignItems: 'center',
+  },
+  statusContent: {
     flex: 1,
   },
-  statusLabel: {
+  statusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2d3748',
+    marginBottom: 4,
+  },
+  statusSubtitle: {
+    fontSize: 14,
+    color: '#718096',
+  },
+  verifiedBadge: {
+    backgroundColor: '#d1fae5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  verifiedBadgeText: {
+    color: '#065f46',
     fontSize: 12,
     fontWeight: '600',
-    color: '#718096',
-    textTransform: 'uppercase',
-    marginBottom: 8,
   },
-  statusValue: {
-    flexDirection: 'row',
+  // Mobile Number Dialog styles
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
+  dialogContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
   },
-  statusActive: {
-    backgroundColor: '#10b981',
+  dialogHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  statusText: {
-    fontSize: 14,
+  dialogTitle: {
+    fontSize: 18,
     fontWeight: '600',
     color: '#2d3748',
   },
-  statusFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  statusUpdateText: {
-    fontSize: 12,
+  dialogDescription: {
+    fontSize: 14,
     color: '#718096',
+    marginBottom: 20,
+    lineHeight: 20,
   },
-  statusDetailsLink: {
-    fontSize: 12,
-    color: '#0a2a66',
+  countryCodePicker: {
+    height: 44,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+    gap: 12,
+  },
+  dialogButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 6,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  dialogCancelButton: { // Renamed from cancelButton
+    backgroundColor: '#f1f5f9',
+  },
+  dialogSubmitButton: { // Renamed from submitButton
+    backgroundColor: '#0a2a66',
+  },
+  dialogCancelButtonText: { // Renamed from cancelButtonText
+    color: '#64748b',
     fontWeight: '600',
   },
-  // Ultra compact styles
-ultraCompactNameRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  marginBottom: 16,
-  gap: 8, // Even smaller gap
-},
-ultraCompactNameInput: {
-  flex: 1,
-  
-},
-ultraCompactInput: {
-  width: "100%",
-  // padding: 8, // Even smaller padding
-   paddingStart: 10,
-  borderWidth: 1,
-  borderColor: "#e2e8f0",
-  borderRadius: 6, // Slightly smaller border radius
-  fontSize: 14,
-  minHeight: 40, // Smaller height
-},
-compactLabel: {
-  fontSize: 14, // Smaller label
-  fontWeight: "600",
-  color: "#4a5568",
-  marginBottom: 6,
-},
-
-
+  dialogSubmitButtonText: { // Renamed from submitButtonText
+    color: 'white',
+    fontWeight: '600',
+  },
+  // Skeleton styles (simplified)
+  headerSkeleton: {
+    paddingTop: 60,
+    paddingBottom: 30,
+  },
+  headerContentSkeleton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  greetingSkeleton: {
+    width: 200,
+    height: 28,
+    backgroundColor: "#ddd",
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  roleSkeleton: {
+    width: 120,
+    height: 18,
+    backgroundColor: "#ddd",
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  editButtonSkeleton: {
+    width: 140,
+    height: 44,
+    backgroundColor: "#ddd",
+    borderRadius: 8,
+  },
+  mainContentSkeleton: {
+    alignItems: "center",
+    padding: 16,
+    marginTop: -20,
+  },
+  cardSkeleton: {
+    width: width - 32,
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  sectionSkeleton: {
+    marginBottom: 20,
+  },
+  sectionTitleSkeleton: {
+    width: 160,
+    height: 20,
+    backgroundColor: "#ddd",
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  rowSkeleton: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  inputGroupSkeleton: {
+    width: width > 500 ? "48%" : "100%",
+    marginBottom: 16,
+  },
+  labelSkeleton: {
+    width: 80,
+    height: 16,
+    backgroundColor: "#ddd",
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  inputSkeleton: {
+    width: "100%",
+    height: 40,
+    backgroundColor: "#eee",
+    borderRadius: 8,
+  },
 });
 
 export default ProfileScreen;

@@ -12,6 +12,7 @@ import {
   Text,
   Modal,
   AppStateStatus,
+  Platform,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Auth0Provider } from "react-native-auth0";
@@ -31,12 +32,12 @@ import NotificationClient from "./src/NotificationClient/NotificationClient";
 import BookingRequestToast from "./src/Notifications/BookingRequestToast";
 import io, { Socket } from "socket.io-client";
 import { AppUserProvider, useAppUser } from "./src/context/AppUserContext";
-import { Platform } from "react-native";
-import axios from 'axios';
+import axios from "axios";
 import { useDispatch } from "react-redux";
 import { add } from "./src/features/pricingSlice";
+import MobileNumberDialog from "./src/MobileNumberDialog";
+import axiosInstance from "./src/axiosInstance";
 
-// Define types based on your component expectations
 interface Engagement {
   engagement_id: number;
   service_type: string;
@@ -55,7 +56,6 @@ interface SocketEngagementData {
   engagement: Engagement;
 }
 
-// Main App Component that uses the context
 const MainApp = () => {
   const [chatbotOpen, setChatbotOpen] = useState(false);
   const [currentView, setCurrentView] = useState("HOME");
@@ -66,32 +66,116 @@ const MainApp = () => {
   const [activeToast, setActiveToast] = useState<Engagement | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [showNotificationClient, setShowNotificationClient] = useState(false);
+  const [shouldShowMobileDialog, setShouldShowMobileDialog] = useState(false);
+  const [hasCheckedMobileNumber, setHasCheckedMobileNumber] = useState(false);
+  const [customerData, setCustomerData] = useState<any>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const socketRef = useRef<Socket | null>(null);
   const SOCKET_URL = "https://payments-j5id.onrender.com";
 
   const dispatch = useDispatch();
-  const { appUser } = useAppUser(); // Remove clearAppUser since it doesn't exist
+  const { appUser } = useAppUser();
 
-  // Enhanced useEffect to handle user state changes
   useEffect(() => {
     console.log("🔄 AppUser changed:", appUser ? `Logged in as ${appUser.role}` : "Logged out");
-    
-    // If user logs out, always reset to HOME view
+
     if (!appUser) {
       console.log("👤 No user detected, resetting to HOME view");
       setCurrentView("HOME");
       setShowProfileFromDashboard(false);
       setShowNotificationClient(false);
+      setShouldShowMobileDialog(false);
+      setHasCheckedMobileNumber(false);
+      setCustomerData(null);
     }
   }, [appUser]);
 
   useEffect(() => {
-    // Handle app state changes
+    if (!appUser || appUser?.role?.toUpperCase() !== "CUSTOMER" || hasCheckedMobileNumber) {
+      return;
+    }
+
+    const fetchCustomerDetails = async () => {
+      try {
+        console.log("📱 Fetching customer details for ID:", appUser.customerid);
+        const response = await axiosInstance.get
+          (`/api/customer/get-customer-by-id/${appUser.customerid}`
+        );
+
+        const customer = response.data;
+        setCustomerData(customer);
+
+        if (!customer?.mobileNo) {
+          console.warn("⚠️ Customer mobile number is missing (null). Showing dialog...");
+          setShouldShowMobileDialog(true);
+        } else {
+          console.log("✅ Customer has mobile number:", customer.mobileNo);
+          setShouldShowMobileDialog(false);
+        }
+
+        setHasCheckedMobileNumber(true);
+      } catch (error: any) {
+        console.error("❌ Error fetching customer details:", error);
+        if (error.response?.status === 404) {
+          setCustomerData(null);
+          setShouldShowMobileDialog(true);
+        } else {
+          setShouldShowMobileDialog(false);
+        }
+        setHasCheckedMobileNumber(true);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      fetchCustomerDetails();
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [appUser, hasCheckedMobileNumber]);
+
+  const handleMobileDialogSuccess = () => {
+    console.log("✅ Mobile dialog completed successfully");
+    setShouldShowMobileDialog(false);
+    setHasCheckedMobileNumber(true);
+    if (appUser?.customerid) {
+      setTimeout(() => {
+        setHasCheckedMobileNumber(false);
+      }, 1000);
+    }
+  };
+
+  const handleMobileDialogClose = () => {
+    console.log("📱 Mobile dialog closed");
+    setShouldShowMobileDialog(false);
+    setHasCheckedMobileNumber(true);
+  };
+
+  useEffect(() => {
+    setHasCheckedMobileNumber(false);
+    setShouldShowMobileDialog(false);
+    setCustomerData(null);
+  }, [appUser?.customerid]);
+
+  useEffect(() => {
+    console.log("🔍 Mobile Dialog State:", {
+      shouldShowMobileDialog,
+      hasCheckedMobileNumber,
+      customerData: customerData ? "Exists" : "No data",
+      appUser: appUser
+        ? {
+            role: appUser.role,
+            customerid: appUser.customerid,
+            hasCustomerId: !!appUser.customerid,
+          }
+        : "No user",
+    });
+  }, [shouldShowMobileDialog, hasCheckedMobileNumber, appUser, customerData]);
+
+  useEffect(() => {
     getPricingData();
-    
-    const subscription = AppState.addEventListener("change", (nextAppState: AppStateStatus) => {
+
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === "active"
@@ -134,16 +218,12 @@ const MainApp = () => {
       };
     }
 
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, [isFirstLaunch, fadeAnim]);
 
   const getPricingData = async () => {
     try {
-      const response = await axios.get(
-        `https://utils-ndt3.onrender.com/records`
-      );
+      const response = await axios.get(`https://utils-ndt3.onrender.com/records`);
       dispatch(add(response.data));
       console.log("Pricing Data:", response.data);
     } catch (error) {
@@ -151,22 +231,20 @@ const MainApp = () => {
     }
   };
 
-  // Socket connection for notifications
   useEffect(() => {
     if (!appUser) {
-      // Clean up socket if user logs out
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
       return;
     }
-    
+
     if (appUser.role?.toUpperCase() !== "SERVICE_PROVIDER") return;
-    if (socketRef.current) return; // already connected
-  
+    if (socketRef.current) return;
+
     let mounted = true;
-  
+
     (async () => {
       const token = appUser?.accessToken ?? null;
 
@@ -190,7 +268,10 @@ const MainApp = () => {
       socket.on("new-engagement", (payload: any) => {
         console.log("[socket] new-engagement", payload);
         const engagement = payload?.engagement ?? payload;
-        Alert.alert("New Booking Request", `Booking for ${engagement?.service_type ?? "a service"}`);
+        Alert.alert(
+          "New Booking Request",
+          `Booking for ${engagement?.service_type ?? "a service"}`
+        );
       });
 
       socket.on("connect_error", (err) => {
@@ -205,10 +286,8 @@ const MainApp = () => {
         socket.disconnect();
         socketRef.current = null;
       }
-    })().catch((e) => {
-      console.warn("[socket] init failed", e);
-    });
-  
+    })().catch((e) => console.warn("[socket] init failed", e));
+
     return () => {
       mounted = false;
       const s = socketRef.current;
@@ -222,30 +301,17 @@ const MainApp = () => {
     };
   }, [appUser]);
 
-  const handleAccept = async (engagementId: number) => {
-    try {
-      const payload = {
-        providerId: appUser?.serviceProviderId,
-      };
-
-      console.log("✅ Engagement accepted:", engagementId);
-      setActiveToast(null);
-      
-      Alert.alert("Success", "Booking request accepted successfully");
-    } catch (err) {
-      console.error("❌ Failed to accept engagement", err);
-      Alert.alert("Error", "Failed to accept booking request");
-    }
+  const handleAccept = (id: number) => {
+    Alert.alert("Success", "Booking request accepted successfully");
+    setActiveToast(null);
   };
 
-  const handleReject = (engagementId: number) => {
-    console.log("❌ Engagement rejected:", engagementId);
-    setActiveToast(null);
+  const handleReject = (id: number) => {
     Alert.alert("Rejected", "Booking request has been rejected");
+    setActiveToast(null);
   };
 
   const handleViewChange = (view: string) => {
-    console.log("🔄 View changing to:", view);
     if (view === "" || view === "FORCE_HOME") {
       setCurrentView("HOME");
       setShowProfileFromDashboard(false);
@@ -254,28 +320,16 @@ const MainApp = () => {
     }
   };
 
-  const handleBookingType = (type: string) => {
-    setSelectedBookingType(type);
-  };
-
-  const handleDashboardProfilePress = () => {
-    setShowProfileFromDashboard(true);
-  };
-
-  const handleBackToDashboard = () => {
-    setShowProfileFromDashboard(false);
-  };
-
-  const handleNotificationButtonPress = () => {
-    setShowNotificationClient(true);
+  const handleDashboardProfilePress = () => setShowProfileFromDashboard(true);
+  const handleBackToDashboard = () => setShowProfileFromDashboard(false);
+  const handleNotificationButtonPress = () => setShowNotificationClient(true);
+  const forceShowMobileDialog = () => {
+    setShouldShowMobileDialog(true);
+    setHasCheckedMobileNumber(false);
   };
 
   const renderContent = () => {
-    console.log("🎨 Rendering content - User:", appUser ? appUser.role : "None", "View:", currentView);
-    
-    // If user is SERVICE_PROVIDER and on HOME view, show Dashboard instead
     if (appUser && appUser.role?.toUpperCase() === "SERVICE_PROVIDER" && currentView === "HOME") {
-      console.log("📊 Showing Dashboard for SERVICE_PROVIDER");
       return showProfileFromDashboard ? (
         <ProfileScreen />
       ) : (
@@ -283,16 +337,16 @@ const MainApp = () => {
       );
     }
 
-    // For all other cases (CUSTOMER, not logged in, or other views), use normal flow
-    console.log("🏠 Showing normal flow for view:", currentView);
     switch (currentView) {
       case "HOME":
         return (
           <View style={styles.homeContainer}>
-            <HomePage
-              sendDataToParent={handleViewChange}
-              bookingType={handleBookingType}
-            />
+            <HomePage sendDataToParent={handleViewChange} bookingType={() => {}} />
+            {__DEV__ && appUser?.role?.toUpperCase() === "CUSTOMER" && (
+              <TouchableOpacity style={styles.testButton} onPress={forceShowMobileDialog}>
+                <Text style={styles.testButtonText}>Test Mobile Dialog</Text>
+              </TouchableOpacity>
+            )}
           </View>
         );
       case BOOKINGS:
@@ -306,12 +360,7 @@ const MainApp = () => {
       case PROFILE:
         return <ProfileScreen />;
       default:
-        return (
-          <DetailsView
-            sendDataToParent={handleViewChange}
-            selected={selectedBookingType}
-          />
-        );
+        return <DetailsView sendDataToParent={handleViewChange} selected={selectedBookingType} />;
     }
   };
 
@@ -329,28 +378,23 @@ const MainApp = () => {
 
   return (
     <SafeAreaProvider>
-      <StatusBar backgroundColor="#0a2a66ff" barStyle="light-content" translucent={true} />
+      {/* ✅ FIXED STATUS BAR SECTION */}
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        {/* Fixed Header */}
         <View style={styles.headerWrapper}>
           <Head sendDataToParent={handleViewChange} />
         </View>
-        
-        {/* Notification Button - Positioned below header */}
+
         {appUser && appUser.role?.toUpperCase() === "SERVICE_PROVIDER" && (
           <View style={styles.notificationButtonContainer}>
             <NotificationButton onPress={handleNotificationButtonPress} />
           </View>
         )}
-        
-        {/* Main Content Area */}
+
         <View style={styles.contentContainer}>
           {currentView === PROFILE ||
           (currentView === DASHBOARD && showProfileFromDashboard) ? (
-            <ScrollView
-              style={styles.profileScrollView}
-              contentContainerStyle={styles.profileScrollContent}
-            >
+            <ScrollView style={styles.profileScrollView} contentContainerStyle={styles.profileScrollContent}>
               {renderContent()}
             </ScrollView>
           ) : (
@@ -364,13 +408,20 @@ const MainApp = () => {
               contentInsetAdjustmentBehavior="automatic"
             >
               {renderContent()}
-              {/* Only show footer for CUSTOMER users on HOME page or when no one is logged in */}
-              {currentView === "HOME" && (!appUser || appUser?.role?.toUpperCase() === "CUSTOMER") && <Footer />}
+              {currentView === "HOME" &&
+                (!appUser || appUser?.role?.toUpperCase() === "CUSTOMER") && <Footer />}
             </ScrollView>
           )}
         </View>
 
-        {/* Notification Client Modal */}
+        {shouldShowMobileDialog && (
+          <MobileNumberDialog 
+            open={shouldShowMobileDialog}
+            onClose={handleMobileDialogClose}
+            onSuccess={handleMobileDialogSuccess}
+          />
+        )}
+
         <Modal
           visible={showNotificationClient}
           animationType="slide"
@@ -378,10 +429,7 @@ const MainApp = () => {
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={() => setShowNotificationClient(false)}
-              >
+              <TouchableOpacity style={styles.closeButton} onPress={() => setShowNotificationClient(false)}>
                 <Icon name="close" size={24} color="#333" />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Notifications</Text>
@@ -390,22 +438,16 @@ const MainApp = () => {
           </View>
         </Modal>
 
-        {/* Chatbot */}
         <Chatbot open={chatbotOpen} onClose={() => setChatbotOpen(false)} />
-        
-        {/* Floating Chat Button */}
+
         {!chatbotOpen && (
           <View style={styles.chatButtonContainer}>
-            <TouchableOpacity
-              style={styles.chatButton}
-              onPress={() => setChatbotOpen(true)}
-            >
+            <TouchableOpacity style={styles.chatButton} onPress={() => setChatbotOpen(true)}>
               <Icon name="chat" size={28} color="#fff" />
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Booking Request Toast/Modal */}
         {activeToast && (
           <BookingRequestToast
             engagement={activeToast}
@@ -420,16 +462,13 @@ const MainApp = () => {
   );
 };
 
-// Root App Component that wraps everything with providers
-const App = () => {
-  return (
-    <Auth0Provider domain={config.domain} clientId={config.clientId}>
-      <AppUserProvider>
-        <MainApp />
-      </AppUserProvider>
-    </Auth0Provider>
-  );
-};
+const App = () => (
+  <Auth0Provider domain={config.domain} clientId={config.clientId}>
+    <AppUserProvider>
+      <MainApp />
+    </AppUserProvider>
+  </Auth0Provider>
+);
 
 const styles = StyleSheet.create({
   splashContainer: {
@@ -438,25 +477,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  splashImage: {
-    width: "80%",
-    height: "80%",
-  },
+  splashImage: { width: "80%", height: "80%" },
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#0a2a66", // ✅ blue background for status bar area
   },
   headerWrapper: {
     width: "100%",
     backgroundColor: "#0a2a66ff",
     zIndex: 50,
   },
-  homeContainer: {
-    flex: 1,
-  },
+  homeContainer: { flex: 1 },
   notificationButtonContainer: {
     position: "absolute",
-    top: 80, // Position below the header
+    top: 80,
     right: 20,
     zIndex: 45,
     backgroundColor: "#3b82f6",
@@ -468,48 +502,23 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
   },
-  contentContainer: {
-    flex: 1,
-    marginTop: 50,
-  },
-  mainScrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "space-between",
-    minHeight: "100%",
-  },
-  fullScreenScrollContent: {
-    paddingBottom: 0,
-  },
-  profileScrollView: {
-    flex: 1,
-  },
-  profileScrollContent: {
-    flexGrow: 1,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  contentContainer: { flex: 1, marginTop: 50, backgroundColor: "#fff" },
+  mainScrollView: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: "space-between", minHeight: "100%" },
+  fullScreenScrollContent: { paddingBottom: 0 },
+  profileScrollView: { flex: 1 },
+  profileScrollContent: { flexGrow: 1 },
+  modalContainer: { flex: 1, backgroundColor: "#fff" },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: "#e0e0e0",
     paddingTop: 50,
   },
-  closeButton: {
-    padding: 4,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 16,
-    color: '#333',
-  },
+  closeButton: { padding: 4 },
+  modalTitle: { fontSize: 18, fontWeight: "bold", marginLeft: 16, color: "#333" },
   chatButtonContainer: {
     position: "absolute",
     bottom: 20,
@@ -529,6 +538,16 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  testButton: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    backgroundColor: "#ff6b6b",
+    padding: 10,
+    borderRadius: 8,
+    zIndex: 1000,
+  },
+  testButtonText: { color: "white", fontSize: 12, fontWeight: "bold" },
 });
 
 export default App;
