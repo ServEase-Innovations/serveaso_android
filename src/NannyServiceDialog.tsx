@@ -24,6 +24,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Dimensions } from 'react-native';
 import { useAuth0 } from 'react-native-auth0';
 import { usePricingFilterService } from './utils/PricingFilter';
+import { useAppUser } from './context/AppUserContext';
 
 // Type definitions
 type PackageType = 'day' | 'night' | 'fullTime';
@@ -99,6 +100,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
   const { user: auth0User } = useAuth0();
+  const { setAppUser, appUser } = useAppUser();
   
   // Get pricing filter service
   const { getFilteredPricing } = usePricingFilterService();
@@ -134,7 +136,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       elderlyNight: false,
       elderlyFullTime: false
     };
-    
+  
     nannyCartItems.forEach(item => {
       const key = `${item.careType}${item.packageType.charAt(0).toUpperCase() + item.packageType.slice(1)}` as keyof CartItems;
       initialCartItems[key] = true;
@@ -143,73 +145,56 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     setCartItems(initialCartItems);
   }, []);
 
-  // Get nanny packages from pricing data with proper mapping
+  // Get nanny packages from pricing data with proper mapping based on Categories
   const getNannyPackages = useMemo((): NannyPackages => {
     console.log('Processing nanny pricing data:', nannyPricing);
-    
-    // Default fallback prices
-    const defaultPackages: NannyPackages = {
-      baby: {
-        day: 16000,
-        night: 20000,
-        fullTime: 23000
-      },
-      elderly: {
-        day: 16000,
-        night: 20000,
-        fullTime: 23000
-      }
-    };
 
-    // If no nanny pricing data, return defaults
-    if (!nannyPricing || nannyPricing.length === 0) {
-      console.log('No nanny pricing data found, using defaults');
-      return defaultPackages;
-    }
-
+    // Initialize with zeros - we'll only use data from pricing filter
     const packages: NannyPackages = {
       baby: {
-        day: 16000,
-        night: 20000,
-        fullTime: 23000
+        day: 0,
+        night: 0,
+        fullTime: 0
       },
       elderly: {
-        day: 16000,
-        night: 20000,
-        fullTime: 23000
+        day: 0,
+        night: 0,
+        fullTime: 0
       }
     };
 
-    // Map pricing data to packages
+    // If no nanny pricing data, return zeros
+    if (!nannyPricing || nannyPricing.length === 0) {
+      console.log('No nanny pricing data found');
+      return packages;
+    }
+
+    // Map pricing data to packages based on Categories field
     nannyPricing.forEach((item: any) => {
-      const serviceName = item.ServiceName?.toLowerCase() || '';
+      const categories = item.Categories?.toLowerCase() || '';
       const price = bookingType?.bookingPreference?.toLowerCase() === "date" 
         ? item["Price /Day (INR)"] 
         : item["Price /Month (INR)"];
 
-      console.log(`Processing service: ${serviceName}, price: ${price}`);
+      console.log(`Processing categories: ${categories}, price: ${price}`);
 
-      // Map service names to package types
-      if (serviceName.includes('baby') || serviceName.includes('child')) {
-        if (serviceName.includes('day') || serviceName.includes('daycare')) {
-          packages.baby.day = price || packages.baby.day;
-        } else if (serviceName.includes('night') || serviceName.includes('overnight')) {
-          packages.baby.night = price || packages.baby.night;
-        } else if (serviceName.includes('full') || serviceName.includes('time') || serviceName.includes('live')) {
-          packages.baby.fullTime = price || packages.baby.fullTime;
-        }
-      } else if (serviceName.includes('elderly') || serviceName.includes('senior') || serviceName.includes('old')) {
-        if (serviceName.includes('day') || serviceName.includes('daycare')) {
-          packages.elderly.day = price || packages.elderly.day;
-        } else if (serviceName.includes('night') || serviceName.includes('overnight')) {
-          packages.elderly.night = price || packages.elderly.night;
-        } else if (serviceName.includes('full') || serviceName.includes('time') || serviceName.includes('live')) {
-          packages.elderly.fullTime = price || packages.elderly.fullTime;
-        }
+      // Map categories to package types
+      if (categories.includes('baby care - day') || categories.includes('baby care-day')) {
+        packages.baby.day = price || packages.baby.day;
+      } else if (categories.includes('baby care - night') || categories.includes('baby care-night')) {
+        packages.baby.night = price || packages.baby.night;
+      } else if (categories.includes('baby care - in house') || categories.includes('baby care-in house') || categories.includes('baby care - full')) {
+        packages.baby.fullTime = price || packages.baby.fullTime;
+      } else if (categories.includes('elderly care - day') || categories.includes('elderly care-day')) {
+        packages.elderly.day = price || packages.elderly.day;
+      } else if (categories.includes('elderly care - night') || categories.includes('elderly care-night')) {
+        packages.elderly.night = price || packages.elderly.night;
+      } else if (categories.includes('elderly care - in house') || categories.includes('elderly care-in house') || categories.includes('elderly care - full')) {
+        packages.elderly.fullTime = price || packages.elderly.fullTime;
       }
     });
 
-    console.log('Final nanny packages:', packages);
+    console.log('Final nanny packages from pricing data:', packages);
     return packages;
   }, [nannyPricing, bookingType?.bookingPreference]);
 
@@ -220,25 +205,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     if (pref === 'date') return 'ON_DEMAND';
     if (pref === 'short term') return 'SHORT_TERM';
     return 'MONTHLY';
-  };
-
-  // Booking details using passed props
-  const bookingDetails: BookingDetails = {
-    serviceProviderId: Number(providerDetails?.serviceproviderId) || 0,
-    serviceProviderName: providerFullName,
-    customerId: user?.customerid || auth0User?.customerid || 19,
-    customerName: `${user?.customerDetails?.firstName || auth0User?.name || "Customer"}`.trim(),
-    startDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
-    endDate: bookingType?.endDate || "",
-    engagements: "",
-    address: user?.customerDetails?.currentLocation || "",
-    timeslot: bookingType?.timeRange || "",
-    monthlyAmount: 0,
-    paymentMode: "UPI",
-    bookingType: getBookingTypeFromPreference(bookingType?.bookingPreference),
-    taskStatus: "NOT_STARTED",
-    responsibilities: [],
-    serviceType: "NANNY",
   };
 
   useEffect(() => {
@@ -285,7 +251,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       ...prev,
       [packageType]: {
         ...prev[packageType],
-        age: Math.max(0, prev[packageType].age + value)
+        age: Math.max(1, prev[packageType].age + value)
       }
     }));
   };
@@ -295,31 +261,76 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       ...prev,
       [packageType]: {
         ...prev[packageType],
-        age: Math.max(0, prev[packageType].age + value)
+        age: Math.max(60, prev[packageType].age + value)
       }
     }));
   };
 
   const getPackagePrice = (type: CareType, packageType: PackageType): number => {
     const packages = getNannyPackages[type];
-    return packages[packageType] || 0;
+    const price = packages[packageType];
+    
+    // If no price found in pricing data, don't show the package
+    if (!price || price === 0) {
+      return 0;
+    }
+    
+    return price;
   };
 
   const getPackageDescription = (type: CareType, packageType: PackageType): string => {
     const descriptions: Record<CareType, PackageDescriptions> = {
       baby: {
-        day: 'Professional daytime baby care',
-        night: 'Professional overnight baby care',
-        fullTime: 'Round-the-clock professional baby care'
+        day: '8 hours daytime baby care service. Includes taking care of kids, clothes changing, feeding, taking kid for walk in stroller and playing in the park (cooking excluded)',
+        night: '8 hours overnight baby care service. Includes taking care of kids, clothes changing, feeding, and making kid sleep',
+        fullTime: '16 hours round-the-clock baby care service. Live-in nanny service with sleep hours from 11pm - 6am'
       },
       elderly: {
-        day: 'Professional daytime elderly care',
-        night: 'Professional overnight elderly care',
-        fullTime: 'Round-the-clock professional elderly care'
+        day: '8 hours daytime elderly care service. Includes taking care of elders at home, outside walk, providing medicines on time after food, emergency response',
+        night: '8 hours overnight elderly care service. Includes night-time assistance, medication management, and safety monitoring',
+        fullTime: '16 hours round-the-clock elderly care service. Live-in caregiver service with sleep hours from 11pm - 6am'
       }
     };
     
     return descriptions[type][packageType];
+  };
+
+  const getPackageDetails = (type: CareType, packageType: PackageType) => {
+    const packages = type === 'baby' ? babyPackages : elderlyPackages;
+    const packageData = packages[packageType];
+    const price = getPackagePrice(type, packageType);
+    
+    // Don't render package if no price available
+    if (price === 0) {
+      return null;
+    }
+
+    const reviews = packageType === 'day' ? '(1.5M reviews)' : 
+                   packageType === 'night' ? '(1.2M reviews)' : '(980K reviews)';
+    const rating = packageType === 'day' ? 4.8 : 
+                  packageType === 'night' ? 4.9 : 4.9;
+
+    const descriptionItems = packageType === 'day' ? [
+      '8 hours professional service',
+      type === 'baby' ? 'Clothes changing and feeding' : 'Medication management',
+      type === 'baby' ? 'Park walks and activities' : 'Emergency response system'
+    ] : packageType === 'night' ? [
+      '8 hours overnight service',
+      type === 'baby' ? 'Sleep routine establishment' : 'Night-time safety monitoring',
+      type === 'baby' ? 'Night feeding support' : 'Medication assistance'
+    ] : [
+      '16 hours comprehensive care',
+      'Live-in service provider',
+      type === 'baby' ? 'All daily care activities' : '24/7 emergency response'
+    ];
+
+    return {
+      packageData,
+      price,
+      reviews,
+      rating,
+      descriptionItems
+    };
   };
 
   const handleAddToCart = (packageKey: keyof CartItems) => {
@@ -353,6 +364,12 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       const age = packageDetails.age;
       const price = getPackagePrice(type, packageType);
       const description = getPackageDescription(type, packageType);
+
+      // Don't add to cart if no price available
+      if (price === 0) {
+        Alert.alert('Service Not Available', 'This service is currently not available for booking.');
+        return;
+      }
 
       const cartItem = {
         id: `${type}_${packageType}_${providerDetails?.serviceproviderId || 'default'}`,
@@ -407,6 +424,13 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     try {
       setLoading(true);
       
+      // Check if user is authenticated
+      if (!appUser?.customerid) {
+        Alert.alert("Authentication Required", "Please log in to proceed with booking");
+        setLoading(false);
+        return;
+      }
+
       const selectedPackages: Array<{type: CareType; packageType: PackageType; price: number; description: string}> = [];
       
       (Object.keys(cartItems) as Array<keyof CartItems>).forEach(key => {
@@ -414,12 +438,15 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           const type = key.startsWith('baby') ? 'baby' : 'elderly';
           const packageType = key.replace(type, '').charAt(0).toLowerCase() + 
                             key.replace(type, '').slice(1) as PackageType;
-          selectedPackages.push({
-            type,
-            packageType,
-            price: getPackagePrice(type, packageType),
-            description: getPackageDescription(type, packageType)
-          });
+          const price = getPackagePrice(type, packageType);
+          if (price > 0) {
+            selectedPackages.push({
+              type,
+              packageType,
+              price,
+              description: getPackageDescription(type, packageType)
+            });
+          }
         }
       });
 
@@ -431,17 +458,31 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
 
       const totalAmount = selectedPackages.reduce((sum, pkg) => sum + pkg.price, 0);
       
-      // Update booking details with selected items and total amount
-      const updatedBookingDetails = {
-        ...bookingDetails,
+      // Create booking details with appUser context
+      const bookingDetails: BookingDetails = {
+        serviceProviderId: Number(providerDetails?.serviceproviderId) || 0,
+        serviceProviderName: providerFullName,
+        customerId: appUser?.customerid,
+        customerName: appUser?.name || user?.name,
+        startDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
+        endDate: bookingType?.endDate || "",
         engagements: selectedPackages.map(p => `${p.type} ${p.packageType}`).join(', '),
-        monthlyAmount: totalAmount
+        address: user?.customerDetails?.currentLocation || "",
+        timeslot: bookingType?.timeRange || "",
+        monthlyAmount: totalAmount,
+        paymentMode: "UPI",
+        bookingType: getBookingTypeFromPreference(bookingType?.bookingPreference),
+        taskStatus: "NOT_STARTED",
+        responsibilities: [],
+        serviceType: "NANNY",
       };
+
+      console.log('Booking Payload:', JSON.stringify(bookingDetails, null, 2));
 
       // Create Razorpay order
       const response = await axios.post(
         "https://utils-ndt3.onrender.com/create-order",
-        { amount: totalAmount * 100 }, // amount in paise
+        { amount: totalAmount * 100 },
         {
           headers: { "Content-Type": "application/json" },
         }
@@ -451,23 +492,23 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         const { id: orderId, currency, amount } = response.data;
     
         const options = {
-          key: "rzp_test_lTdgjtSRlEwreA", // Your Razorpay key
+          key: "rzp_test_lTdgjtSRlEwreA",
           amount: amount,
           currency: currency,
           name: "Serveaso",
           description: "Nanny Services Booking",
           order_id: orderId,
           prefill: {
-            name: user?.customerDetails?.firstName || auth0User?.name || "",
-            email: user?.customerDetails?.email || auth0User?.email || "",
-            contact: user?.customerDetails?.mobileNo || auth0User?.mobileNo || "",
+            name: appUser?.name || user?.name || "",
+            email: appUser?.email || user?.email || "",
+            contact: appUser?.mobileNo || user?.mobileNo || "",
           },
           theme: { color: "#3399cc" },
         };
     
         RazorpayCheckout.open(options)
           .then((razorpayResponse) => {
-            handleSuccessfulPayment(razorpayResponse, updatedBookingDetails);
+            handleSuccessfulPayment(razorpayResponse, bookingDetails);
           })
           .catch((error) => {
             Alert.alert("Payment Failed", error.description || "Unknown error");
@@ -482,11 +523,13 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }
   };
 
-  const handleSuccessfulPayment = async (razorpayResponse: any, updatedBookingDetails: BookingDetails) => {
+  const handleSuccessfulPayment = async (razorpayResponse: any, bookingDetails: BookingDetails) => {
     try {
+      console.log('Sending booking to API:', JSON.stringify(bookingDetails, null, 2));
+      
       const bookingResponse = await axiosInstance.post(
         "/api/serviceproviders/engagement/add",
-        updatedBookingDetails,
+        bookingDetails,
         {
           headers: {
             "Content-Type": "application/json",
@@ -512,6 +555,8 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           sendDataToParent('BOOKINGS');
         }
         handleClose();
+      } else {
+        throw new Error("Failed to save booking");
       }
     } catch (error) {
       console.error("Booking error:", error);
@@ -521,29 +566,18 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }
   };
 
-  const renderBabyPackage = (packageType: PackageType) => {
-    const packageData = babyPackages[packageType];
-    const packageKey = `baby${packageType.charAt(0).toUpperCase() + packageType.slice(1)}` as keyof CartItems;
-    const color = '#3399cc';
-    const price = `₹${getPackagePrice('baby', packageType).toLocaleString()}`;
-    const reviews = packageType === 'day' ? '(1.5M reviews)' : 
-                   packageType === 'night' ? '(1.2M reviews)' : '(980K reviews)';
-    const rating = packageType === 'day' ? 4.8 : 
-                  packageType === 'night' ? 4.9 : 4.9;
+  const renderPackage = (type: CareType, packageType: PackageType) => {
+    const packageKey = `${type}${packageType.charAt(0).toUpperCase() + packageType.slice(1)}` as keyof CartItems;
+    const packageDetails = getPackageDetails(type, packageType);
     
-    const descriptionItems = packageType === 'day' ? [
-      'Professional daytime baby care',
-      'Age-appropriate activities',
-      'Meal preparation and feeding'
-    ] : packageType === 'night' ? [
-      'Professional overnight baby care',
-      'Night feeding and diaper changes',
-      'Sleep routine establishment'
-    ] : [
-      'Round-the-clock professional care',
-      'All daily care activities included',
-      'Live-in nanny service'
-    ];
+    // Don't render package if no price available
+    if (!packageDetails) {
+      return null;
+    }
+
+    const { packageData, price, reviews, rating, descriptionItems } = packageDetails;
+    const color = '#3399cc';
+    const formattedPrice = `₹${price.toLocaleString()}`;
 
     return (
       <View key={packageType} style={[
@@ -553,20 +587,22 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       ]}>
         <View style={styles.packageHeader}>
           <View>
-            <Text style={styles.packageTitle}>Baby Care - {packageType.charAt(0).toUpperCase() + packageType.slice(1)}</Text>
+            <Text style={styles.packageTitle}>
+              {type === 'baby' ? 'Baby Care' : 'Elderly Care'} - {packageType.charAt(0).toUpperCase() + packageType.slice(1)}
+            </Text>
             <View style={styles.ratingContainer}>
               <Text style={[styles.ratingValue, { color }]}>{rating}</Text>
               <Text style={styles.reviewsText}>{reviews}</Text>
             </View>
             <Text style={styles.bookingTypeText}>
-              {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
+              {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'} • On Demand
             </Text>
           </View>
           <View style={styles.priceContainer}>
-            <Text style={[styles.priceValue, { color }]}>{price}</Text>
+            <Text style={[styles.priceValue, { color }]}>{formattedPrice}</Text>
             <Text style={styles.careType}>
-              {packageType === 'day' ? 'Daytime care' : 
-               packageType === 'night' ? 'Overnight care' : 'Full-time care'}
+              {packageType === 'day' ? '8 hours service' : 
+               packageType === 'night' ? '8 hours service' : '16 hours service'}
             </Text>
           </View>
         </View>
@@ -576,14 +612,15 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           <View style={styles.personsInput}>
             <TouchableOpacity 
               style={styles.ageButton}
-              onPress={() => handleBabyAgeChange(packageType, -1)}
+              onPress={() => type === 'baby' ? handleBabyAgeChange(packageType, -1) : handleElderlyAgeChange(packageType, -1)}
+              disabled={type === 'baby' ? packageData.age <= 1 : packageData.age <= 60}
             >
-              <Text style={styles.ageButtonText}>-</Text>
+              <Text style={[styles.ageButtonText, (type === 'baby' ? packageData.age <= 1 : packageData.age <= 60) && styles.disabledAgeButton]}>-</Text>
             </TouchableOpacity>
-            <Text style={styles.personsValue}>≤{packageData.age}</Text>
+            <Text style={styles.personsValue}>{packageData.age}</Text>
             <TouchableOpacity 
               style={styles.ageButton}
-              onPress={() => handleBabyAgeChange(packageType, 1)}
+              onPress={() => type === 'baby' ? handleBabyAgeChange(packageType, 1) : handleElderlyAgeChange(packageType, 1)}
             >
               <Text style={styles.ageButtonText}>+</Text>
             </TouchableOpacity>
@@ -622,105 +659,40 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     );
   };
 
-  const renderElderlyPackage = (packageType: PackageType) => {
-    const packageData = elderlyPackages[packageType];
-    const packageKey = `elderly${packageType.charAt(0).toUpperCase() + packageType.slice(1)}` as keyof CartItems;
-    const color = '#3399cc';
-    const price = `₹${getPackagePrice('elderly', packageType).toLocaleString()}`;
-    const reviews = packageType === 'day' ? '(1.1M reviews)' : 
-                   packageType === 'night' ? '(950K reviews)' : '(850K reviews)';
-    const rating = packageType === 'day' ? 4.7 : 
-                  packageType === 'night' ? 4.8 : 4.9;
-    
-    const descriptionItems = packageType === 'day' ? [
-      'Professional daytime elderly care',
-      'Medication management',
-      'Meal preparation and assistance'
-    ] : packageType === 'night' ? [
-      'Professional overnight elderly care',
-      'Night-time assistance and monitoring',
-      'Sleep comfort and safety'
-    ] : [
-      'Round-the-clock professional care',
-      'All daily care activities included',
-      'Live-in caregiver service'
-    ];
+  const renderBabyPackages = () => {
+    const packages = [
+      renderPackage('baby', 'day'),
+      renderPackage('baby', 'night'),
+      renderPackage('baby', 'fullTime')
+    ].filter(Boolean); // Remove null packages
 
-    return (
-      <View key={packageType} style={[
-        styles.packageCard, 
-        cartItems[packageKey] && styles.selectedPackage,
-        { borderLeftColor: color }
-      ]}>
-        <View style={styles.packageHeader}>
-          <View>
-            <Text style={styles.packageTitle}>Elderly Care - {packageType.charAt(0).toUpperCase() + packageType.slice(1)}</Text>
-            <View style={styles.ratingContainer}>
-              <Text style={[styles.ratingValue, { color }]}>{rating}</Text>
-              <Text style={styles.reviewsText}>{reviews}</Text>
-            </View>
-            <Text style={styles.bookingTypeText}>
-              {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
-            </Text>
-          </View>
-          <View style={styles.priceContainer}>
-            <Text style={[styles.priceValue, { color }]}>{price}</Text>
-            <Text style={styles.careType}>
-              {packageType === 'day' ? 'Daytime care' : 
-               packageType === 'night' ? 'Overnight care' : 'Full-time care'}
-            </Text>
-          </View>
+    if (packages.length === 0) {
+      return (
+        <View style={styles.noServiceContainer}>
+          <Text style={styles.noServiceText}>No baby care services available at the moment</Text>
         </View>
-        
-        <View style={styles.personsControl}>
-          <Text style={styles.personsLabel}>Age:</Text>
-          <View style={styles.personsInput}>
-            <TouchableOpacity 
-              style={styles.ageButton}
-              onPress={() => handleElderlyAgeChange(packageType, -1)}
-            >
-              <Text style={styles.ageButtonText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.personsValue}>≤{packageData.age}</Text>
-            <TouchableOpacity 
-              style={styles.ageButton}
-              onPress={() => handleElderlyAgeChange(packageType, 1)}
-            >
-              <Text style={styles.ageButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
+      );
+    }
+
+    return packages;
+  };
+
+  const renderElderlyPackages = () => {
+    const packages = [
+      renderPackage('elderly', 'day'),
+      renderPackage('elderly', 'night'),
+      renderPackage('elderly', 'fullTime')
+    ].filter(Boolean); // Remove null packages
+
+    if (packages.length === 0) {
+      return (
+        <View style={styles.noServiceContainer}>
+          <Text style={styles.noServiceText}>No elderly care services available at the moment</Text>
         </View>
-        
-        <View style={styles.descriptionList}>
-          {descriptionItems.map((item, index) => (
-            <View key={index} style={styles.descriptionItem}>
-              <Text style={styles.descriptionBullet}>•</Text>
-              <Text style={styles.descriptionText}>{item}</Text>
-            </View>
-          ))}
-        </View>
-        
-        <TouchableOpacity
-          style={[
-            styles.cartButton,
-            cartItems[packageKey] && styles.selectedCartButton
-          ]}
-          onPress={() => handleAddToCart(packageKey)}
-        >
-          {cartItems[packageKey] ? (
-            <Icon name="remove-shopping-cart" size={20} color="white" />
-          ) : (
-            <Icon name="add-shopping-cart" size={20} color="#3399cc" />
-          )}
-          <Text style={[
-            styles.cartButtonText,
-            cartItems[packageKey] && styles.selectedCartButtonText
-          ]}>
-            {cartItems[packageKey] ? 'REMOVE FROM CART' : 'ADD TO CART'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
+      );
+    }
+
+    return packages;
   };
 
   return (    
@@ -769,19 +741,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           
           <ScrollView style={styles.scrollView}>
             <View style={styles.packagesContainer}>
-              {activeTab === 'baby' ? (
-                <>
-                  {renderBabyPackage('day')}
-                  {renderBabyPackage('night')}
-                  {renderBabyPackage('fullTime')}
-                </>
-              ) : (
-                <>
-                  {renderElderlyPackage('day')}
-                  {renderElderlyPackage('night')}
-                  {renderElderlyPackage('fullTime')}
-                </>
-              )}
+              {activeTab === 'baby' ? renderBabyPackages() : renderElderlyPackages()}
             </View>
           </ScrollView>
           
@@ -986,6 +946,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#333',
   },
+  disabledAgeButton: {
+    color: '#ccc',
+  },
   personsValue: {
     marginHorizontal: 15,
     fontSize: 16,
@@ -1109,6 +1072,16 @@ const styles = StyleSheet.create({
   checkoutButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  noServiceContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noServiceText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

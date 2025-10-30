@@ -145,11 +145,13 @@ export const NewDetails: React.FC<DetailsProps> = ({
         longitude = coords.longitude;
         console.log("Using current device location:", latitude, longitude);
       }
-
+//       || "2025-04-01"
+// || "2025-04-30"
+// || "09:00-17:00"
       // Format dates with fallbacks - improved from React web version
-      const startDate = formatDateOnly(bookingType?.startDate) || "2025-04-01";
-      const endDate = formatDateOnly(bookingType?.endDate) || "2025-04-30";
-      const timeslot = bookingType?.timeRange || "09:00-17:00";
+      const startDate = formatDateOnly(bookingType?.startDate) ;
+      const endDate = formatDateOnly(bookingType?.endDate) ;
+      const timeslot = bookingType?.timeRange ;
       const housekeepingRole = bookingType?.housekeepingRole || selected?.toUpperCase() || "COOK";
 
       console.log("Search parameters:", {
@@ -418,9 +420,9 @@ export const NewDetails: React.FC<DetailsProps> = ({
         <Text style={styles.retryText} onPress={retrySearch}>
           Tap to search again
         </Text>
-        <Text style={[styles.retryText, {marginTop: 0}]} onPress={loadMockData}>
+        {/* <Text style={[styles.retryText, {marginTop: 0}]} onPress={loadMockData}>
           Or use demo data
-        </Text>
+        </Text> */}
       </View>
     );
   };

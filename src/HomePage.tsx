@@ -325,8 +325,8 @@ const HomePage: React.FC<ChildComponentProps> = ({
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
+    // Keep the picker open until user explicitly confirms
+    if (event.type === 'set' && selectedDate) {
       setStartDate(selectedDate);
       setEndDate(selectedDate);
       
@@ -347,11 +347,22 @@ const HomePage: React.FC<ChildComponentProps> = ({
         setEndTime(calculatedEndTime);
       }
     }
+    
+    // Only hide the picker when user taps "OK" or outside (Android) or when done (iOS)
+    if (Platform.OS === 'ios') {
+      // Keep iOS picker open until user taps "Done"
+      if (event.type === 'dismissed') {
+        setShowDatePicker(false);
+      }
+    } else {
+      // Android - close on both set and dismissed
+      setShowDatePicker(false);
+    }
   };
 
   const onTimeChange = (event: any, selectedTime?: Date) => {
-    setShowTimePicker(false);
-    if (selectedTime) {
+    // Keep the picker open until user explicitly confirms
+    if (event.type === 'set' && selectedTime) {
       setStartTime(selectedTime);
       const calculatedEndTime = new Date(selectedTime.getTime() + duration * 60 * 60000);
       setEndTime(calculatedEndTime);
@@ -362,6 +373,17 @@ const HomePage: React.FC<ChildComponentProps> = ({
         setStartDate(today);
         setEndDate(today);
       }
+    }
+    
+    // Only hide the picker when user taps "OK" or outside (Android) or when done (iOS)
+    if (Platform.OS === 'ios') {
+      // Keep iOS picker open until user taps "Done"
+      if (event.type === 'dismissed') {
+        setShowTimePicker(false);
+      }
+    } else {
+      // Android - close on both set and dismissed
+      setShowTimePicker(false);
     }
   };
 
@@ -682,142 +704,140 @@ const HomePage: React.FC<ChildComponentProps> = ({
       <Modal visible={open} animationType="slide" transparent={true}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            
-            <Text style={styles.modalTitle}>Book a {selectedType.toLowerCase()}</Text>
+            <ScrollView 
+              style={styles.modalScrollView}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={true}
+            >
+              <Text style={styles.modalTitle}>Book a {selectedType.toLowerCase()}</Text>
 
-            <View style={styles.radioGroup}>
-              <Text style={styles.radioLabel}>Book by</Text>
-              <View style={styles.radioOptions}>
-                <View style={styles.radioOption}>
-                  <RadioButton
-                    selected={selectedRadioButtonValue === "Date"}
-                    onPress={() => getSelectedValue("Date")}
-                  />
-                  <Text style={styles.radioText}>Date</Text>
-                </View>
-                <View style={styles.radioOption}>
-                  <RadioButton
-                    selected={selectedRadioButtonValue === "Short term"}
-                    onPress={() => getSelectedValue("Short term")}
-                  />
-                  <Text style={styles.radioText}>Short term</Text>
-                </View>
-                <View style={styles.radioOption}>
-                  <RadioButton
-                    selected={selectedRadioButtonValue === "Monthly"}
-                    onPress={() => getSelectedValue("Monthly")}
-                  />
-                  <Text style={styles.radioText}>Monthly</Text>
+              <View style={styles.radioGroup}>
+                <Text style={styles.radioLabel}>Book by</Text>
+                <View style={styles.radioOptions}>
+                  <View style={styles.radioOption}>
+                    <RadioButton
+                      selected={selectedRadioButtonValue === "Date"}
+                      onPress={() => getSelectedValue("Date")}
+                    />
+                    <Text style={styles.radioText}>Date</Text>
+                  </View>
+                  <View style={styles.radioOption}>
+                    <RadioButton
+                      selected={selectedRadioButtonValue === "Short term"}
+                      onPress={() => getSelectedValue("Short term")}
+                    />
+                    <Text style={styles.radioText}>Short term</Text>
+                  </View>
+                  <View style={styles.radioOption}>
+                    <RadioButton
+                      selected={selectedRadioButtonValue === "Monthly"}
+                      onPress={() => getSelectedValue("Monthly")}
+                    />
+                    <Text style={styles.radioText}>Monthly</Text>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            {/* Date/Time Selection Section */}
-            {selectedRadioButtonValue && (
-              <View style={styles.dateTimeContainer}>
-                {/* Date Selection */}
-                <View style={styles.dateContainer}>
-                  <Text style={styles.label}>
-                    {selectedRadioButtonValue === "Monthly" ? "Select Start Date" : "Select Date"}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.dateInput}
-                    onPress={() => showPicker("date")}
-                  >
-                    <Text style={styles.dateInputText}>
-                      {startDate ? formatDate(startDate) : "Select date"}
+              {/* Date/Time Selection Section */}
+              {selectedRadioButtonValue && (
+                <View style={styles.dateTimeContainer}>
+                  {/* Date Selection */}
+                  <View style={styles.dateContainer}>
+                    <Text style={styles.label}>
+                      {selectedRadioButtonValue === "Monthly" ? "Select Start Date" : "Select Date"}
                     </Text>
-                  </TouchableOpacity>
-                </View>
+                    <TouchableOpacity
+                      style={styles.dateInput}
+                      onPress={() => showPicker("date")}
+                    >
+                      <Text style={styles.dateInputText}>
+                        {startDate ? formatDate(startDate) : "Select date"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-                {/* Time Selection */}
-                <View style={styles.dateContainer}>
-                  <Text style={styles.label}>Select Start Time</Text>
-                  <TouchableOpacity
-                    style={styles.dateInput}
-                    onPress={() => showPicker("time")}
-                  >
-                    <Text style={styles.dateInputText}>
-                      {startTime ? formatTime(startTime) : "Select time"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  {/* Time Selection */}
+                  <View style={styles.dateContainer}>
+                    <Text style={styles.label}>Select Start Time</Text>
+                    <TouchableOpacity
+                      style={styles.dateInput}
+                      onPress={() => showPicker("time")}
+                    >
+                      <Text style={styles.dateInputText}>
+                        {startTime ? formatTime(startTime) : "Select time"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-                {/* Duration Selector for Date Option */}
-                {selectedRadioButtonValue === "Date" && startDate && startTime && (
-                  <View style={styles.durationContainer}>
-                    <Text style={styles.durationTitle}>Service Duration</Text>
-                    <View style={styles.durationSelector}>
-                      <TouchableOpacity 
-                        style={[
-                          styles.durationButton,
-                          isDecreaseDisabled && styles.durationButtonDisabled
-                        ]}
-                        onPress={decreaseDuration}
-                        disabled={isDecreaseDisabled}
-                      >
-                        <Text style={[
-                          styles.durationButtonText,
-                          isDecreaseDisabled && styles.durationButtonTextDisabled
-                        ]}>-</Text>
-                      </TouchableOpacity>
-                      
-                      <View style={styles.durationDisplay}>
-                        <Text style={styles.durationText}>
-                          {duration} hour{duration > 1 ? 's' : ''}
-                        </Text>
+                  {/* Duration Selector for Date Option */}
+                  {selectedRadioButtonValue === "Date" && startDate && startTime && (
+                    <View style={styles.durationContainer}>
+                      <Text style={styles.durationTitle}>Service Duration</Text>
+                      <View style={styles.durationSelector}>
+                        <TouchableOpacity 
+                          style={[
+                            styles.durationButton,
+                            isDecreaseDisabled && styles.durationButtonDisabled
+                          ]}
+                          onPress={decreaseDuration}
+                          disabled={isDecreaseDisabled}
+                        >
+                          <Text style={[
+                            styles.durationButtonText,
+                            isDecreaseDisabled && styles.durationButtonTextDisabled
+                          ]}>-</Text>
+                        </TouchableOpacity>
+                        
+                        <View style={styles.durationDisplay}>
+                          <Text style={styles.durationText}>
+                            {duration} hour{duration > 1 ? 's' : ''}
+                          </Text>
+                        </View>
+                        
+                        <TouchableOpacity 
+                          style={[
+                            styles.durationButton,
+                            isIncreaseDisabled && styles.durationButtonDisabled
+                          ]}
+                          onPress={increaseDuration}
+                          disabled={isIncreaseDisabled}
+                        >
+                          <Text style={[
+                            styles.durationButtonText,
+                            isIncreaseDisabled && styles.durationButtonTextDisabled
+                          ]}>+</Text>
+                        </TouchableOpacity>
                       </View>
                       
-                      <TouchableOpacity 
-                        style={[
-                          styles.durationButton,
-                          isIncreaseDisabled && styles.durationButtonDisabled
-                        ]}
-                        onPress={increaseDuration}
-                        disabled={isIncreaseDisabled}
-                      >
-                        <Text style={[
-                          styles.durationButtonText,
-                          isIncreaseDisabled && styles.durationButtonTextDisabled
-                        ]}>+</Text>
-                      </TouchableOpacity>
-                    </View>
-                    
-                    <Text style={styles.durationNote}>
-                      Service will end at: {endTime ? formatTime(endTime) : 'Calculating...'}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Booking Summary */}
-                {startDate && startTime && (
-                  <View style={styles.bookingSummary}>
-                    <Text style={styles.summaryTitle}>Booking Summary</Text>
-                    <Text style={styles.summaryText}>
-                      Date: {formatDate(startDate)}
-                    </Text>
-                    <Text style={styles.summaryText}>
-                      Start Time: {formatTime(startTime)}
-                    </Text>
-                    {selectedRadioButtonValue === "Date" && (
-                      <Text style={styles.summaryText}>
-                        Duration: {duration} hour{duration > 1 ? 's' : ''}
+                      <Text style={styles.durationNote}>
+                        Service will end at: {endTime ? formatTime(endTime) : 'Calculating...'}
                       </Text>
-                    )}
-                    <Text style={styles.summaryNote}>
-                      Your service is scheduled for {formatDate(startDate)} at {formatTime(startTime)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
+                    </View>
+                  )}
 
-            {/* Relax Message */}
-            <View style={styles.relaxMessage}>
-              <Text style={styles.relaxText}>
-                Relax, we'll handle the rest. Our verified professionals ensure your peace of mind.
-              </Text>
-            </View>
+                  {/* Booking Summary */}
+                  {startDate && startTime && (
+                    <View style={styles.bookingSummary}>
+                      <Text style={styles.summaryTitle}>Booking Summary</Text>
+                      <Text style={styles.summaryText}>
+                        Date: {formatDate(startDate)}
+                      </Text>
+                      <Text style={styles.summaryText}>
+                        Start Time: {formatTime(startTime)}
+                      </Text>
+                      {selectedRadioButtonValue === "Date" && (
+                        <Text style={styles.summaryText}>
+                          Duration: {duration} hour{duration > 1 ? 's' : ''}
+                        </Text>
+                      )}
+                      <Text style={styles.summaryNote}>
+                        Your service is scheduled for {formatDate(startDate)} at {formatTime(startTime)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </ScrollView>
 
             <View style={styles.modalButtons}>
               <Button title="Cancel" onPress={handleClose} />
@@ -831,15 +851,27 @@ const HomePage: React.FC<ChildComponentProps> = ({
         </View>
       </Modal>
 
-      {/* Date/Time Pickers */}
-      {(showDatePicker || showTimePicker) && (
+      {/* Date/Time Pickers - Now controlled manually */}
+      {showDatePicker && (
         <DateTimePicker
           value={startDate || new Date()}
-          mode={currentPicker}
-          display="default"
-          onChange={currentPicker === "date" ? onDateChange : onTimeChange}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onDateChange}
           minimumDate={new Date()}
           maximumDate={getMaxDate()}
+          style={Platform.OS === 'ios' ? styles.iosPicker : {}}
+        />
+      )}
+
+      {showTimePicker && (
+        <DateTimePicker
+          value={startTime || new Date()}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onTimeChange}
+          style={Platform.OS === 'ios' ? styles.iosPicker : {}}
+          is24Hour={false}
         />
       )}
 
@@ -1227,20 +1259,18 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#fff",
-    padding: 20,
     borderRadius: 8,
-    width: "90%",
+    // width: "90%",
     maxWidth: 400,
-    maxHeight: "80%",
-    overflow: 'hidden', 
+    maxHeight: "60%",
+    // overflow: 'hidden',
   },
   modalScrollView: {
-  flex: 1,
-},
-modalScrollContent: {
-  padding: 20,
-  paddingBottom: 10, // Add some bottom padding for the buttons
-},
+    flex: 1,
+  },
+  modalScrollContent: {
+    padding: 20,
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: "bold",
@@ -1308,7 +1338,9 @@ modalScrollContent: {
   modalButtons: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: 16,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
     gap: 8,
   },
   dateInputText: {
@@ -1493,6 +1525,11 @@ modalScrollContent: {
     color: '#666',
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  iosPicker: {
+    width: width * 0.9,
+    height: 200,
+    backgroundColor: 'white',
   },
 });
 

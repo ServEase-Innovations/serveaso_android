@@ -49,6 +49,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   // Use the pricing filter service
   const { getFilteredPricing } = usePricingFilterService();
   const maidPricing = getFilteredPricing('MAID');
+ console.log('Maid Pricing Data:', maidPricing);
 
   const [cartItems, setCartItems] = useState<Record<string, boolean>>(() => {
     const initialCartItems = {

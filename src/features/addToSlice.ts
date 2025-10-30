@@ -59,11 +59,20 @@ export const addToSlice = createSlice({
       });
     },
 
-    // Remove item from cart
-    removeFromCart: (state, action: PayloadAction<{ id: string; type: CartItem['type'] }>) => {
-      state.items = state.items.filter(
-        (item) => !(item.id === action.payload.id && item.type === action.payload.type)
-      );
+    // Remove item from cart - FIXED: Make id optional for bulk removal
+    removeFromCart: (state, action: PayloadAction<{ id?: string; type: CartItem['type'] }>) => {
+      if (action.payload.id) {
+        // Remove specific item by id and type
+        state.items = state.items.filter(
+          (item) => !(item.id === action.payload.id && item.type === action.payload.type)
+        );
+      } else {
+        // Remove all items of specified type
+        state.items = state.items.filter(
+          (item) => item.type !== action.payload.type
+        );
+      }
+      
       // Save to AsyncStorage
       AsyncStorage.setItem('unifiedCart', JSON.stringify(state.items)).catch(error => {
         console.error('Error saving cart to AsyncStorage', error);
