@@ -10,7 +10,7 @@ export type BookingDetails = {
     engagements?: string;
     timeslot?: string;
     monthlyAmount?: number;
-    paymentMode?: "CASH" | "CARD" | "ONLINE" | "UPI"| "RAZORPAY";  // Assuming predefined payment modes
+    paymentMode?: "CASH" | "CARD" | "ONLINE" | "UPI" | "razorpay";  // Assuming predefined payment modes
     bookingType?: string;
     bookingDate?: string;  // ISO format date-time
     responsibilities?: any;

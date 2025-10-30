@@ -29,6 +29,7 @@ import NannyServicesDialog from "./NannyServiceDialog";
 import LinearGradient from 'react-native-linear-gradient';
 import AgentRegistrationForm from './AgentRegistrationForm';
 import { useAuth0 } from 'react-native-auth0';
+import BookingDialog from './BookingDialog'; // Import the BookingDialog component
 
 // Import local images
 const cookImage = require("../assets/images/Cooknew.png");
@@ -80,13 +81,10 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [open, setOpen] = useState(false);
   const [selectedType, setSelectedtype] = useState("");
   const [selectedRadioButtonValue, setSelectedRadioButtonValue] = useState("");
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [startTime, setStartTime] = useState<Date | null>(null);
-  const [endTime, setEndTime] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [currentPicker, setCurrentPicker] = useState<"date" | "time">("date");
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState<any>(null);
+  const [endTime, setEndTime] = useState<any>(null);
   const [showRegistration, setShowRegistration] = useState(false);
   const [serviceDetailsOpen, setServiceDetailsOpen] = useState(false);
   const [selectedServiceType, setSelectedServiceType] = useState<"cook" | "maid" | "babycare" | null>(null);
@@ -99,7 +97,6 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [showAgentRegistration, setShowAgentRegistration] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [duration, setDuration] = useState(1); // Default 1 hour duration
 
   // Auth0 authentication
   const { user: auth0User, authorize, clearSession } = useAuth0();
@@ -243,204 +240,66 @@ const HomePage: React.FC<ChildComponentProps> = ({
     setEndDate(null);
     setStartTime(null);
     setEndTime(null);
-    setDuration(1);
   };
 
   const handleClose = () => {
     setOpen(false);
   };
 
-  // Check if time is within allowed booking hours (5 AM - 10 PM)
-  const isBookingValid = (time: Date | null) => {
-    if (!time) return false;
-    const now = new Date();
-    const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60000);
-    
-    // Allow times that are at least 30 minutes ahead
-    if (time < thirtyMinutesFromNow) return false;
-    
-    const hour = time.getHours();
-    return hour >= 5 && hour < 22; // 5 AM–10 PM
+const handleSave = (bookingDetails: any) => {
+  const formatDate = (value: any) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return value; // already formatted string
+    return date.toISOString().split("T")[0]; // "YYYY-MM-DD"
   };
 
-  const handleSave = () => {
-    if (startTime && !isBookingValid(startTime)) {
-      Alert.alert(
-        "Invalid Time",
-        "Please select a time between 5 AM and 10 PM, at least 30 minutes from now"
-      );
-      return;
+  const formatTime = (value: any) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return value; // already formatted string
+    return date.toTimeString().slice(0, 5); // "HH:mm"
+  };
+
+  const booking = {
+    start_date: formatDate(bookingDetails.startDate),
+    start_time: formatTime(bookingDetails.startTime),
+    end_date: formatDate(bookingDetails.endDate || bookingDetails.startDate),
+    end_time: formatTime(bookingDetails.endTime),
+    timeRange:
+      bookingDetails.startTime && bookingDetails.endTime
+        ? `${formatTime(bookingDetails.startTime)} - ${formatTime(bookingDetails.endTime)}`
+        : formatTime(bookingDetails.startTime) || "",
+    bookingPreference: selectedRadioButtonValue,
+    housekeepingRole: selectedType,
+  };
+
+  console.log("Dispatching booking:", booking);
+
+  if (selectedRadioButtonValue === "Date") {
+    switch (selectedType) {
+      case "COOK":
+        setShowCookDialog(true);
+        break;
+      case "MAID":
+        setShowMaidServiceDialog(true);
+        break;
+      case "NANNY":
+        setShowNannyServicesDialog(true);
+        break;
+      default:
+        sendDataToParent(DETAILS);
     }
+  } else {
+    sendDataToParent(DETAILS);
+  }
 
-    const booking = {
-      startDate: startDate?.toISOString(),
-      endDate: startDate?.toISOString(),
-      startTime: startTime?.toISOString(),
-      endTime: endTime?.toISOString(),
-      bookingPreference: selectedRadioButtonValue,
-      serviceType: selectedType,
-      housekeepingRole: selectedType,
-      duration: duration
-    };
+  setOpen(false);
+  dispatch(add(booking));
+};
 
-    console.log("Dispatching booking:", booking);
 
-    if (selectedRadioButtonValue === "Date") {
-      switch (selectedType) {
-        case "COOK":
-          setShowCookDialog(true);
-          break;
-        case "MAID":
-          setShowMaidServiceDialog(true);
-          break;
-        case "NANNY":
-          setShowNannyServicesDialog(true);
-          break;
-        default:
-          sendDataToParent(DETAILS);
-      }
-    } else {
-      sendDataToParent(DETAILS);
-    }
 
-    setOpen(false);
-    dispatch(add(booking));
-  };
-
-  const isConfirmDisabled = () => {
-    if (!startDate) return true;
-    if (!startTime) return true;
-    return false;
-  };
-
-  const showPicker = (type: "date" | "time") => {
-    setCurrentPicker(type);
-    if (type === "date") {
-      setShowDatePicker(true);
-      setShowTimePicker(false);
-    } else {
-      setShowTimePicker(true);
-      setShowDatePicker(false);
-    }
-  };
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    // Keep the picker open until user explicitly confirms
-    if (event.type === 'set' && selectedDate) {
-      setStartDate(selectedDate);
-      setEndDate(selectedDate);
-      
-      // If no time is selected yet, set a default time
-      if (!startTime) {
-        const defaultTime = new Date(selectedDate);
-        const now = new Date();
-        
-        // If selected date is today, set time to 30 minutes from now
-        if (selectedDate.toDateString() === now.toDateString()) {
-          defaultTime.setTime(now.getTime() + 30 * 60000);
-        } else {
-          // For future dates, set default time to 8:00 AM
-          defaultTime.setHours(8, 0, 0, 0);
-        }
-        setStartTime(defaultTime);
-        const calculatedEndTime = new Date(defaultTime.getTime() + duration * 60 * 60000);
-        setEndTime(calculatedEndTime);
-      }
-    }
-    
-    // Only hide the picker when user taps "OK" or outside (Android) or when done (iOS)
-    if (Platform.OS === 'ios') {
-      // Keep iOS picker open until user taps "Done"
-      if (event.type === 'dismissed') {
-        setShowDatePicker(false);
-      }
-    } else {
-      // Android - close on both set and dismissed
-      setShowDatePicker(false);
-    }
-  };
-
-  const onTimeChange = (event: any, selectedTime?: Date) => {
-    // Keep the picker open until user explicitly confirms
-    if (event.type === 'set' && selectedTime) {
-      setStartTime(selectedTime);
-      const calculatedEndTime = new Date(selectedTime.getTime() + duration * 60 * 60000);
-      setEndTime(calculatedEndTime);
-      
-      // If no date is selected, set today's date
-      if (!startDate) {
-        const today = new Date();
-        setStartDate(today);
-        setEndDate(today);
-      }
-    }
-    
-    // Only hide the picker when user taps "OK" or outside (Android) or when done (iOS)
-    if (Platform.OS === 'ios') {
-      // Keep iOS picker open until user taps "Done"
-      if (event.type === 'dismissed') {
-        setShowTimePicker(false);
-      }
-    } else {
-      // Android - close on both set and dismissed
-      setShowTimePicker(false);
-    }
-  };
-
-  const formatDate = (date: Date | null) => {
-    if (!date) return "";
-    return date.toLocaleDateString('en-US', { 
-      month: '2-digit', 
-      day: '2-digit', 
-      year: 'numeric' 
-    });
-  };
-
-  const formatTime = (time: Date | null) => {
-    if (!time) return "";
-    return time.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: true 
-    });
-  };
-
-  // Calculate maximum date
-  const getMaxDate = () => {
-    const today = new Date();
-    if (selectedRadioButtonValue === "Monthly") {
-      return new Date(today.getTime() + 89 * 24 * 60 * 60000); // 90 days
-    }
-    return new Date(today.getTime() + 21 * 24 * 60 * 60000); // 21 days
-  };
-
-  // Handle duration changes
-  const increaseDuration = () => {
-    if (startTime) {
-      const newDuration = duration + 1;
-      const newEndTime = new Date(startTime.getTime() + newDuration * 60 * 60000);
-      
-      // Check if new end time would exceed 10 PM
-      if (newEndTime.getHours() < 22) {
-        setDuration(newDuration);
-        setEndTime(newEndTime);
-      } else {
-        Alert.alert("Time Limit", "Service cannot extend beyond 10 PM");
-      }
-    }
-  };
-
-  const decreaseDuration = () => {
-    if (duration > 1) {
-      const newDuration = duration - 1;
-      setDuration(newDuration);
-      if (startTime) {
-        const newEndTime = new Date(startTime.getTime() + newDuration * 60 * 60000);
-        setEndTime(newEndTime);
-      }
-    }
-  };
-  
   const handleLearnMore = (service: string) => {
     switch (service) {
       case "Home Cook":
@@ -460,8 +319,6 @@ const HomePage: React.FC<ChildComponentProps> = ({
 
   // Fix for disabled props - convert null to false
   const isServiceDisabled = role === "SERVICE_PROVIDER";
-  const isDecreaseDisabled = duration <= 1;
-  const isIncreaseDisabled = !!(endTime && endTime.getHours() >= 22);
 
   return (
     <ScrollView style={styles.container}>
@@ -700,180 +557,22 @@ const HomePage: React.FC<ChildComponentProps> = ({
       {/* How it works */}
       <HowItWorksSection />
 
-      {/* Enhanced Booking Dialog */}
-      <Modal visible={open} animationType="slide" transparent={true}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <ScrollView 
-              style={styles.modalScrollView}
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
-            >
-              <Text style={styles.modalTitle}>Book a {selectedType.toLowerCase()}</Text>
-
-              <View style={styles.radioGroup}>
-                <Text style={styles.radioLabel}>Book by</Text>
-                <View style={styles.radioOptions}>
-                  <View style={styles.radioOption}>
-                    <RadioButton
-                      selected={selectedRadioButtonValue === "Date"}
-                      onPress={() => getSelectedValue("Date")}
-                    />
-                    <Text style={styles.radioText}>Date</Text>
-                  </View>
-                  <View style={styles.radioOption}>
-                    <RadioButton
-                      selected={selectedRadioButtonValue === "Short term"}
-                      onPress={() => getSelectedValue("Short term")}
-                    />
-                    <Text style={styles.radioText}>Short term</Text>
-                  </View>
-                  <View style={styles.radioOption}>
-                    <RadioButton
-                      selected={selectedRadioButtonValue === "Monthly"}
-                      onPress={() => getSelectedValue("Monthly")}
-                    />
-                    <Text style={styles.radioText}>Monthly</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Date/Time Selection Section */}
-              {selectedRadioButtonValue && (
-                <View style={styles.dateTimeContainer}>
-                  {/* Date Selection */}
-                  <View style={styles.dateContainer}>
-                    <Text style={styles.label}>
-                      {selectedRadioButtonValue === "Monthly" ? "Select Start Date" : "Select Date"}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.dateInput}
-                      onPress={() => showPicker("date")}
-                    >
-                      <Text style={styles.dateInputText}>
-                        {startDate ? formatDate(startDate) : "Select date"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Time Selection */}
-                  <View style={styles.dateContainer}>
-                    <Text style={styles.label}>Select Start Time</Text>
-                    <TouchableOpacity
-                      style={styles.dateInput}
-                      onPress={() => showPicker("time")}
-                    >
-                      <Text style={styles.dateInputText}>
-                        {startTime ? formatTime(startTime) : "Select time"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Duration Selector for Date Option */}
-                  {selectedRadioButtonValue === "Date" && startDate && startTime && (
-                    <View style={styles.durationContainer}>
-                      <Text style={styles.durationTitle}>Service Duration</Text>
-                      <View style={styles.durationSelector}>
-                        <TouchableOpacity 
-                          style={[
-                            styles.durationButton,
-                            isDecreaseDisabled && styles.durationButtonDisabled
-                          ]}
-                          onPress={decreaseDuration}
-                          disabled={isDecreaseDisabled}
-                        >
-                          <Text style={[
-                            styles.durationButtonText,
-                            isDecreaseDisabled && styles.durationButtonTextDisabled
-                          ]}>-</Text>
-                        </TouchableOpacity>
-                        
-                        <View style={styles.durationDisplay}>
-                          <Text style={styles.durationText}>
-                            {duration} hour{duration > 1 ? 's' : ''}
-                          </Text>
-                        </View>
-                        
-                        <TouchableOpacity 
-                          style={[
-                            styles.durationButton,
-                            isIncreaseDisabled && styles.durationButtonDisabled
-                          ]}
-                          onPress={increaseDuration}
-                          disabled={isIncreaseDisabled}
-                        >
-                          <Text style={[
-                            styles.durationButtonText,
-                            isIncreaseDisabled && styles.durationButtonTextDisabled
-                          ]}>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                      
-                      <Text style={styles.durationNote}>
-                        Service will end at: {endTime ? formatTime(endTime) : 'Calculating...'}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Booking Summary */}
-                  {startDate && startTime && (
-                    <View style={styles.bookingSummary}>
-                      <Text style={styles.summaryTitle}>Booking Summary</Text>
-                      <Text style={styles.summaryText}>
-                        Date: {formatDate(startDate)}
-                      </Text>
-                      <Text style={styles.summaryText}>
-                        Start Time: {formatTime(startTime)}
-                      </Text>
-                      {selectedRadioButtonValue === "Date" && (
-                        <Text style={styles.summaryText}>
-                          Duration: {duration} hour{duration > 1 ? 's' : ''}
-                        </Text>
-                      )}
-                      <Text style={styles.summaryNote}>
-                        Your service is scheduled for {formatDate(startDate)} at {formatTime(startTime)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </ScrollView>
-
-            <View style={styles.modalButtons}>
-              <Button title="Cancel" onPress={handleClose} />
-              <Button
-                title="Confirm"
-                onPress={handleSave}
-                disabled={isConfirmDisabled()}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Date/Time Pickers - Now controlled manually */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={startDate || new Date()}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onDateChange}
-          minimumDate={new Date()}
-          maximumDate={getMaxDate()}
-          style={Platform.OS === 'ios' ? styles.iosPicker : {}}
-        />
-      )}
-
-      {showTimePicker && (
-        <DateTimePicker
-          value={startTime || new Date()}
-          mode="time"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onTimeChange}
-          style={Platform.OS === 'ios' ? styles.iosPicker : {}}
-          is24Hour={false}
-        />
-      )}
+      {/* Booking Dialog */}
+      <BookingDialog
+        open={open}
+        onClose={handleClose}
+        onSave={handleSave}
+        selectedOption={selectedRadioButtonValue}
+        onOptionChange={getSelectedValue}
+        startDate={startDate}
+        endDate={endDate}
+        startTime={startTime}
+        endTime={endTime}
+        setStartDate={setStartDate}
+        setEndDate={setEndDate}
+        setStartTime={setStartTime}
+        setEndTime={setEndTime}
+      />
 
       {/* Service Dialogs */}
       {showCookDialog && (
@@ -883,12 +582,13 @@ const HomePage: React.FC<ChildComponentProps> = ({
               onClose={() => setShowCookDialog(false)}
               sendDataToParent={sendDataToParent}
               bookingType={{
-                startDate: startDate?.toISOString(),
-                endDate: startDate?.toISOString(),
-                timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
+                startDate: startDate,
+                endDate: endDate || startDate,
+                timeRange: startTime
+                  ? `${startTime.format("HH:mm")} - ${endTime.format("HH:mm")}`
+                  : startTime?.format("HH:mm") || "",
                 bookingPreference: selectedRadioButtonValue,
                 housekeepingRole: selectedType,
-                duration: duration
               }}
             />
           </View>
@@ -898,19 +598,30 @@ const HomePage: React.FC<ChildComponentProps> = ({
       {showNannyServicesDialog && (
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogBox}>
-            <NannyServicesDialog
-              open={showNannyServicesDialog}
-              handleClose={() => setShowNannyServicesDialog(false)}
-              sendDataToParent={sendDataToParent}
-              bookingType={{
-                startDate: startDate?.toISOString(),
-                endDate: startDate?.toISOString(),
-                timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
-                bookingPreference: selectedRadioButtonValue,
-                housekeepingRole: selectedType,
-                duration: duration
-              }}
-            />
+           <NannyServicesDialog
+  open={showNannyServicesDialog}
+  handleClose={() => setShowNannyServicesDialog(false)}
+  sendDataToParent={sendDataToParent}
+  bookingType={{
+    start_date: startDate ? new Date(startDate).toISOString().split("T")[0] : "",
+    start_time: startTime ? new Date(startTime).toTimeString().slice(0, 5) : "",
+    end_date: endDate
+      ? new Date(endDate).toISOString().split("T")[0]
+      : startDate
+      ? new Date(startDate).toISOString().split("T")[0]
+      : "",
+    end_time: endTime ? new Date(endTime).toTimeString().slice(0, 5) : "",
+    timeRange:
+      startTime
+        ? `${new Date(startTime).toTimeString().slice(0, 5)}`
+        : startTime
+        ? new Date(startTime).toTimeString().slice(0, 5)
+        : "",
+    bookingPreference: selectedRadioButtonValue,
+    housekeepingRole: selectedType,
+  }}
+/>
+
           </View>
         </View>
       )}
@@ -922,14 +633,6 @@ const HomePage: React.FC<ChildComponentProps> = ({
               open={showMaidServiceDialog}
               handleClose={() => setShowMaidServiceDialog(false)}
               sendDataToParent={sendDataToParent}
-              bookingType={{
-                startDate: startDate?.toISOString(),
-                endDate: startDate?.toISOString(),
-                timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
-                bookingPreference: selectedRadioButtonValue,
-                housekeepingRole: selectedType,
-                duration: duration
-              }}
             />
           </View>
         </View>
@@ -1251,108 +954,6 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    // width: "90%",
-    maxWidth: 400,
-    maxHeight: "60%",
-    // overflow: 'hidden',
-  },
-  modalScrollView: {
-    flex: 1,
-  },
-  modalScrollContent: {
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  radioGroup: {
-    marginBottom: 16,
-  },
-  radioLabel: {
-    fontSize: 16,
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  radioOptions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  radioOption: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  radioText: {
-    marginLeft: 8,
-    fontSize: 14,
-  },
-  dateTimeContainer: {
-    gap: 16,
-  },
-  dateContainer: {
-    gap: 8,
-  },
-  monthlyContainer: {
-    gap: 16,
-  },
-  label: {
-    fontSize: 14,
-    marginBottom: 4,
-    fontWeight: '500',
-  },
-  dateInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 4,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-  },
-  timeInputContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
-  },
-  timeInputWrapper: {
-    flex: 1,
-  },
-  timeInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 4,
-    padding: 12,
-  },
-  dateBlock: {
-    flex: 1,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    gap: 8,
-  },
-  dateInputText: {
-    color: '#000',
-    fontSize: 14,
-  },
-  timeInputText: {
-    color: '#000',
-  },
-  disabledInput: {
-    backgroundColor: '#f0f0f0',
-  },
   dialogOverlay: {
     position: 'absolute',
     top: 0,
@@ -1427,109 +1028,6 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
     fontSize: 10,
     marginTop: 2,
-  },
-  // New styles for enhanced date-time picker
-  durationContainer: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-    backgroundColor: '#fafafa',
-  },
-  durationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  durationSelector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  durationButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1976d2',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  durationButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  durationButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  durationButtonTextDisabled: {
-    color: '#666',
-  },
-  durationDisplay: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  durationText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  durationNote: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  estimatedCost: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1976d2',
-    textAlign: 'center',
-  },
-  bookingSummary: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-    backgroundColor: '#f0f8ff',
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#1976d2',
-  },
-  summaryText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
-  },
-  summaryNote: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
-  relaxMessage: {
-    backgroundColor: '#f0f8ff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  relaxText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  iosPicker: {
-    width: width * 0.9,
-    height: 200,
-    backgroundColor: 'white',
   },
 });
 

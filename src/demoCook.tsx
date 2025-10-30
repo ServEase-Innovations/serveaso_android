@@ -188,40 +188,43 @@ const DemoCook = ({
   };
 
   // Add this helper function to validate payload
-  const validatePayload = (payload: BookingPayload) => {
-    const errors: string[] = [];
+ const validatePayload = (payload: BookingPayload) => {
+  const errors: string[] = [];
 
-    if (!payload.customerid || payload.customerid <= 0) {
-      errors.push("Invalid customer ID");
-    }
+  if (!payload.customerid || payload.customerid <= 0) {
+    errors.push("Invalid customer ID");
+  }
 
-    if (!payload.serviceproviderid || payload.serviceproviderid <= 0) {
-      errors.push("Invalid service provider ID");
-    }
+  // For ON_DEMAND bookings, serviceproviderid can be null/0
+  // For other types, it should be valid
+  const isOnDemand = payload.booking_type === "ON_DEMAND";
+  if (!isOnDemand && (!payload.serviceproviderid || payload.serviceproviderid <= 0)) {
+    errors.push("Invalid service provider ID");
+  }
 
-    if (!payload.start_date) {
-      errors.push("Start date is required");
-    }
+  if (!payload.start_date) {
+    errors.push("Start date is required");
+  }
 
-    if (!payload.start_time || !/^\d{2}:\d{2}:\d{2}$/.test(payload.start_time)) {
-      errors.push("Invalid start time format. Expected HH:MM:SS");
-    }
+  if (!payload.start_time || !/^\d{2}:\d{2}:\d{2}$/.test(payload.start_time)) {
+    errors.push("Invalid start time format. Expected HH:MM:SS");
+  }
 
-    if (payload.booking_type === "ON_DEMAND" && !payload.end_time) {
-      errors.push("End time is required for ON_DEMAND bookings");
-    }
+  if (payload.booking_type === "ON_DEMAND" && !payload.end_time) {
+    errors.push("End time is required for ON_DEMAND bookings");
+  }
 
-    if (!payload.base_amount || payload.base_amount <= 0) {
-      errors.push("Invalid base amount");
-    }
+  if (!payload.base_amount || payload.base_amount <= 0) {
+    errors.push("Invalid base amount");
+  }
 
-    if (errors.length > 0) {
-      console.error("🚨 Payload validation errors:", errors);
-      return false;
-    }
+  if (errors.length > 0) {
+    console.error("🚨 Payload validation errors:", errors);
+    return false;
+  }
 
-    return true;
-  };
+  return true;
+};
 
   const initialPackages = useMemo(() => {
     if (!cookPricing || cookPricing.length === 0) return [];
@@ -317,7 +320,7 @@ const DemoCook = ({
               description: currentPackage.includes.join(', '),
               basePrice: currentPackage.basePrice || currentPackage.price,
               maxPersons: currentPackage.maxPersons || 15,
-              bookingType: currentPackage.bookingType
+              // bookingType: currentPackage.bookingType
             }
           }));
         }, 0);
@@ -344,7 +347,7 @@ const DemoCook = ({
             description: currentPackage.includes.join(', '),
             basePrice: currentPackage.basePrice || currentPackage.price,
             maxPersons: currentPackage.maxPersons || 15,
-            bookingType: currentPackage.bookingType
+            // bookingType: currentPackage.bookingType
           }));
         } else {
           dispatch(removeFromCart({
@@ -380,7 +383,7 @@ const DemoCook = ({
           description: pkg.includes.join(', '),
           basePrice: pkg.basePrice || pkg.price,
           maxPersons: pkg.maxPersons || 15,
-          bookingType: pkg.bookingType
+          // bookingType: pkg.bookingType
         }));
       }
     });
@@ -419,22 +422,23 @@ const handleCheckout = async () => {
       }))
     };
 
-    // Fix: Format start_time properly
+    // Format start_time properly
     const currentBookingType = getBookingTypeFromPreference(bookingType?.bookingPreference);
     const startTime = formatTimeForBackend(bookingType?.timeRange);
 
-    // Conditional serviceproviderid logic
+    // Conditional serviceproviderid logic - FIXED
     const isOnDemand = currentBookingType === "ON_DEMAND";
     
-    // Prepare base payload
+    // Handle serviceproviderid properly to match BookingPayload type
+    let serviceproviderid: number | null = null;
+    if (!isOnDemand && providerDetails?.serviceproviderId) {
+      serviceproviderid = Number(providerDetails.serviceproviderId);
+    }
+
+    // Prepare payload matching BookingPayload interface
     const payload: BookingPayload = {
       customerid: customerId,
-      // Only include serviceproviderid if NOT on demand
-      ...(!isOnDemand && {
-        serviceproviderid: providerDetails?.serviceproviderId 
-          ? Number(providerDetails.serviceproviderId)
-          : 0,
-      }),
+      serviceproviderid: serviceproviderid, // Now properly typed as number | null
       start_date: bookingType?.startDate || new Date().toISOString().split("T")[0],
       end_date: bookingType?.endDate || "",
       responsibilities: responsibilities,
@@ -450,44 +454,7 @@ const handleCheckout = async () => {
     };
 
     console.log("📦 Booking payload:", JSON.stringify(payload, null, 2));
-    console.log(`🔍 Booking Type: ${currentBookingType}, Service Provider ID ${isOnDemand ? 'EXCLUDED' : 'INCLUDED'}: ${!isOnDemand ? providerDetails?.serviceproviderId : 'N/A'}`);
-
-    // Update validation to account for conditional serviceproviderid
-    const validatePayload = (payload: BookingPayload) => {
-      const errors: string[] = [];
-
-      if (!payload.customerid || payload.customerid <= 0) {
-        errors.push("Invalid customer ID");
-      }
-
-      // Only validate serviceproviderid if NOT on demand
-      if (!isOnDemand && (!payload.serviceproviderid || payload.serviceproviderid <= 0)) {
-        errors.push("Invalid service provider ID");
-      }
-
-      if (!payload.start_date) {
-        errors.push("Start date is required");
-      }
-
-      if (!payload.start_time || !/^\d{2}:\d{2}:\d{2}$/.test(payload.start_time)) {
-        errors.push("Invalid start time format. Expected HH:MM:SS");
-      }
-
-      if (payload.booking_type === "ON_DEMAND" && !payload.end_time) {
-        errors.push("End time is required for ON_DEMAND bookings");
-      }
-
-      if (!payload.base_amount || payload.base_amount <= 0) {
-        errors.push("Invalid base amount");
-      }
-
-      if (errors.length > 0) {
-        console.error("🚨 Payload validation errors:", errors);
-        return false;
-      }
-
-      return true;
-    };
+    console.log(`🔍 Booking Type: ${currentBookingType}, Service Provider ID: ${serviceproviderid}`);
 
     // Validate payload before sending
     if (!validatePayload(payload)) {
@@ -496,120 +463,73 @@ const handleCheckout = async () => {
       return;
     }
 
-    try {
-      // Use BookingService to create engagement and get Razorpay order
-      const result = await BookingService.prepareBookingData(payload);
-      
-      console.log("✅ Engagement created:", result.engagementData);
-      console.log("💰 Checkout options:", result.checkoutOptions);
+    // ✅ Use the bookAndPay method exactly like in React web version
+    console.log("🚀 Calling BookingService.bookAndPay...");
+    const result = await BookingService.bookAndPay(payload);
+    
+    console.log("✅ bookAndPay result:", result);
 
-      // Open Razorpay checkout
-      const razorpayResponse = await new Promise<any>((resolve, reject) => {
-        RazorpayCheckout.open(result.checkoutOptions)
-          .then(resolve)
-          .catch(reject);
-      });
+    // ✅ Success handling - matching your React web version
+    setSnackbarMessage(result?.verifyResult?.message || "Booking & Payment Successful ✅");
+    setSnackbarSeverity("success");
+    setSnackbarVisible(true);
 
-      console.log("✅ Razorpay response:", razorpayResponse);
+    // Clear cart and close dialogs
+    selectedPackages.forEach(pkg => {
+      dispatch(removeFromCart({
+        id: pkg.name.toUpperCase(),
+        type: 'meal'
+      }));
+    });
 
-      // Verify payment
-      const paymentVerificationData = {
-        razorpay_payment_id: razorpayResponse.razorpay_payment_id,
-        razorpay_order_id: razorpayResponse.razorpay_order_id,
-        razorpay_signature: razorpayResponse.razorpay_signature,
-        engagementId: result.engagementData.id || result.engagementData.engagementId
-      };
-
-      console.log("🔍 Verifying payment with data:", paymentVerificationData);
-
-      const verificationResult = await BookingService.verifyPayment(paymentVerificationData);
-
-      if (verificationResult.success) {
-        // Payment successful
-        setSnackbarMessage(verificationResult.message || "Booking & Payment Successful ✅");
-        setSnackbarSeverity("success");
-        setSnackbarVisible(true);
-
-        // Clear cart and close dialogs
-        selectedPackages.forEach(pkg => {
-          dispatch(removeFromCart({
-            id: pkg.name.toUpperCase(),
-            type: 'meal'
-          }));
-        });
-
-        if (sendDataToParent) {
-          sendDataToParent(BOOKINGS);
-        }
-        
-        setTimeout(() => {
-          setShowCartDialog(false);
-          onClose();
-        }, 2000);
-        
-      } else {
-        throw new Error(verificationResult.error || "Payment verification failed");
-      }
-
-    } catch (error: any) {
-      console.error("❌ Payment process error:", error);
-      
-      // Enhanced error logging
-      if (error.response) {
-        console.error("🚨 Server responded with error:", {
-          status: error.response.status,
-          data: error.response.data,
-          headers: error.response.headers
-        });
-      } else if (error.request) {
-        console.error("🚨 No response received:", error.request);
-      } else {
-        console.error("🚨 Error setting up request:", error.message);
-      }
-      
-      if (error instanceof Error) {
-        Alert.alert("Payment Failed", error.message);
-      } else {
-        Alert.alert("Payment Failed", "An unexpected error occurred during payment");
-      }
-      setLoading(false);
+    if (sendDataToParent) {
+      sendDataToParent(BOOKINGS);
     }
     
+    setTimeout(() => {
+      setShowCartDialog(false);
+      onClose();
+    }, 2000);
+
   } catch (error: any) {
     console.error('❌ Checkout error:', error);
     
-    // Enhanced error logging for outer catch
-    if (error.response) {
-      console.error("🚨 Outer catch - Server response:", {
-        status: error.response.status,
-        data: error.response.data,
-        url: error.response.config?.url,
-        method: error.response.config?.method
-      });
-      
-      // Extract specific error message
-      let errorMessage = "Failed to process booking";
-      if (error.response.data) {
-        if (typeof error.response.data === 'string') {
-          errorMessage = error.response.data;
-        } else if (error.response.data.message) {
-          errorMessage = error.response.data.message;
-        } else if (error.response.data.error) {
-          errorMessage = error.response.data.error;
-        }
-      }
-      
-      setSnackbarMessage(`Error ${error.response.status}: ${errorMessage}`);
-    } else if (error.request) {
-      console.error("🚨 Outer catch - No response:", error.request);
-      setSnackbarMessage("Network error: No response from server");
-    } else {
-      console.error("🚨 Outer catch - Setup error:", error.message);
-      setSnackbarMessage(`Error: ${error.message}`);
-    }
+    // ✅ Enhanced error handling - matching your React web version
+    let backendMessage = "Failed to initiate payment";
     
+    if (error?.response?.data) {
+      if (typeof error.response.data === "string") {
+        backendMessage = error.response.data;
+      } else if (error.response.data.error) {
+        backendMessage = error.response.data.error;
+      } else if (error.response.data.message) {
+        backendMessage = error.response.data.message;
+      }
+    } else if (error.message) {
+      backendMessage = error.message;
+    }
+
+    // Handle Razorpay specific errors
+    if (error?.code) {
+      switch (error.code) {
+        case 0:
+          backendMessage = "Payment cancelled by user";
+          break;
+        case 1:
+          backendMessage = "Payment failed. Please try again.";
+          break;
+        case 2:
+          backendMessage = "Network error. Please check your internet connection.";
+          break;
+        default:
+          backendMessage = error.description || "Payment failed";
+      }
+    }
+
+    setSnackbarMessage(backendMessage);
     setSnackbarSeverity("error");
     setSnackbarVisible(true);
+  } finally {
     setLoading(false);
   }
 };

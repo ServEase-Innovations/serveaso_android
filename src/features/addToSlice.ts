@@ -59,18 +59,16 @@ export const addToSlice = createSlice({
       });
     },
 
-    // Remove item from cart - FIXED: Make id optional for bulk removal
+    // Remove item from cart - Enhanced version from React code
     removeFromCart: (state, action: PayloadAction<{ id?: string; type: CartItem['type'] }>) => {
       if (action.payload.id) {
-        // Remove specific item by id and type
+        // Remove specific item
         state.items = state.items.filter(
           (item) => !(item.id === action.payload.id && item.type === action.payload.type)
         );
       } else {
-        // Remove all items of specified type
-        state.items = state.items.filter(
-          (item) => item.type !== action.payload.type
-        );
+        // Remove all items of this type
+        state.items = state.items.filter((item) => item.type !== action.payload.type);
       }
       
       // Save to AsyncStorage
