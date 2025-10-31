@@ -23,6 +23,8 @@ import { addToCart, removeFromCart, selectCartItems } from './features/addToSlic
 import { isMaidCartItem } from './types/cartSlice';
 import RazorpayCheckout from 'react-native-razorpay';
 import { usePricingFilterService } from './utils/PricingFilter';
+import BookingService, { BookingPayload } from './services/bookingService';
+import { useAppUser } from './context/AppUserContext';
 
 interface MaidServiceDialogProps {
   open: boolean;
@@ -32,6 +34,41 @@ interface MaidServiceDialogProps {
   user?: any;
   bookingType?: any;
 }
+
+// Define cart item types
+type CartItemKey = 
+  | 'utensilCleaning'
+  | 'sweepingMopping'
+  | 'bathroomCleaning'
+  | 'bathroomDeepCleaning'
+  | 'normalDusting'
+  | 'deepDusting'
+  | 'utensilDrying'
+  | 'clothesDrying';
+
+type CartItemsType = Record<CartItemKey, boolean>;
+
+// Type guard to check if a string is a valid cart item key
+function isCartItemKey(key: string): key is CartItemKey {
+  return [
+    'utensilCleaning',
+    'sweepingMopping',
+    'bathroomCleaning',
+    'bathroomDeepCleaning',
+    'normalDusting',
+    'deepDusting',
+    'utensilDrying',
+    'clothesDrying'
+  ].includes(key);
+}
+
+type HouseSize = '1BHK' | '2BHK' | '3BHK' | '4BHK+';
+
+type PackageState = {
+  utensilCleaning: { persons: number };
+  sweepingMopping: { houseSize: HouseSize };
+  bathroomCleaning: { bathrooms: number };
+};
 
 const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({ 
   open, 
@@ -49,10 +86,10 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   // Use the pricing filter service
   const { getFilteredPricing } = usePricingFilterService();
   const maidPricing = getFilteredPricing('MAID');
- console.log('Maid Pricing Data:', maidPricing);
+  console.log('Maid Pricing Data:', maidPricing);
 
-  const [cartItems, setCartItems] = useState<Record<string, boolean>>(() => {
-    const initialCartItems = {
+  const [cartItems, setCartItems] = useState<CartItemsType>(() => {
+    const initialCartItems: CartItemsType = {
       utensilCleaning: false,
       sweepingMopping: false,
       bathroomCleaning: false,
@@ -64,9 +101,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     };
 
     maidCartItems.forEach(item => {
-      if (item.serviceType === 'package') {
-        initialCartItems[item.name] = true;
-      } else if (item.serviceType === 'addon') {
+      if ((item.serviceType === 'package' || item.serviceType === 'addon') && isCartItemKey(item.name)) {
         initialCartItems[item.name] = true;
       }
     });
@@ -74,16 +109,19 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     return initialCartItems;
   });
 
-  const [packageStates, setPackageStates] = useState({
+  const [packageStates, setPackageStates] = useState<PackageState>({
     utensilCleaning: { persons: 3 },
     sweepingMopping: { houseSize: '2BHK' },
     bathroomCleaning: { bathrooms: 2 }
   });
   
   const dispatch = useDispatch();
+  const { setAppUser, appUser } = useAppUser();
+  
   const users = useSelector((state: any) => state.user?.value);
   const currentLocation = users?.customerDetails?.currentLocation;
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
+  const customerId = appUser?.customerid || user?.customerid || 19;
 
   // Get booking type from preference
   const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
@@ -95,26 +133,9 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   };
 
   // Booking details using passed props
-  const bookingDetails: BookingDetails = {
-    serviceProviderId: Number(providerDetails?.serviceproviderId) || 0,
-    serviceProviderName: providerFullName,
-    customerId: user?.customerid || users?.customerid || 19,
-    customerName: `${user?.customerDetails?.firstName || users?.customerDetails?.firstName} ${user?.customerDetails?.lastName || users?.customerDetails?.lastName}`.trim() || "Customer",
-    startDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
-    endDate: bookingType?.endDate || "",
-    engagements: "",
-    address: currentLocation || user?.customerDetails?.currentLocation || "",
-    timeslot: bookingType?.timeRange || "",
-    monthlyAmount: 0,
-    paymentMode: "UPI",
-    bookingType: getBookingTypeFromPreference(bookingType?.bookingPreference),
-    taskStatus: "NOT_STARTED",
-    responsibilities: [],
-    serviceType: "MAID",
-  };
 
   // Get pricing for specific services with proper matching
-  const getPackagePrice = (packageName: string): number => {
+  const getPackagePrice = (packageName: CartItemKey): number => {
     if (!maidPricing || maidPricing.length === 0) {
       console.log('No maid pricing data available');
       // Fallback prices if no pricing data available
@@ -129,10 +150,15 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     console.log('Available maid pricing:', maidPricing);
     
     // Map package names to service name patterns
-    const servicePatterns: Record<string, string[]> = {
+    const servicePatterns: Record<CartItemKey, string[]> = {
       utensilCleaning: ['utensil', 'cleaning', 'utensils'],
       sweepingMopping: ['sweeping', 'mopping', 'floor'],
-      bathroomCleaning: ['bathroom', 'cleaning', 'toilet']
+      bathroomCleaning: ['bathroom', 'cleaning', 'toilet'],
+      bathroomDeepCleaning: [],
+      normalDusting: [],
+      deepDusting: [],
+      utensilDrying: [],
+      clothesDrying: []
     };
 
     const patterns = servicePatterns[packageName] || [];
@@ -163,7 +189,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     }
   };
 
-  const getAddOnPrice = (addOnName: string): number => {
+  const getAddOnPrice = (addOnName: CartItemKey): number => {
     if (!maidPricing || maidPricing.length === 0) {
       console.log('No maid pricing data available for addons');
       // Fallback prices if no pricing data available
@@ -180,12 +206,15 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     console.log('Available maid pricing for addons:', maidPricing);
     
     // Map addon names to service name patterns
-    const addOnPatterns: Record<string, string[]> = {
+    const addOnPatterns: Record<CartItemKey, string[]> = {
       bathroomDeepCleaning: ['deep', 'bathroom', 'deep cleaning'],
       normalDusting: ['dusting', 'normal dusting', 'furniture'],
       deepDusting: ['deep dusting', 'chemical', 'décor'],
       utensilDrying: ['utensil drying', 'drying', 'utensils'],
-      clothesDrying: ['clothes', 'drying', 'laundry']
+      clothesDrying: ['clothes', 'drying', 'laundry'],
+      utensilCleaning: [],
+      sweepingMopping: [],
+      bathroomCleaning: []
     };
 
     const patterns = addOnPatterns[addOnName] || [];
@@ -217,7 +246,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     }
   };
 
-  const getPackageDescription = (packageName: string): string => {
+  const getPackageDescription = (packageName: CartItemKey): string => {
     switch(packageName) {
       case 'utensilCleaning': 
         return 'All kind of daily utensil cleaning\nParty used type utensil cleaning';
@@ -229,7 +258,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     }
   };
 
-  const getPackageDetails = (packageName: string) => {
+  const getPackageDetails = (packageName: CartItemKey) => {
     switch(packageName) {
       case 'utensilCleaning':
         return { persons: packageStates.utensilCleaning.persons };
@@ -241,7 +270,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     }
   };
 
-  const getAddOnDescription = (addOnName: string): string => {
+  const getAddOnDescription = (addOnName: CartItemKey): string => {
     switch(addOnName) {
       case 'bathroomDeepCleaning':
         return 'Weekly cleaning of bathrooms, all bathroom walls cleaned';
@@ -288,7 +317,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   };
 
   const handleHouseSizeChange = (operation: string) => {
-    const sizes = ['1BHK', '2BHK', '3BHK', '4BHK+'];
+    const sizes: HouseSize[] = ['1BHK', '2BHK', '3BHK', '4BHK+'];
     const currentIndex = sizes.indexOf(packageStates.sweepingMopping.houseSize);
     
     setPackageStates(prev => ({
@@ -314,7 +343,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     }));
   };
 
-  const handleAddPackageToCart = (packageName: string) => {
+  const handleAddPackageToCart = (packageName: CartItemKey) => {
     const packageDetails = {
       id: `package_${packageName}`,
       type: 'maid' as const,
@@ -337,7 +366,9 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     }));
   };
 
-  const handleAddAddOnToCart = (addOnName: string) => {
+     console.log("Formatted bookingType Time:", bookingType);
+
+  const handleAddAddOnToCart = (addOnName: CartItemKey) => {
     const addOnDetails = {
       id: `addon_${addOnName}`,
       type: 'maid' as const,
@@ -380,106 +411,425 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   const countSelectedItems = () => {
     return Object.values(cartItems).filter(item => item).length;
   };
+// const handleCheckout = async () => {
+//   try {
+//     setLoading(true);
 
-  const handleSuccessfulPayment = async (razorpayResponse: any, updatedBookingDetails: BookingDetails) => {
-    try {
-      const bookingResponse = await axiosInstance.post(
-        "/api/serviceproviders/engagement/add",
-        updatedBookingDetails,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+//     const selectedServices = maidCartItems.filter(isMaidCartItem);
+//     const baseTotal = selectedServices.reduce((sum, item) => sum + (item.price || 0), 0);
+    
+//     if (baseTotal <= 0) {
+//       Alert.alert('Warning', 'No items selected for checkout');
+//       setLoading(false);
+//       return;
+//     }
 
-      if (bookingResponse.status === 201) {
-        // Clear cart items
-        Object.keys(cartItems).forEach(itemName => {
-          if (cartItems[itemName]) {
-            const id = itemName.includes('package_') ? `package_${itemName}` : `addon_${itemName}`;
-            dispatch(removeFromCart({ id, type: 'maid' }));
-          }
-        });
+//     const customerId = appUser?.customerid || user?.customerid || "guest-id";
+    
+//     // Separate packages and add-ons
+//     const packages = selectedServices.filter(item => item.serviceType === "package");
+//     const addOns = selectedServices.filter(item => item.serviceType === "addon");
 
-        if (sendDataToParent) {
-          sendDataToParent(BOOKINGS);
-        }
-        handleClose();
-      }
-    } catch (error) {
-      console.error("Booking error:", error);
-      Alert.alert("Error", "Failed to save booking details");
-    } finally {
-      setLoading(false);
-    }
-  };
+//     // Format responsibilities
+//     const responsibilities = {
+//       tasks: packages.map(item => {
+//         // Map package names to task types with their details
+//         if (item.name === "utensilCleaning") {
+//           return { 
+//             taskType: "Utensil Cleaning", 
+//             persons: item.details?.persons || 1 
+//           };
+//         }
+//         if (item.name === "sweepingMopping") {
+//           return { 
+//             taskType: "Sweeping & Mopping", 
+//             houseSize: item.details?.houseSize || "2BHK" 
+//           };
+//         }
+//         if (item.name === "bathroomCleaning") {
+//           return { 
+//             taskType: "Bathroom Cleaning", 
+//             bathrooms: item.details?.bathrooms || 1 
+//           };
+//         }
+//         return { taskType: item.name };
+//       }),
+//       add_ons: addOns.map(item => ({ 
+//         taskType: item.name 
+//       }))
+//     };
 
-  const handleCheckout = async () => {
-    try {
-      setLoading(true);
-      const selectedItems = Object.entries(cartItems)
-        .filter(([_, selected]) => selected)
-        .map(([name]) => name);
+//     // Get booking type
+//     const currentBookingType = getBookingTypeFromPreference(bookingType?.bookingPreference);
+//     const isOnDemand = currentBookingType === "ON_DEMAND";
+    
+//     // Handle serviceproviderid properly
+//     let serviceproviderid: number | null = null;
+//     if (!isOnDemand && providerDetails?.serviceproviderId) {
+//       serviceproviderid = Number(providerDetails.serviceproviderId);
+//     }
 
-      if (selectedItems.length === 0) {
-        Alert.alert('Error', 'Please add at least one item to cart');
-        setLoading(false);
-        return;
-      }
-
-      const totalAmount = calculateTotal();
+//     // Format time properly
+//     const formatTimeForBackend = (timeString: string): string => {
+//       if (!timeString) return '10:00:00';
       
-      // Update booking details with selected items and total amount
-      const updatedBookingDetails = {
-        ...bookingDetails,
-        engagements: selectedItems.join(', '),
-        monthlyAmount: totalAmount
-      };
+//       try {
+//         let timeToFormat = timeString;
+        
+//         if (timeString.includes(' - ')) {
+//           timeToFormat = timeString.split(' - ')[0].trim();
+//         }
+        
+//         if (/^\d{2}:\d{2}:\d{2}$/.test(timeToFormat)) {
+//           return timeToFormat;
+//         }
+        
+//         const timeRegex = /(\d{1,2}):(\d{2})\s*(AM|PM)/i;
+//         const match = timeToFormat.match(timeRegex);
+        
+//         if (match) {
+//           let [_, hours, minutes, modifier] = match;
+//           let hourNum = parseInt(hours);
+          
+//           if (modifier.toUpperCase() === 'PM' && hourNum !== 12) {
+//             hourNum += 12;
+//           } else if (modifier.toUpperCase() === 'AM' && hourNum === 12) {
+//             hourNum = 0;
+//           }
+          
+//           return `${hourNum.toString().padStart(2, '0')}:${minutes}:00`;
+//         }
+        
+//         if (timeToFormat.includes(':')) {
+//           const parts = timeToFormat.split(':');
+//           if (parts.length === 2) {
+//             return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+//           }
+//         }
+        
+//         return '10:00:00';
+//       } catch (error) {
+//         console.error("Error formatting time:", error);
+//         return '10:00:00';
+//       }
+//     };
 
-      // Create Razorpay order
-      const response = await axios.post(
-        "https://utils-ndt3.onrender.com/create-order",
-        { amount: totalAmount * 100 }, // amount in paise
-        {
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+//     const startTime = formatTimeForBackend(bookingType?.timeRange);
+ 
+
+//     // Prepare the final payload
+//     const payload: BookingPayload = {
+//       customerid: customerId,
+//       // serviceproviderid: serviceproviderid,
+//       serviceproviderid: providerDetails?.serviceproviderId
+//           ? Number(providerDetails.serviceproviderId)
+//           : 0,
+//       start_date: bookingType?.start_Date || new Date().toISOString().split("T")[0],
+//       end_date: bookingType?.end_Date || new Date().toISOString().split("T")[0],
+//       start_time: bookingType?.start_Time,
+//       responsibilities: responsibilities,
+//       booking_type: currentBookingType,
+//       taskStatus: "NOT_STARTED",
+//       service_type: "MAID",
+//       base_amount: baseTotal,
+//       payment_mode: "razorpay",
+//       latitude: currentLocation?.latitude || 24.5235712, // Use actual location
+//       longitude: currentLocation?.longitude || 88.0214016, // Use actual location
+//       // ...(isOnDemand && {
+//       //   end_time: bookingType?.end_Time ,
+//       // }),
+//       ...(bookingType?.bookingPreference?.toLowerCase() === "date" && {
+//           end_time: bookingType?.end_Time , // || ""
+//         }),
+//     };
+//     // || formatTimeForBackend('06:00 PM')
+
+//     console.log("Final Maid Service Payload:", JSON.stringify(payload, null, 2));
+
+//     // Create Razorpay order
+//     const orderResponse = await axios.post(
+//       "https://utils-ndt3.onrender.com/create-order",
+//       { amount: baseTotal * 100 }, // amount in paise
+//       {
+//         headers: { "Content-Type": "application/json" },
+//       }
+//     );
+
+//     if (orderResponse.status === 200) {
+//       const { id: orderId, currency, amount } = orderResponse.data;
+
+//       const options = {
+//         key: "rzp_test_lTdgjtSRlEwreA",
+//         amount: amount,
+//         currency: currency,
+//         name: "Serveaso",
+//         description: "Maid Service Booking",
+//         order_id: orderId,
+//         prefill: {
+//           name: users?.customerDetails?.firstName || user?.customerDetails?.firstName || "",
+//           email: users?.customerDetails?.email || user?.customerDetails?.email || "",
+//           contact: users?.customerDetails?.mobileNo || user?.customerDetails?.mobileNo || "",
+//         },
+//         theme: { color: "#3399cc" },
+//       };
+
+//       RazorpayCheckout.open(options)
+//         .then(async (razorpayResponse) => {
+//           try {
+//             // Call booking service after successful payment
+//             const result = await BookingService.bookAndPay(payload);
+            
+//             Alert.alert(
+//               "Success ✅", 
+//               result?.verifyResult?.message || "Maid Service Booking & Payment Successful",
+//               [
+//                 {
+//                   text: "OK",
+//                   onPress: () => {
+//                     if (sendDataToParent) {
+//                       sendDataToParent(BOOKINGS);
+//                     }
+//                     handleClose();
+//                   }
+//                 }
+//               ]
+//             );
+
+//           } catch (bookingError) {
+//             console.error("Booking error after payment:", bookingError);
+//             Alert.alert("Error", "Payment successful but booking failed. Please contact support.");
+//           } finally {
+//             setLoading(false);
+//           }
+//         })
+//         .catch((error) => {
+//           console.error("Razorpay payment error:", error);
+//           Alert.alert("Payment Failed", error.description || "Unknown error");
+//           setLoading(false);
+//         });
+//     }
+
+//   } catch (error: any) {
+//     console.error("Checkout error:", error);
+
+//     let backendMessage = "Failed to initiate payment";
+//     if (error?.response?.data) {
+//       if (typeof error.response.data === "string") {
+//         backendMessage = error.response.data;
+//       } else if (error.response.data.error) {
+//         backendMessage = error.response.data.error;
+//       } else if (error.response.data.message) {
+//         backendMessage = error.response.data.message;
+//       }
+//     } else if (error.message) {
+//       backendMessage = error.message;
+//     }
+
+//     Alert.alert("Error", backendMessage);
+//     setLoading(false);
+//   }
+// };
+const handleCheckout = async () => {
+  try {
+    setLoading(true);
+
+    const selectedServices = maidCartItems.filter(isMaidCartItem);
+    const baseTotal = selectedServices.reduce((sum, item) => sum + (item.price || 0), 0);
     
-      if (response.status === 200) {
-        const { id: orderId, currency, amount } = response.data;
-    
-        const options = {
-          key: "rzp_test_lTdgjtSRlEwreA", // Your Razorpay key
-          amount: amount,
-          currency: currency,
-          name: "Serveaso",
-          description: "Maid Service Booking",
-          order_id: orderId,
-          prefill: {
-            name: users?.customerDetails?.firstName || user?.customerDetails?.firstName || "",
-            email: users?.customerDetails?.email || user?.customerDetails?.email || "",
-            contact: users?.customerDetails?.mobileNo || user?.customerDetails?.mobileNo || "",
-          },
-          theme: { color: "#3399cc" },
-        };
-    
-        RazorpayCheckout.open(options)
-          .then((razorpayResponse) => {
-            handleSuccessfulPayment(razorpayResponse, updatedBookingDetails);
-          })
-          .catch((error) => {
-            Alert.alert("Payment Failed", error.description || "Unknown error");
-            console.error("Razorpay payment error:", error);
-            setLoading(false);
-          });
-      }
-    } catch (error) {
-      console.error("Error while creating Razorpay order:", error);
-      Alert.alert("Error", "Failed to initiate payment. Please try again.");
+    if (baseTotal <= 0) {
+      Alert.alert('Warning', 'No items selected for checkout');
       setLoading(false);
+      return;
     }
-  };
+
+    const customerId = appUser?.customerid || user?.customerid || "guest-id";
+    
+    // Separate packages and add-ons
+    const packages = selectedServices.filter(item => item.serviceType === "package");
+    const addOns = selectedServices.filter(item => item.serviceType === "addon");
+
+    // Format responsibilities
+    const responsibilities = {
+      tasks: packages.map(item => {
+        if (item.name === "utensilCleaning") {
+          return { 
+            taskType: "Utensil Cleaning", 
+            persons: item.details?.persons || 1 
+          };
+        }
+        if (item.name === "sweepingMopping") {
+          return { 
+            taskType: "Sweeping & Mopping", 
+            houseSize: item.details?.houseSize || "2BHK" 
+          };
+        }
+        if (item.name === "bathroomCleaning") {
+          return { 
+            taskType: "Bathroom Cleaning", 
+            bathrooms: item.details?.bathrooms || 1 
+          };
+        }
+        return { taskType: item.name };
+      }),
+      add_ons: addOns.map(item => ({ 
+        taskType: item.name 
+      }))
+    };
+
+    // Get booking type
+    const currentBookingType = getBookingTypeFromPreference(bookingType?.bookingPreference);
+    const isOnDemand = currentBookingType === "ON_DEMAND";
+    
+    // Format time properly
+    const formatTimeForBackend = (timeString: string): string => {
+      console.log("🕒 Original time string:", timeString);
+      
+      if (!timeString) {
+        return '10:00:00';
+      }
+      
+      try {
+        let timeToFormat = timeString;
+        
+        if (timeString.includes(' - ')) {
+          timeToFormat = timeString.split(' - ')[0].trim();
+        }
+        
+        if (/^\d{2}:\d{2}:\d{2}$/.test(timeToFormat)) {
+          return timeToFormat;
+        }
+        
+        const timeRegex = /(\d{1,2}):(\d{2})\s*(AM|PM)/i;
+        const match = timeToFormat.match(timeRegex);
+        
+        if (match) {
+          let [_, hours, minutes, modifier] = match;
+          let hourNum = parseInt(hours);
+          
+          if (modifier.toUpperCase() === 'PM' && hourNum !== 12) {
+            hourNum += 12;
+          } else if (modifier.toUpperCase() === 'AM' && hourNum === 12) {
+            hourNum = 0;
+          }
+          
+          return `${hourNum.toString().padStart(2, '0')}:${minutes}:00`;
+        }
+        
+        if (timeToFormat.includes(':')) {
+          const parts = timeToFormat.split(':');
+          if (parts.length === 2) {
+            return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+          }
+        }
+        
+        return '10:00:00';
+      } catch (error) {
+        console.error("🕒 Error formatting time:", error);
+        return '10:00:00';
+      }
+    };
+
+    // Calculate times
+    const startTime = formatTimeForBackend(bookingType?.timeRange);
+    let endTime = '';
+    
+    if (isOnDemand) {
+      try {
+        const [hours, minutes] = startTime.split(':').map(Number);
+        let endHours = hours + 1;
+        if (endHours >= 24) endHours -= 24;
+        endTime = `${endHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+      } catch (error) {
+        endTime = formatTimeForBackend('06:00 PM');
+      }
+    }
+
+    // Prepare payload
+    const payload: BookingPayload = {
+      customerid: customerId,
+      serviceproviderid: providerDetails?.serviceproviderId
+        ? Number(providerDetails.serviceproviderId)
+        : 0,
+      start_date: bookingType?.startDate || new Date().toISOString().split("T")[0],
+      end_date: bookingType?.endDate || new Date().toISOString().split("T")[0],
+      start_time: startTime,
+      responsibilities: responsibilities,
+      booking_type: currentBookingType,
+      taskStatus: "NOT_STARTED",
+      service_type: "MAID",
+      base_amount: baseTotal,
+      payment_mode: "razorpay",
+      latitude: currentLocation?.latitude || 24.5235712,
+      longitude: currentLocation?.longitude || 88.0214016,
+      ...(isOnDemand && {
+        end_time: endTime,
+      }),
+    };
+
+    console.log("Final Maid Service Payload:", JSON.stringify(payload, null, 2));
+
+    // ✅ Use ONLY BookingService.bookAndPay - it handles Razorpay internally
+    console.log("🚀 Calling BookingService.bookAndPay...");
+    const result = await BookingService.bookAndPay(payload);
+    
+    console.log("✅ bookAndPay result:", result);
+
+    // Success handling
+    Alert.alert(
+      "Success ✅", 
+      result?.verifyResult?.message || "Maid Service Booking & Payment Successful",
+      [
+        {
+          text: "OK",
+          onPress: () => {
+            if (sendDataToParent) {
+              sendDataToParent(BOOKINGS);
+            }
+            handleClose();
+          }
+        }
+      ]
+    );
+
+  } catch (error: any) {
+    console.error('❌ Checkout error:', error);
+    
+    let backendMessage = "Failed to complete booking";
+    
+    if (error?.response?.data) {
+      if (typeof error.response.data === "string") {
+        backendMessage = error.response.data;
+      } else if (error.response.data.error) {
+        backendMessage = error.response.data.error;
+      } else if (error.response.data.message) {
+        backendMessage = error.response.data.message;
+      }
+    } else if (error.message) {
+      backendMessage = error.message;
+    }
+
+    // Handle Razorpay specific errors
+    if (error?.code) {
+      switch (error.code) {
+        case 0:
+          backendMessage = "Payment cancelled by user";
+          break;
+        case 1:
+          backendMessage = "Payment failed. Please try again.";
+          break;
+        case 2:
+          backendMessage = "Network error. Please check your internet connection.";
+          break;
+        default:
+          backendMessage = error.description || "Payment failed";
+      }
+    }
+
+    Alert.alert("Error", backendMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (!open) return null;
 

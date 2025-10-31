@@ -633,6 +633,24 @@ const handleSave = (bookingDetails: any) => {
               open={showMaidServiceDialog}
               handleClose={() => setShowMaidServiceDialog(false)}
               sendDataToParent={sendDataToParent}
+               bookingType={{
+    start_date: startDate ? new Date(startDate).toISOString().split("T")[0] : "",
+    start_time: startTime ? new Date(startTime).toTimeString().slice(0, 5) : "",
+    end_date: endDate
+      ? new Date(endDate).toISOString().split("T")[0]
+      : startDate
+      ? new Date(startDate).toISOString().split("T")[0]
+      : "",
+    end_time: endTime ? new Date(endTime).toTimeString().slice(0, 5) : "",
+    timeRange:
+      startTime
+        ? `${new Date(startTime).toTimeString().slice(0, 5)}`
+        : startTime
+        ? new Date(startTime).toTimeString().slice(0, 5)
+        : "",
+    bookingPreference: selectedRadioButtonValue,
+    housekeepingRole: selectedType,
+  }}
             />
           </View>
         </View>
