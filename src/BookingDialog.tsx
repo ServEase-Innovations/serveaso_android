@@ -1,26 +1,28 @@
-// src/components/BookingDialog.tsx
-import React, { useState } from 'react';
+/* eslint-disable */
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
   Platform,
   Alert,
-} from 'react-native';
-import { RadioButton, Button, Portal, Dialog, PaperProvider } from 'react-native-paper';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import dayjs, { Dayjs } from 'dayjs';
-import customParseFormat from 'dayjs/plugin/customParseFormat';
+  Dimensions,
+  ScrollView,
+} from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import dayjs, { Dayjs } from "dayjs";
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 
 dayjs.extend(customParseFormat);
+dayjs.extend(isSameOrAfter);
 
 interface BookingDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (bookingDetails: any) => void;
   selectedOption: string;
   onOptionChange: (val: string) => void;
   startDate: string | null;
@@ -32,6 +34,14 @@ interface BookingDialogProps {
   setStartTime: (val: Dayjs | null) => void;
   setEndTime: (val: Dayjs | null) => void;
 }
+
+const isBookingValid = (time: Dayjs | null) => {
+  if (!time) return false;
+  const now = dayjs();
+  if (time.isBefore(now.add(30, "minute").subtract(1, "second"))) return false;
+  const hour = time.hour();
+  return hour >= 5 && hour < 22; // 5 AM–10 PM
+};
 
 const BookingDialog: React.FC<BookingDialogProps> = ({
   open,
@@ -48,322 +58,496 @@ const BookingDialog: React.FC<BookingDialogProps> = ({
   setStartTime,
   setEndTime,
 }) => {
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [showPicker, setShowPicker] = useState<"start" | "end" | null>(null);
+  const [lastSelectedDate, setLastSelectedDate] = useState<Dayjs | null>(null);
+  const [pickerKey, setPickerKey] = useState(0); // Key to force re-render
 
   const today = dayjs();
-  const maxDate21Days = today.add(20, 'day');
-  const maxDate90Days = today.add(89, 'day');
+  const maxDate21Days = today.add(21, "day");
+  const maxDate90Days = today.add(89, "day");
 
-  const updateStartDate = (date: Date) => {
-    const newValue = dayjs(date);
-    setStartDate(newValue.format('YYYY-MM-DD'));
-    setStartTime(newValue);
-
-    if (selectedOption === 'Monthly') {
-      const endDateValue = newValue.add(1, 'month');
-      setEndDate(endDateValue.format('YYYY-MM-DD'));
-      setEndTime(endDateValue);
+  const updateStartDate = (newValue: Dayjs) => {
+    let adjustedTime = newValue;
+    if (newValue.isSame(today, "day")) {
+      const nowPlus30 = today.add(30, "minute");
+      if (newValue.isBefore(nowPlus30)) adjustedTime = nowPlus30;
+      if (adjustedTime.hour() < 5) adjustedTime = adjustedTime.hour(5).minute(0);
+      else if (adjustedTime.hour() >= 22)
+        adjustedTime = adjustedTime.hour(21).minute(55);
+    } else {
+      adjustedTime = adjustedTime.hour(5).minute(0);
     }
 
-    if (selectedOption === 'Date') {
-      setEndDate(newValue.format('YYYY-MM-DD'));
-      setEndTime(newValue);
+    setStartDate(adjustedTime.toISOString());
+    setStartTime(adjustedTime);
+    setLastSelectedDate(adjustedTime);
+
+    const defaultEnd = adjustedTime.add(1, "hour");
+    setEndDate(defaultEnd.toISOString());
+    setEndTime(defaultEnd);
+
+    if (selectedOption === "Monthly") {
+      const endDateValue = adjustedTime.add(1, "month");
+      setEndDate(endDateValue.toISOString());
+      setEndTime(endDateValue);
     }
   };
 
-  const updateEndDate = (date: Date) => {
-    const newValue = dayjs(date);
-    setEndDate(newValue.format('YYYY-MM-DD'));
+  const updateEndDate = (newValue: Dayjs) => {
+    setEndDate(newValue.toISOString());
     setEndTime(newValue);
   };
 
-  const updateStartTime = (time: Date) => {
-    const newTime = dayjs(time);
-    if (startTime) {
-      const updatedDateTime = startTime
-        .set('hour', newTime.hour())
-        .set('minute', newTime.minute());
-      setStartTime(updatedDateTime);
-      setStartDate(updatedDateTime.format('YYYY-MM-DD'));
-    }
-  };
-
-  const updateEndTime = (time: Date) => {
-    const newTime = dayjs(time);
-    if (endTime) {
-      const updatedDateTime = endTime
-        .set('hour', newTime.hour())
-        .set('minute', newTime.minute());
-      setEndTime(updatedDateTime);
-      setEndDate(updatedDateTime.format('YYYY-MM-DD'));
-    }
-  };
-
-  const handleOptionChange = (val: string) => {
-    setStartDate(null);
-    setEndDate(null);
-    setStartTime(null);
-    setEndTime(null);
-    onOptionChange(val);
-  };
-
   const isConfirmDisabled = () => {
-    if (!selectedOption) return true;
-
     switch (selectedOption) {
-      case 'Date':
+      case "Date":
         return !startDate || !startTime;
-      case 'Short term':
+      case "Short term":
         if (!startDate || !endDate || !startTime || !endTime) return true;
         return dayjs(endDate).isBefore(dayjs(startDate));
-      case 'Monthly':
+      case "Monthly":
         return !startDate || !startTime;
       default:
         return true;
     }
   };
 
-  const formatDateTime = (date: Dayjs | null) => {
-    if (!date) return 'Select date/time';
-    return date.format('MM/DD/YYYY hh:mm A');
+  const handleAccept = () => {
+    if (startTime && !isBookingValid(startTime)) {
+      Alert.alert(
+        "Invalid Time",
+        "Please select a time between 5 AM and 10 PM, at least 30 minutes from now"
+      );
+      return;
+    }
+
+    onSave({
+      option: selectedOption,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+    });
   };
 
-  const shouldDisableTime = (hour: number) => {
-    return hour < 5 || hour >= 22;
+  const getDuration = () => {
+    if (!startTime || !endTime) return 1;
+    return endTime.diff(startTime, "hour");
   };
+
+  const handleDateChange = (event: any, selectedDate: Date | undefined, type: "start" | "end") => {
+    // Always close the picker first to avoid the dismiss error
+    setShowPicker(null);
+    
+    // Add a small delay to ensure the picker is properly closed
+    setTimeout(() => {
+      // Check if date is undefined (cancelled)
+      if (!selectedDate) {
+        return;
+      }
+
+      const newValue = dayjs(selectedDate);
+      
+      if (type === "start") {
+        updateStartDate(newValue);
+      } else {
+        updateEndDate(newValue);
+      }
+
+      // Force re-render of picker for next use
+      setPickerKey(prev => prev + 1);
+    }, 100);
+  };
+
+  const openPicker = (type: "start" | "end") => {
+    // Force re-render of picker
+    setPickerKey(prev => prev + 1);
+    setShowPicker(type);
+  };
+
+  const renderDatePicker = (type: "start" | "end") => {
+    const currentDate = type === "start" ? startTime : endTime;
+    
+    if (Platform.OS === 'ios') {
+      return (
+        <View style={styles.pickerContainer}>
+          <DateTimePicker
+            key={`${type}-${pickerKey}`}
+            value={currentDate ? new Date(currentDate.toISOString()) : new Date()}
+            mode="datetime"
+            display="spinner"
+            minimumDate={
+              type === "start"
+                ? new Date()
+                : startDate
+                ? new Date(dayjs(startDate).add(1, "hour").toISOString())
+                : new Date()
+            }
+            maximumDate={
+              selectedOption === "Monthly"
+                ? new Date(maxDate90Days.toISOString())
+                : new Date(maxDate21Days.toISOString())
+            }
+            onChange={(event, date) => handleDateChange(event, date, type)}
+          />
+          
+          <View style={styles.iosButtonContainer}>
+            <TouchableOpacity 
+              style={styles.iosButton}
+              onPress={() => setShowPicker(null)}
+            >
+              <Text style={styles.iosButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    // Android - render picker only when showPicker is true
+    if (showPicker === type) {
+      return (
+        <DateTimePicker
+          key={`${type}-${pickerKey}`}
+          value={currentDate ? new Date(currentDate.toISOString()) : new Date()}
+          mode="datetime"
+          display="default"
+          minimumDate={
+            type === "start"
+              ? new Date()
+              : startDate
+              ? new Date(dayjs(startDate).add(1, "hour").toISOString())
+              : new Date()
+          }
+          maximumDate={
+            selectedOption === "Monthly"
+              ? new Date(maxDate90Days.toISOString())
+              : new Date(maxDate21Days.toISOString())
+          }
+          onChange={(event, date) => handleDateChange(event, date, type)}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  const duration = getDuration();
 
   return (
-    <Modal
-      visible={open}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalContainer}>
-        <View style={styles.dialogContent}>
-          <Text style={styles.title}>Select your Booking Option</Text>
-          
-          <ScrollView style={styles.scrollView}>
-            <Text style={styles.sectionTitle}>Book by</Text>
-            
-            <RadioButton.Group
-              onValueChange={handleOptionChange}
-              value={selectedOption}
-            >
-              <View style={styles.radioContainer}>
-                <RadioButton.Item label="Date" value="Date" />
-                <RadioButton.Item label="Short term" value="Short term" />
-                <RadioButton.Item label="Monthly" value="Monthly" />
-              </View>
-            </RadioButton.Group>
+    <Modal visible={open} transparent animationType="fade">
+      <View style={styles.overlay}>
+        <View style={styles.container}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 20 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.title}>Select your Booking Option</Text>
 
-            {/* Date Option */}
-            {selectedOption === 'Date' && (
-              <View style={styles.dateSection}>
-                <Text style={styles.label}>Select Start Date & Time</Text>
+            {/* Radio options */}
+            <View style={styles.radioRow}>
+              {["Date", "Short term", "Monthly"].map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[
+                    styles.radioOption,
+                    selectedOption === opt && styles.radioOptionSelected,
+                  ]}
+                  onPress={() => onOptionChange(opt)}
+                >
+                  <Text
+                    style={[
+                      styles.radioText,
+                      selectedOption === opt && styles.radioTextSelected,
+                    ]}
+                  >
+                    {opt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* DATE Option */}
+            {selectedOption === "Date" && (
+              <>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowStartDatePicker(true)}
+                  onPress={() => openPicker("start")}
                 >
-                  <Text>{formatDateTime(startTime)}</Text>
+                  <Text style={styles.dateButtonText}>
+                    {startDate
+                      ? `Start: ${dayjs(startDate).format("MMM D, YYYY h:mm A")}`
+                      : "Select Start Date"}
+                  </Text>
                 </TouchableOpacity>
 
-                {showStartDatePicker && (
-                  <DateTimePicker
-                    value={startTime?.toDate() || new Date()}
-                    mode="datetime"
-                    display="default"
-                    minimumDate={today.add(30, 'minute').toDate()}
-                    maximumDate={maxDate21Days.toDate()}
-                    onChange={(event, selectedDate) => {
-                      setShowStartDatePicker(false);
-                      if (selectedDate) {
-                        const selectedDayjs = dayjs(selectedDate);
-                        if (shouldDisableTime(selectedDayjs.hour())) {
-                          Alert.alert(
-                            'Invalid Time',
-                            'ServEaso provides services from 5:00 AM to 10:00 PM, please select the correct time slot'
-                          );
-                          return;
-                        }
-                        updateStartDate(selectedDate);
-                      }
-                    }}
-                  />
+                {renderDatePicker("start")}
+
+                {startDate && (
+                  <View style={styles.confirmBox}>
+                    <Text style={styles.sectionTitle}>Booking Details</Text>
+                    <Text style={styles.sectionText}>
+                      Start Date:{" "}
+                      {dayjs(startDate).format("MMMM D, YYYY [at] h:mm A")}
+                    </Text>
+                    <Text style={styles.sectionText}>
+                      Duration: {duration} hour{duration > 1 ? "s" : ""}
+                    </Text>
+
+                    <View style={styles.durationRow}>
+                      <TouchableOpacity
+                        style={styles.adjustButton}
+                        onPress={() => {
+                          if (startTime && endTime && duration > 1) {
+                            const newEnd = startTime.add(duration - 1, "hour");
+                            setEndTime(newEnd);
+                            setEndDate(newEnd.toISOString());
+                          }
+                        }}
+                      >
+                        <Text style={styles.adjustText}>-</Text>
+                      </TouchableOpacity>
+
+                      <Text style={styles.durationText}>
+                        {duration} hour{duration > 1 ? "s" : ""}
+                      </Text>
+
+                      <TouchableOpacity
+                        style={styles.adjustButton}
+                        onPress={() => {
+                          if (startTime && endTime) {
+                            const newEnd = startTime.add(duration + 1, "hour");
+                            if (newEnd.hour() < 22) {
+                              setEndTime(newEnd);
+                              setEndDate(newEnd.toISOString());
+                            }
+                          }
+                        }}
+                      >
+                        <Text style={styles.adjustText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 )}
-              </View>
+              </>
             )}
 
-            {/* Short Term Option */}
-            {selectedOption === 'Short term' && (
-              <View style={styles.dateSection}>
-                <Text style={styles.label}>Select Start Date & Time</Text>
+            {/* SHORT TERM */}
+            {selectedOption === "Short term" && (
+              <>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowStartDatePicker(true)}
+                  onPress={() => openPicker("start")}
                 >
-                  <Text>{formatDateTime(startTime)}</Text>
+                  <Text style={styles.dateButtonText}>
+                    {startDate
+                      ? `Start: ${dayjs(startDate).format("MMM D, YYYY h:mm A")}`
+                      : "Select Start Date"}
+                  </Text>
                 </TouchableOpacity>
-
-                <Text style={[styles.label, { marginTop: 16 }]}>Select End Date & Time</Text>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowEndDatePicker(true)}
-                  disabled={!startDate}
+                  onPress={() => openPicker("end")}
                 >
-                  <Text>{formatDateTime(endTime)}</Text>
+                  <Text style={styles.dateButtonText}>
+                    {endDate
+                      ? `End: ${dayjs(endDate).format("MMM D, YYYY h:mm A")}`
+                      : "Select End Date"}
+                  </Text>
                 </TouchableOpacity>
 
-                {showStartDatePicker && (
-                  <DateTimePicker
-                    value={startTime?.toDate() || new Date()}
-                    mode="datetime"
-                    display="default"
-                    minimumDate={today.toDate()}
-                    maximumDate={maxDate90Days.toDate()}
-                    onChange={(event, selectedDate) => {
-                      setShowStartDatePicker(false);
-                      if (selectedDate) {
-                        updateStartDate(selectedDate);
-                      }
-                    }}
-                  />
-                )}
-
-                {showEndDatePicker && (
-                  <DateTimePicker
-                    value={endTime?.toDate() || new Date()}
-                    mode="datetime"
-                    display="default"
-                    minimumDate={startDate ? dayjs(startDate).add(1, 'day').toDate() : today.toDate()}
-                    maximumDate={startDate ? dayjs(startDate).add(20, 'day').toDate() : today.toDate()}
-                    onChange={(event, selectedDate) => {
-                      setShowEndDatePicker(false);
-                      if (selectedDate) {
-                        updateEndDate(selectedDate);
-                      }
-                    }}
-                  />
-                )}
-              </View>
+                {renderDatePicker("start")}
+                {renderDatePicker("end")}
+              </>
             )}
 
-            {/* Monthly Option */}
-            {selectedOption === 'Monthly' && (
-              <View style={styles.dateSection}>
-                <Text style={styles.label}>Select Start Date & Time</Text>
+            {/* MONTHLY */}
+            {selectedOption === "Monthly" && (
+              <>
                 <TouchableOpacity
                   style={styles.dateButton}
-                  onPress={() => setShowStartDatePicker(true)}
+                  onPress={() => openPicker("start")}
                 >
-                  <Text>{formatDateTime(startTime)}</Text>
+                  <Text style={styles.dateButtonText}>
+                    {startDate
+                      ? `Start: ${dayjs(startDate).format("MMM D, YYYY h:mm A")}`
+                      : "Select Start Date"}
+                  </Text>
                 </TouchableOpacity>
-
-                {showStartDatePicker && (
-                  <DateTimePicker
-                    value={startTime?.toDate() || new Date()}
-                    mode="datetime"
-                    display="default"
-                    minimumDate={today.toDate()}
-                    maximumDate={maxDate90Days.toDate()}
-                    onChange={(event, selectedDate) => {
-                      setShowStartDatePicker(false);
-                      if (selectedDate) {
-                        const selectedDayjs = dayjs(selectedDate);
-                        if (shouldDisableTime(selectedDayjs.hour())) {
-                          Alert.alert(
-                            'Invalid Time',
-                            'ServEaso provides services from 5:00 AM to 10:00 PM, please select the correct time slot'
-                          );
-                          return;
-                        }
-                        updateStartDate(selectedDate);
-                      }
-                    }}
-                  />
-                )}
-              </View>
+                {renderDatePicker("start")}
+              </>
             )}
+
+            {/* Buttons */}
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  isConfirmDisabled() && styles.disabledButton,
+                ]}
+                onPress={handleAccept}
+                disabled={isConfirmDisabled()}
+              >
+                <Text style={styles.confirmText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
-
-          <View style={styles.actions}>
-            <Button mode="outlined" onPress={onClose} style={styles.button}>
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
-              onPress={onSave}
-              disabled={isConfirmDisabled()}
-              style={styles.button}
-            >
-              Confirm
-            </Button>
-          </View>
         </View>
       </View>
     </Modal>
   );
 };
 
+export default BookingDialog;
+
 const styles = StyleSheet.create({
-  modalContainer: {
+  overlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  dialogContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
+  container: {
+    backgroundColor: "#fff",
+    width: Dimensions.get("window").width * 0.9,
+    maxHeight: Dimensions.get("window").height * 0.85,
+    borderRadius: 12,
     padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  scrollView: {
-    maxHeight: 400,
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
+    fontWeight: "700",
+    marginBottom: 10,
+    textAlign: "center",
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#1976d2',
+  radioRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginVertical: 10,
   },
-  radioContainer: {
-    marginBottom: 20,
+  radioOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
   },
-  dateSection: {
-    marginBottom: 20,
+  radioOptionSelected: {
+    backgroundColor: "#007AFF20",
+    borderColor: "#007AFF",
   },
-  label: {
+  radioText: {
     fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
+    color: "#333",
+  },
+  radioTextSelected: {
+    color: "#007AFF",
+    fontWeight: "600",
   },
   dateButton: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
+    borderColor: "#ccc",
+    borderRadius: 8,
     padding: 12,
-    backgroundColor: '#f9f9f9',
+    marginVertical: 6,
+  },
+  dateButtonText: {
+    fontSize: 15,
+    color: "#333",
+  },
+  confirmBox: {
+    backgroundColor: "#f9f9f9",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  sectionText: {
+    fontSize: 14,
+    color: "#444",
+    marginBottom: 3,
+  },
+  durationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  adjustButton: {
+    backgroundColor: "#007AFF20",
+    padding: 10,
+    borderRadius: 6,
+  },
+  adjustText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#007AFF",
+  },
+  durationText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
   actions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    marginRight: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#007AFF",
+  },
+  confirmButton: {
+    flex: 1,
+    marginLeft: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "#007AFF",
+  },
+  confirmText: {
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "600",
+  },
+  cancelText: {
+    color: "#007AFF",
+    textAlign: "center",
+    fontWeight: "600",
+  },
+  disabledButton: {
+    backgroundColor: "#ccc",
+  },
+  pickerContainer: {
+    marginVertical: 10,
+  },
+  iosButtonContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 20,
-    gap: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    backgroundColor: '#f9f9f9',
   },
-  button: {
-    minWidth: 80,
+  iosButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 6,
+  },
+  iosButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
-
-export default BookingDialog;

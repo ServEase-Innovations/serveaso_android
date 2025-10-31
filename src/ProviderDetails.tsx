@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useRef, useState } from "react";
 import { 
   View, 
@@ -9,13 +8,12 @@ import {
   Alert
 } from "react-native";
 import moment from "moment";
-import AddIcon from 'react-native-vector-icons/MaterialIcons';
-import RemoveIcon from 'react-native-vector-icons/MaterialIcons';
-import FavoriteIcon from 'react-native-vector-icons/MaterialIcons';
-import FavoriteBorderIcon from 'react-native-vector-icons/MaterialIcons';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useDispatch, useSelector } from "react-redux";
 import { add, update } from "./features/bookingTypeSlice";
 import DemoCook from "./demoCook";
+import MaidServiceDialog from "./MaidServiceDialog";
+import NannyServicesDialog from "./NannyServiceDialog";
 import axiosInstance from "./axiosInstance";
 import { useAppUser } from "./context/AppUserContext";
 
@@ -83,7 +81,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
   const [matchedMorningSelection, setMatchedMorningSelection] = useState<string | null>(null);
   const [matchedEveningSelection, setMatchedEveningSelection] = useState<string | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false); // New state for favorite status
+  const [isFavorite, setIsFavorite] = useState(false);
 
   const hasCheckedRef = useRef(false);
 
@@ -132,9 +130,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
 
   // Toggle favorite status
   const toggleFavorite = (event: any) => {
-    // In React Native, we don't need stopPropagation like in web
     setIsFavorite(!isFavorite);
-    // Here you would typically make an API call to save the favorite status
     console.log("Favorite toggled for provider:", props.serviceproviderId, "New status:", !isFavorite);
   };
 
@@ -234,6 +230,9 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
       selectedEveningTime: eveningSelection
     };
     props.selectedProvider(providerDetails);
+    
+    // CRITICAL FIX: Set open to true to show the dialog
+    setOpen(true);
   };
 
   const getHoursDifference = (start: string, end: string) => {
@@ -244,16 +243,15 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     return (endTotalMinutes - startTotalMinutes) / 60;
   };
 
-  const handleLogin = () => {
-    setOpen(true);
-  };
-
   const handleClose = () => {
+    console.log('Closing service dialog');
     setOpen(false);
   };
 
-  const handleBookingPage = (e: string | undefined) => {
+  const handleBookingPage = (data: string) => {
+    console.log('Data received from dialog:', data);
     setOpen(false);
+    // Handle navigation or other actions based on the data
   };
 
   const handleStartTimeChange = (newStartTime: string) => {
@@ -309,83 +307,135 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     endTime
   };
 
+  const getGenderSymbol = (gender: string) => {
+    switch (gender) {
+      case 'FEMALE': return 'F';
+      case 'MALE': return 'M';
+      default: return 'O';
+    }
+  };
+
   const renderServiceDialog = () => {
-    return (
-      <DemoCook 
-        visible={open}
-        onClose={handleClose}
-        sendDataToParent={handleBookingPage}
-        user={user}
-        providerDetails={providerDetailsData}
-        bookingType={bookingType}
-      />
-    );
+    switch (props.housekeepingRole) {
+      case "COOK":
+        return (
+          <DemoCook 
+            visible={open}
+            onClose={handleClose}
+            sendDataToParent={handleBookingPage}
+            user={user}
+            providerDetails={providerDetailsData}
+            bookingType={bookingType}
+          />
+        );
+      case "MAID":
+        return (
+          <MaidServiceDialog
+            open={open}
+            handleClose={handleClose}
+            providerDetails={providerDetailsData}
+            sendDataToParent={handleBookingPage}
+            // user={user}
+            // bookingType={bookingType}        
+          />
+        );
+      case "NANNY":
+        return (
+          <NannyServicesDialog 
+            open={open} // FIXED: Changed from false to open
+            handleClose={handleClose} // FIXED: Using actual handleClose function
+            providerDetails={providerDetailsData}
+            sendDataToParent={handleBookingPage}
+            user={user}
+            bookingType={bookingType}
+          />
+        );
+      default:
+        return null;
+    }
   };
 
   return (
     <>
       <View style={styles.container}>
         <View style={styles.card}>
-          <TouchableOpacity
-            style={styles.expandButton}
-            onPress={toggleExpand}
-          >
-            {isExpanded ? (
-              <RemoveIcon name="remove" size={24} color="#1976d2" />
-            ) : (
-              <AddIcon name="add" size={24} color="#1976d2" />
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.bookNowButton}
-            onPress={handleLogin}
-          >
-            <Text style={styles.bookNowText}>Book Now</Text>
-          </TouchableOpacity>
+          {/* Header with buttons - Improved layout */}
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.expandButton}
+              onPress={toggleExpand}
+            >
+              <Icon 
+                name={isExpanded ? "remove" : "add"} 
+                size={24} 
+                color="#1976d2" 
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.bookNowButton}
+              onPress={handleBookNow} // FIXED: Using handleBookNow instead of handleLogin
+            >
+              <Text style={styles.bookNowText}>Book Now</Text>
+            </TouchableOpacity>
 
-          {/* Favorite Button */}
-          <TouchableOpacity
-            style={styles.favoriteButton}
-            onPress={toggleFavorite}
-          >
-            {isFavorite ? (
-              <FavoriteIcon name="favorite" size={24} color="red" />
-            ) : (
-              <FavoriteBorderIcon name="favorite-border" size={24} color="gray" />
-            )}
-          </TouchableOpacity>
+            {/* Favorite Button */}
+            <TouchableOpacity
+              style={styles.favoriteButton}
+              onPress={toggleFavorite}
+            >
+              <Icon 
+                name={isFavorite ? "favorite" : "favorite-border"} 
+                size={24} 
+                color={isFavorite ? 'red' : 'gray'} 
+              />
+            </TouchableOpacity>
+          </View>
 
-          <View style={styles.content}>
-            <View style={styles.essentials}>
-              <View style={styles.nameContainer}>
-                <Text style={styles.nameText}>
-                  {props.firstName} {props.middleName} {props.lastName}
-                </Text>
-                <Text style={styles.genderAgeText}>
-                  ({props.gender === "FEMALE" ? "F " : props.gender === "MALE" ? "M " : "O"}
-                  {calculateAge(props.dob)})
-                </Text>
-                <Image
-                  source={dietImage}
-                  style={styles.dietImage}
-                />
-              </View>
+          {/* Provider Info - Improved layout */}
+          <View style={styles.providerInfo}>
+            <View style={styles.nameRow}>
+              <Text style={styles.nameText}>
+                {props.firstName} {props.middleName} {props.lastName}
+              </Text>
+              <Text style={styles.genderAgeText}>
+                ({getGenderSymbol(props.gender)} {calculateAge(props.dob)})
+              </Text>
+              <Image 
+                source={dietImage} 
+                style={styles.dietIcon}
+                resizeMode="contain"
+              />
             </View>
 
             {isExpanded && (
-              <View>
-                <Text style={styles.detailText}>
-                  Language: {props.language || "English"}
-                </Text>
-                <Text style={styles.detailText}>
-                  Experience: {props.experience || "1 year"}, 
-                  Other Services: {props.otherServices || "N/A"}
-                </Text>
-                
-                <View style={styles.warningContainer}>
-                  {warning && <Text style={styles.warningText}>{warning}</Text>}
+              <View style={styles.expandedContent}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Language: </Text>
+                  <Text style={styles.detailValue}>
+                    {props.language || "English"}
+                  </Text>
                 </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Experience: </Text>
+                  <Text style={styles.detailValue}>
+                    {props.experience || "1 year"}
+                  </Text>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Other Services: </Text>
+                  <Text style={styles.detailValue}>
+                    {props.otherServices || "N/A"}
+                  </Text>
+                </View>
+
+                {warning ? (
+                  <View style={styles.warningContainer}>
+                    <Text style={styles.warningText}>{warning}</Text>
+                  </View>
+                ) : null}
               </View>
             )}
           </View>
@@ -400,82 +450,103 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
 const styles = StyleSheet.create({
   container: {
     padding: 10,
+    backgroundColor: '#f5f5f5',
   },
   card: {
     backgroundColor: 'white',
     borderRadius: 8,
-    padding: 15,
+    padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
     marginBottom: 10,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   expandButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
     borderWidth: 1,
     borderColor: '#1976d2',
-    padding: 8,
     borderRadius: 4,
+    padding: 8,
+    marginRight: 8,
   },
   bookNowButton: {
-    position: 'absolute',
-    top: 10,
-    right: 80,
     borderWidth: 1,
     borderColor: '#1976d2',
-    padding: 8,
     borderRadius: 4,
-  },
-  favoriteButton: {
-    position: 'absolute',
-    top: 10,
-    right: 160,
-    padding: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
   },
   bookNowText: {
     color: '#1976d2',
     fontSize: 14,
+    fontWeight: '500',
   },
-  content: {
-    marginTop: 20,
+  favoriteButton: {
+    padding: 8,
   },
-  essentials: {
-    marginBottom: 10,
+  providerInfo: {
+    flex: 1,
   },
-  nameContainer: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
+    marginBottom: 8,
   },
   nameText: {
     fontWeight: 'bold',
     fontSize: 18,
+    color: '#333',
+    marginRight: 8,
   },
   genderAgeText: {
     fontWeight: 'bold',
     fontSize: 18,
-    marginLeft: 8,
+    color: '#333',
+    marginRight: 8,
   },
-  dietImage: {
+  dietIcon: {
     width: 20,
     height: 20,
-    marginLeft: 8,
   },
-  detailText: {
+  expandedContent: {
+    marginTop: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  detailLabel: {
     fontWeight: 'bold',
-    marginBottom: 5,
     fontSize: 14,
+    color: '#333',
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
   },
   warningContainer: {
-    alignItems: 'flex-end',
-    marginTop: 5,
+    backgroundColor: '#ffebee',
+    padding: 8,
+    borderRadius: 4,
+    marginTop: 8,
   },
   warningText: {
-    color: 'red',
+    color: '#d32f2f',
     fontSize: 12,
   },
 });

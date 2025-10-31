@@ -33,6 +33,9 @@ export interface NannyCartItem extends BaseCartItem {
   careType: 'baby' | 'elderly';
   packageType: 'day' | 'night' | 'fullTime';
   age: number;
+  providerId?: string;  // Added from React code
+  providerName?: string; // Added from React code
+  activeTab: "baby" | "elderly";
 }
 
 // Combined Cart Item type

@@ -13,7 +13,8 @@ import {
   ViewStyle,
   ImageStyle,
   Animated,
-  Dimensions
+  Dimensions,
+  Alert
 } from "react-native";
 import { useDispatch } from "react-redux";
 import { add } from "./features/bookingTypeSlice";
@@ -28,6 +29,7 @@ import NannyServicesDialog from "./NannyServiceDialog";
 import LinearGradient from 'react-native-linear-gradient';
 import AgentRegistrationForm from './AgentRegistrationForm';
 import { useAuth0 } from 'react-native-auth0';
+import BookingDialog from './BookingDialog'; // Import the BookingDialog component
 
 // Import local images
 const cookImage = require("../assets/images/Cooknew.png");
@@ -79,14 +81,10 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const [open, setOpen] = useState(false);
   const [selectedType, setSelectedtype] = useState("");
   const [selectedRadioButtonValue, setSelectedRadioButtonValue] = useState("");
-  const [openServiceDialog, setOpenServiceDialog] = useState(false);
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [startTime, setStartTime] = useState<Date | null>(null);
-  const [endTime, setEndTime] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [currentPicker, setCurrentPicker] = useState<"start" | "end">("start");
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState<any>(null);
+  const [endTime, setEndTime] = useState<any>(null);
   const [showRegistration, setShowRegistration] = useState(false);
   const [serviceDetailsOpen, setServiceDetailsOpen] = useState(false);
   const [selectedServiceType, setSelectedServiceType] = useState<"cook" | "maid" | "babycare" | null>(null);
@@ -104,7 +102,6 @@ const HomePage: React.FC<ChildComponentProps> = ({
   const { user: auth0User, authorize, clearSession } = useAuth0();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [role, setRole] = useState<string | null>(null);
-  const [notificationPermission, setNotificationPermission] = useState<string>('default');
 
   // Check authentication status
   useEffect(() => {
@@ -249,15 +246,20 @@ const HomePage: React.FC<ChildComponentProps> = ({
     setOpen(false);
   };
 
-  const handleSave = () => {
+  const handleSave = (bookingDetails: any) => {
     const booking = {
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
-      startTime: startTime?.toISOString(),
-      endTime: endTime?.toISOString(),
+      startDate: bookingDetails.startDate,
+      endDate: bookingDetails.endDate,
+      timeRange: bookingDetails.startTime && bookingDetails.endTime 
+        ? `${bookingDetails.startTime.format("HH:mm")} - ${bookingDetails.endTime.format("HH:mm")}`
+        : bookingDetails.startTime?.format("HH:mm") || "",
       bookingPreference: selectedRadioButtonValue,
-      serviceType: selectedType,
+      housekeepingRole: selectedType,
+      startTime: bookingDetails.startTime?.format("HH:mm"),
+      endTime: bookingDetails.endTime?.format("HH:mm"),
     };
+
+    console.log("Dispatching booking:", booking);
 
     if (selectedRadioButtonValue === "Date") {
       switch (selectedType) {
@@ -281,59 +283,6 @@ const HomePage: React.FC<ChildComponentProps> = ({
     dispatch(add(booking));
   };
 
-  const isConfirmDisabled = () => {
-    if (!startDate) return true;
-    if (selectedRadioButtonValue !== "Monthly" && !endDate) return true;
-    if (!startTime) return true;
-    if (selectedRadioButtonValue !== "Monthly" && !endTime) return true;
-    return false;
-  };
-
-  const showDatepicker = (type: "start" | "end") => {
-    setCurrentPicker(type);
-    setShowDatePicker(true);
-  };
-
-  const showTimepicker = (type: "start" | "end") => {
-    setCurrentPicker(type);
-    setShowTimePicker(true);
-  };
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      if (currentPicker === "start") {
-        setStartDate(selectedDate);
-        if (selectedRadioButtonValue === "Date") {
-          setEndDate(selectedDate);
-        }
-      } else {
-        setEndDate(selectedDate);
-      }
-    }
-  };
-
-  const onTimeChange = (event: any, selectedTime?: Date) => {
-    setShowTimePicker(false);
-    if (selectedTime) {
-      if (currentPicker === "start") {
-        setStartTime(selectedTime);
-      } else {
-        setEndTime(selectedTime);
-      }
-    }
-  };
-
-  const formatDate = (date: Date | null) => {
-    if (!date) return "";
-    return date.toLocaleDateString();
-  };
-
-  const formatTime = (time: Date | null) => {
-    if (!time) return "";
-    return time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-  
   const handleLearnMore = (service: string) => {
     switch (service) {
       case "Home Cook":
@@ -350,6 +299,9 @@ const HomePage: React.FC<ChildComponentProps> = ({
     }
     setServiceDetailsOpen(true);
   };
+
+  // Fix for disabled props - convert null to false
+  const isServiceDisabled = role === "SERVICE_PROVIDER";
 
   return (
     <ScrollView style={styles.container}>
@@ -380,18 +332,18 @@ const HomePage: React.FC<ChildComponentProps> = ({
                   styles.serviceIconContainerRectangular,
                   hoveredService === "COOK" && styles.serviceIconContainerRectangularHover,
                 ]}
-                onPress={() => role !== "SERVICE_PROVIDER" && handleClick("COOK")}
+                onPress={() => !isServiceDisabled && handleClick("COOK")}
                 onPressIn={() => setHoveredService("COOK")}
                 onPressOut={() => setHoveredService(null)}
-                disabled={role === "SERVICE_PROVIDER"}
+                disabled={isServiceDisabled}
               >
                 <Image source={cookImage} style={[
                   styles.serviceImageRectangular,
-                  role === "SERVICE_PROVIDER" && styles.disabledService
+                  isServiceDisabled && styles.disabledService
                 ]} />
                 <View style={styles.serviceOverlay}>
                   <Text style={styles.serviceLabelRectangular}>Home Cook</Text>
-                  {role === "SERVICE_PROVIDER" && (
+                  {isServiceDisabled && (
                     <Text style={styles.disabledText}>Not available</Text>
                   )}
                 </View>
@@ -405,18 +357,18 @@ const HomePage: React.FC<ChildComponentProps> = ({
                   styles.serviceIconContainerRectangular,
                   hoveredService === "MAID" && styles.serviceIconContainerRectangularHover,
                 ]}
-                onPress={() => role !== "SERVICE_PROVIDER" && handleClick("MAID")}
+                onPress={() => !isServiceDisabled && handleClick("MAID")}
                 onPressIn={() => setHoveredService("MAID")}
                 onPressOut={() => setHoveredService(null)}
-                disabled={role === "SERVICE_PROVIDER"}
+                disabled={isServiceDisabled}
               >
                 <Image source={maidImage} style={[
                   styles.serviceImageRectangular,
-                  role === "SERVICE_PROVIDER" && styles.disabledService
+                  isServiceDisabled && styles.disabledService
                 ]} />
                 <View style={styles.serviceOverlay}>
                   <Text style={styles.serviceLabelRectangular}>Cleaning Help</Text>
-                  {role === "SERVICE_PROVIDER" && (
+                  {isServiceDisabled && (
                     <Text style={styles.disabledText}>Not available</Text>
                   )}
                 </View>
@@ -430,18 +382,18 @@ const HomePage: React.FC<ChildComponentProps> = ({
                   styles.serviceIconContainerRectangular,
                   hoveredService === "NANNY" && styles.serviceIconContainerRectangularHover,
                 ]}
-                onPress={() => role !== "SERVICE_PROVIDER" && handleClick("NANNY")}
+                onPress={() => !isServiceDisabled && handleClick("NANNY")}
                 onPressIn={() => setHoveredService("NANNY")}
                 onPressOut={() => setHoveredService(null)}
-                disabled={role === "SERVICE_PROVIDER"}
+                disabled={isServiceDisabled}
               >
                 <Image source={nannyImage} style={[
                   styles.serviceImageRectangular,
-                  role === "SERVICE_PROVIDER" && styles.disabledService
+                  isServiceDisabled && styles.disabledService
                 ]} />
                 <View style={styles.serviceOverlay}>
                   <Text style={styles.serviceLabelRectangular}>Caregiver</Text>
-                  {role === "SERVICE_PROVIDER" && (
+                  {isServiceDisabled && (
                     <Text style={styles.disabledText}>Not available</Text>
                   )}
                 </View>
@@ -589,131 +541,23 @@ const HomePage: React.FC<ChildComponentProps> = ({
       <HowItWorksSection />
 
       {/* Booking Dialog */}
-      <Modal visible={open} animationType="slide" transparent={true}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Book a {selectedType.toLowerCase()}</Text>
+      <BookingDialog
+        open={open}
+        onClose={handleClose}
+        onSave={handleSave}
+        selectedOption={selectedRadioButtonValue}
+        onOptionChange={getSelectedValue}
+        startDate={startDate}
+        endDate={endDate}
+        startTime={startTime}
+        endTime={endTime}
+        setStartDate={setStartDate}
+        setEndDate={setEndDate}
+        setStartTime={setStartTime}
+        setEndTime={setEndTime}
+      />
 
-            <View style={styles.radioGroup}>
-              <Text style={styles.radioLabel}>Book by</Text>
-              <View style={styles.radioOptions}>
-                <View style={styles.radioOption}>
-                  <RadioButton
-                    selected={selectedRadioButtonValue === "Date"}
-                    onPress={() => getSelectedValue("Date")}
-                  />
-                  <Text style={styles.radioText}>Date</Text>
-                </View>
-                <View style={styles.radioOption}>
-                  <RadioButton
-                    selected={selectedRadioButtonValue === "Short term"}
-                    onPress={() => getSelectedValue("Short term")}
-                  />
-                  <Text style={styles.radioText}>Short term</Text>
-                </View>
-                <View style={styles.radioOption}>
-                  <RadioButton
-                    selected={selectedRadioButtonValue === "Monthly"}
-                    onPress={() => getSelectedValue("Monthly")}
-                  />
-                  <Text style={styles.radioText}>Monthly</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Date/Time Selection Section */}
-            {selectedRadioButtonValue && (
-              <View style={styles.dateTimeContainer}>
-                {/* Date Selection */}
-                <View style={styles.dateContainer}>
-                  <Text style={styles.label}>
-                    {selectedRadioButtonValue === "Monthly" ? "Select Month" : "Select Date"}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.dateInput}
-                    onPress={() => showDatepicker("start")}
-                  >
-                    <Text style={styles.dateInputText}>
-                      {formatDate(startDate) || "Select date"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* End date for non-monthly bookings */}
-                {(selectedRadioButtonValue === "Date" || selectedRadioButtonValue === "Short term") && (
-                  <View style={styles.dateContainer}>
-                    <Text style={styles.label}>End Date</Text>
-                    <TouchableOpacity
-                      style={[styles.dateInput, !startDate && styles.disabledInput]}
-                      onPress={() => showDatepicker("end")}
-                      disabled={!startDate}
-                    >
-                      <Text style={styles.dateInputText}>
-                        {formatDate(endDate) || "Select date"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Time Selection */}
-                <View style={styles.timeInputContainer}>
-                  <View style={styles.timeInputWrapper}>
-                    <Text style={styles.label}>Start Time</Text>
-                    <TouchableOpacity
-                      style={styles.timeInput}
-                      onPress={() => showTimepicker("start")}
-                    >
-                      <Text style={styles.timeInputText}>
-                        {formatTime(startTime) || "Select time"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  
-                  {/* End time for non-monthly bookings */}
-                  {(selectedRadioButtonValue === "Date" || selectedRadioButtonValue === "Short term") && (
-                    <View style={styles.timeInputWrapper}>
-                      <Text style={styles.label}>End Time</Text>
-                      <TouchableOpacity
-                        style={[styles.timeInput, !startTime && styles.disabledInput]}
-                        onPress={() => showTimepicker("end")}
-                        disabled={!startTime}
-                      >
-                        <Text style={styles.timeInputText}>
-                          {formatTime(endTime) || "Select time"}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-
-            <View style={styles.modalButtons}>
-              <Button title="Cancel" onPress={handleClose} />
-              <Button
-                title="Confirm"
-                onPress={handleSave}
-                disabled={isConfirmDisabled()}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {(showDatePicker || showTimePicker) && (
-        <DateTimePicker
-          value={
-            currentPicker === "start"
-              ? startDate || new Date()
-              : endDate || new Date()
-          }
-          mode={showDatePicker ? "date" : "time"}
-          display="default"
-          onChange={showDatePicker ? onDateChange : onTimeChange}
-          minimumDate={new Date()}
-        />
-      )}
-
+      {/* Service Dialogs */}
       {showCookDialog && (
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogBox}>
@@ -721,10 +565,13 @@ const HomePage: React.FC<ChildComponentProps> = ({
               onClose={() => setShowCookDialog(false)}
               sendDataToParent={sendDataToParent}
               bookingType={{
-                startDate: startDate?.toISOString(),
-                endDate: endDate?.toISOString(),
-                timeRange: `${formatTime(startTime)} - ${formatTime(endTime)}`,
-                bookingPreference: selectedRadioButtonValue
+                startDate: startDate,
+                endDate: endDate || startDate,
+                timeRange: startTime && endTime 
+                  ? `${startTime.format("HH:mm")} - ${endTime.format("HH:mm")}`
+                  : startTime?.format("HH:mm") || "",
+                bookingPreference: selectedRadioButtonValue,
+                housekeepingRole: selectedType,
               }}
             />
           </View>
@@ -738,6 +585,15 @@ const HomePage: React.FC<ChildComponentProps> = ({
               open={showNannyServicesDialog}
               handleClose={() => setShowNannyServicesDialog(false)}
               sendDataToParent={sendDataToParent}
+              bookingType={{
+                startDate: startDate,
+                endDate: endDate || startDate,
+                timeRange: startTime && endTime 
+                  ? `${startTime.format("HH:mm")} - ${endTime.format("HH:mm")}`
+                  : startTime?.format("HH:mm") || "",
+                bookingPreference: selectedRadioButtonValue,
+                housekeepingRole: selectedType,
+              }}
             />
           </View>
         </View>
@@ -1070,93 +926,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     textAlign: "center",
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 8,
-    width: "90%",
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
-  radioGroup: {
-    marginBottom: 16,
-  },
-  radioLabel: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  radioOptions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  radioOption: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  radioText: {
-    marginLeft: 8,
-  },
-  dateTimeContainer: {
-    gap: 16,
-  },
-  dateContainer: {
-    gap: 16,
-  },
-  monthlyContainer: {
-    gap: 16,
-  },
-  label: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  dateInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 4,
-    padding: 12,
-  },
-  timeInputContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
-  },
-  timeInputWrapper: {
-    flex: 1,
-  },
-  timeInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 4,
-    padding: 12,
-  },
-  dateBlock: {
-    flex: 1,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 16,
-    gap: 8,
-  },
-  dateInputText: {
-    color: '#000',
-  },
-  timeInputText: {
-    color: '#000',
-  },
-  disabledInput: {
-    backgroundColor: '#f0f0f0',
   },
   dialogOverlay: {
     position: 'absolute',
