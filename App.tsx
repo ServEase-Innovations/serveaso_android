@@ -36,6 +36,7 @@ import axios from "axios";
 import { useDispatch } from "react-redux";
 import { add } from "./src/features/pricingSlice";
 import MobileNumberDialog from "./src/MobileNumberDialog";
+import axiosInstance from "./src/axiosInstance";
 
 interface Engagement {
   engagement_id: number;
@@ -98,8 +99,8 @@ const MainApp = () => {
     const fetchCustomerDetails = async () => {
       try {
         console.log("📱 Fetching customer details for ID:", appUser.customerid);
-        const response = await axios.get(
-          `https://payments-j5id.onrender.com/api/customer/get-customer-by-id/${appUser.customerid}`
+        const response = await axiosInstance.get
+          (`/api/customer/get-customer-by-id/${appUser.customerid}`
         );
 
         const customer = response.data;
@@ -414,7 +415,11 @@ const MainApp = () => {
         </View>
 
         {shouldShowMobileDialog && (
-          <MobileNumberDialog onSuccess={handleMobileDialogSuccess} onClose={handleMobileDialogClose} />
+          <MobileNumberDialog 
+            open={shouldShowMobileDialog}
+            onClose={handleMobileDialogClose}
+            onSuccess={handleMobileDialogSuccess}
+          />
         )}
 
         <Modal

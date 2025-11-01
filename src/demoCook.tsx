@@ -18,6 +18,7 @@ import { BOOKINGS } from './Constants/pagesConstants';
 import axiosInstance from './axiosInstance';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePricingFilterService } from './utils/PricingFilter';
+import Head, { LocationData } from './Head';
 
 // Redux actions
 import { addToCart, removeFromCart, updateCartItem } from './features/addToSlice';
@@ -91,6 +92,8 @@ const DemoCook = ({
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+//using for location fetching from head.tsx
+    const [currentLocation, setCurrentLocation] = React.useState<LocationData | null>(null);
 
   const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
     if (!bookingPreference) return 'MONTHLY';
@@ -439,17 +442,17 @@ const handleCheckout = async () => {
     const payload: BookingPayload = {
       customerid: customerId,
       serviceproviderid: serviceproviderid, // Now properly typed as number | null
-      start_date: bookingType?.startDate || new Date().toISOString().split("T")[0],
-      end_date: bookingType?.endDate || "",
+      start_date: bookingType?.start_Date || new Date().toISOString().split("T")[0],
+      end_date: bookingType?.end_Date || new Date().toISOString().split("T")[0],
       responsibilities: responsibilities,
       booking_type: currentBookingType,
       taskStatus: "NOT_STARTED",
       service_type: "COOK",
       base_amount: baseTotal,
       payment_mode: "razorpay",
-      start_time: startTime,
+      start_time: bookingType?.start_Time,
       ...(currentBookingType === "ON_DEMAND" && {
-        end_time: bookingType?.endTime || formatTimeForBackend('06:00 PM'),
+        end_time: bookingType?.end_Time || formatTimeForBackend('06:00 PM'),
       }),
     };
 
@@ -713,12 +716,17 @@ const handleCheckout = async () => {
       </View>
 
       {/* Cart Dialog */}
-      <CartDialog
+      {/* <CartDialog
         open={showCartDialog}
         handleClose={() => setShowCartDialog(false)}
         handleCheckout={handleCheckout}
         // loading={loading}
-      />
+      /> */}
+      <CartDialog
+  open={showCartDialog}
+  handleClose={() => setShowCartDialog(false)}
+  handleCheckout={handleCheckout} // This should work now
+/>
 
       {/* Snackbar for notifications */}
       <Modal

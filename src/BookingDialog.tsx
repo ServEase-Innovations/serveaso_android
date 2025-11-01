@@ -189,77 +189,173 @@ const BookingDialog: React.FC<BookingDialogProps> = ({
     return { validHours, validMinutes: minutes };
   };
 
-  const handleCustomTimeConfirm = () => {
-    if (showCustomTimePicker) {
-      // Convert to 24-hour format
-      let hours24 = customHours;
-      if (!use24HourFormat) {
-        // Convert from 12-hour to 24-hour format
-        if (customAmPm === "PM" && customHours !== 12) {
-          hours24 = customHours + 12;
-        } else if (customAmPm === "AM" && customHours === 12) {
-          hours24 = 0;
-        }
+  // const handleCustomTimeConfirm = () => {
+  //   if (showCustomTimePicker) {
+  //     // Convert to 24-hour format
+  //     let hours24 = customHours;
+  //     if (!use24HourFormat) {
+  //       // Convert from 12-hour to 24-hour format
+  //       if (customAmPm === "PM" && customHours !== 12) {
+  //         hours24 = customHours + 12;
+  //       } else if (customAmPm === "AM" && customHours === 12) {
+  //         hours24 = 0;
+  //       }
+  //     }
+
+  //     // Validate time
+  //     if (!isTimeValid(hours24, customMinutes, showCustomTimePicker)) {
+  //       const now = dayjs();
+  //       const selectedDateTime = tempDate 
+  //         ? dayjs(tempDate).hour(hours24).minute(customMinutes)
+  //         : dayjs().hour(hours24).minute(customMinutes);
+
+  //       if (selectedDateTime.isBefore(now.add(30, 'minute')) && showCustomTimePicker === "start") {
+  //         Alert.alert(
+  //           "Invalid Time",
+  //           "Please select a time at least 30 minutes from now"
+  //         );
+  //         return;
+  //       } else if (hours24 < 5 || hours24 >= 22) {
+  //         Alert.alert(
+  //           "Invalid Time",
+  //           "Please select a time between 5 AM (05:00) and 10 PM (22:00)"
+  //         );
+  //         return;
+  //       }
+  //     }
+
+  //     let selectedDateTime: Dayjs;
+
+  //     if (tempDate) {
+  //       selectedDateTime = dayjs(tempDate)
+  //         .hour(hours24)
+  //         .minute(customMinutes)
+  //         .second(0)
+  //         .millisecond(0);
+  //       setTempDate(null);
+  //     } else {
+  //       const currentDateTime = showCustomTimePicker === "start" ? startTime : endTime;
+  //       if (currentDateTime) {
+  //         selectedDateTime = currentDateTime
+  //           .hour(hours24)
+  //           .minute(customMinutes)
+  //           .second(0)
+  //           .millisecond(0);
+  //       } else {
+  //         selectedDateTime = dayjs()
+  //           .hour(hours24)
+  //           .minute(customMinutes)
+  //           .second(0)
+  //           .millisecond(0);
+  //       }
+  //     }
+
+  //     // Apply final validation and adjustments
+  //     if (showCustomTimePicker === "start") {
+  //       updateStartDateTime(selectedDateTime);
+  //     } else {
+  //       updateEndDateTime(selectedDateTime);
+  //     }
+  //   }
+
+  //   setShowCustomTimePicker(null);
+  // };
+const handleCustomTimeConfirm = () => {
+  if (showCustomTimePicker) {
+    console.log("🕒 handleCustomTimeConfirm called for:", showCustomTimePicker);
+    
+    // Convert to 24-hour format for storage
+    let hours24 = customHours;
+    if (!use24HourFormat) {
+      console.log("🔄 Converting from 12-hour to 24-hour format");
+      console.log("📊 Before conversion:", { customHours, customAmPm });
+      
+      // Convert from 12-hour to 24-hour format
+      if (customAmPm === "PM" && customHours !== 12) {
+        hours24 = customHours + 12;
+      } else if (customAmPm === "AM" && customHours === 12) {
+        hours24 = 0;
       }
+      // If AM and not 12, hours24 remains the same
+      // If PM and 12, hours24 remains 12
+      
+      console.log("📊 After conversion:", { hours24 });
+    }
 
-      // Validate time
-      if (!isTimeValid(hours24, customMinutes, showCustomTimePicker)) {
-        const now = dayjs();
-        const selectedDateTime = tempDate 
-          ? dayjs(tempDate).hour(hours24).minute(customMinutes)
-          : dayjs().hour(hours24).minute(customMinutes);
+    // Store as clean 24-hour format string
+    const timeString = `${hours24.toString().padStart(2, '0')}:${customMinutes.toString().padStart(2, '0')}`;
+    console.log("✅ Final time string (24h):", timeString);
 
-        if (selectedDateTime.isBefore(now.add(30, 'minute')) && showCustomTimePicker === "start") {
-          Alert.alert(
-            "Invalid Time",
-            "Please select a time at least 30 minutes from now"
-          );
-          return;
-        } else if (hours24 < 5 || hours24 >= 22) {
-          Alert.alert(
-            "Invalid Time",
-            "Please select a time between 5 AM (05:00) and 10 PM (22:00)"
-          );
-          return;
-        }
+    // Validate time
+    if (!isTimeValid(hours24, customMinutes, showCustomTimePicker)) {
+      const now = dayjs();
+      const selectedDateTime = tempDate 
+        ? dayjs(tempDate).hour(hours24).minute(customMinutes)
+        : dayjs().hour(hours24).minute(customMinutes);
+
+      if (selectedDateTime.isBefore(now.add(30, 'minute')) && showCustomTimePicker === "start") {
+        Alert.alert(
+          "Invalid Time",
+          "Please select a time at least 30 minutes from now"
+        );
+        return;
+      } else if (hours24 < 5 || hours24 >= 22) {
+        Alert.alert(
+          "Invalid Time",
+          "Please select a time between 5 AM (05:00) and 10 PM (22:00)"
+        );
+        return;
       }
+    }
 
-      let selectedDateTime: Dayjs;
+    let selectedDateTime: Dayjs;
 
-      if (tempDate) {
-        selectedDateTime = dayjs(tempDate)
+    if (tempDate) {
+      selectedDateTime = dayjs(tempDate)
+        .hour(hours24)
+        .minute(customMinutes)
+        .second(0)
+        .millisecond(0);
+      console.log("📅 Using tempDate with time:", selectedDateTime.format());
+      setTempDate(null);
+    } else {
+      const currentDateTime = showCustomTimePicker === "start" ? startTime : endTime;
+      if (currentDateTime) {
+        selectedDateTime = currentDateTime
           .hour(hours24)
           .minute(customMinutes)
           .second(0)
           .millisecond(0);
-        setTempDate(null);
+        console.log("📅 Using existing datetime with new time:", selectedDateTime.format());
       } else {
-        const currentDateTime = showCustomTimePicker === "start" ? startTime : endTime;
-        if (currentDateTime) {
-          selectedDateTime = currentDateTime
-            .hour(hours24)
-            .minute(customMinutes)
-            .second(0)
-            .millisecond(0);
-        } else {
-          selectedDateTime = dayjs()
-            .hour(hours24)
-            .minute(customMinutes)
-            .second(0)
-            .millisecond(0);
-        }
-      }
-
-      // Apply final validation and adjustments
-      if (showCustomTimePicker === "start") {
-        updateStartDateTime(selectedDateTime);
-      } else {
-        updateEndDateTime(selectedDateTime);
+        // Create new datetime with today's date and selected time
+        selectedDateTime = dayjs()
+          .hour(hours24)
+          .minute(customMinutes)
+          .second(0)
+          .millisecond(0);
+        console.log("📅 Creating new datetime:", selectedDateTime.format());
       }
     }
 
-    setShowCustomTimePicker(null);
-  };
+    // Apply final validation and adjustments
+    if (showCustomTimePicker === "start") {
+      console.log("🚀 Updating start date/time");
+      updateStartDateTime(selectedDateTime);
+    } else {
+      console.log("🏁 Updating end date/time");
+      updateEndDateTime(selectedDateTime);
+    }
+
+    // Log the final state
+    console.log("🎯 Time selection completed:");
+    console.log("   - Selected time (24h):", timeString);
+    console.log("   - Selected datetime:", selectedDateTime.format());
+    console.log("   - For:", showCustomTimePicker);
+  }
+
+  setShowCustomTimePicker(null);
+};
 
   const handleCustomTimeCancel = () => {
     setShowCustomTimePicker(null);
@@ -267,61 +363,142 @@ const BookingDialog: React.FC<BookingDialogProps> = ({
   };
 
   const updateStartDateTime = (newDateTime: Dayjs) => {
-    const now = dayjs();
-    let adjustedDateTime = newDateTime;
+  const now = dayjs();
+  let adjustedDateTime = newDateTime;
 
-    // Ensure start time is at least 30 minutes from now if it's today
-    if (newDateTime.isSame(now, 'day') && newDateTime.isBefore(now.add(30, 'minute'))) {
-      adjustedDateTime = now.add(30, 'minute');
+  console.log("🔄 updateStartDateTime called:", newDateTime.format());
+
+  // Ensure start time is at least 30 minutes from now if it's today
+  if (newDateTime.isSame(now, 'day') && newDateTime.isBefore(now.add(30, 'minute'))) {
+    adjustedDateTime = now.add(30, 'minute');
+    console.log("⏰ Adjusted to 30 mins from now:", adjustedDateTime.format());
+  }
+
+  // Ensure time is within 5 AM - 10 PM
+  const hour = adjustedDateTime.hour();
+  if (hour < 5) {
+    adjustedDateTime = adjustedDateTime.hour(5).minute(0);
+    console.log("🌅 Adjusted to 5 AM:", adjustedDateTime.format());
+  } else if (hour >= 22) {
+    adjustedDateTime = adjustedDateTime.hour(21).minute(55);
+    console.log("🌙 Adjusted to 9:55 PM:", adjustedDateTime.format());
+  }
+
+  // Store dates and times in clean formats
+  setStartDate(adjustedDateTime.format("YYYY-MM-DD")); // Clean date format
+  setStartTime(adjustedDateTime); // Store as dayjs object
+
+  console.log("💾 Stored start data:");
+  console.log("   - Date:", adjustedDateTime.format("YYYY-MM-DD"));
+  console.log("   - Time (24h):", adjustedDateTime.format("HH:mm"));
+  console.log("   - Full datetime:", adjustedDateTime.format());
+
+  // Set default end time based on booking option
+  if (selectedOption === "Date") {
+    const defaultEnd = adjustedDateTime.add(1, "hour");
+    // Ensure end time doesn't go beyond 10 PM
+    let finalEnd = defaultEnd;
+    if (defaultEnd.hour() >= 22) {
+      finalEnd = adjustedDateTime.hour(21).minute(55);
     }
+    setEndDate(finalEnd.format("YYYY-MM-DD"));
+    setEndTime(finalEnd);
+    console.log("⏱️ Set default end time:", finalEnd.format("HH:mm"));
+  } else if (selectedOption === "Monthly") {
+    const endDateValue = adjustedDateTime.add(1, "month");
+    setEndDate(endDateValue.format("YYYY-MM-DD"));
+    setEndTime(endDateValue);
+    console.log("📅 Set monthly end date:", endDateValue.format("YYYY-MM-DD"));
+  }
+};
 
-    // Ensure time is within 5 AM - 10 PM
-    const hour = adjustedDateTime.hour();
-    if (hour < 5) {
-      adjustedDateTime = adjustedDateTime.hour(5).minute(0);
-    } else if (hour >= 22) {
-      adjustedDateTime = adjustedDateTime.hour(21).minute(55);
-    }
+const updateEndDateTime = (newDateTime: Dayjs) => {
+  let adjustedDateTime = newDateTime;
 
-    setStartDate(adjustedDateTime.toISOString());
-    setStartTime(adjustedDateTime);
+  console.log("🔄 updateEndDateTime called:", newDateTime.format());
 
-    // Set default end time based on booking option
-    if (selectedOption === "Date") {
-      const defaultEnd = adjustedDateTime.add(1, "hour");
-      // Ensure end time doesn't go beyond 10 PM
-      let finalEnd = defaultEnd;
-      if (defaultEnd.hour() >= 22) {
-        finalEnd = adjustedDateTime.hour(21).minute(55);
-      }
-      setEndDate(finalEnd.toISOString());
-      setEndTime(finalEnd);
-    } else if (selectedOption === "Monthly") {
-      const endDateValue = adjustedDateTime.add(1, "month");
-      setEndDate(endDateValue.toISOString());
-      setEndTime(endDateValue);
-    }
-  };
+  // Ensure end time is after start time
+  if (startTime && newDateTime.isBefore(startTime)) {
+    adjustedDateTime = startTime.add(1, 'hour');
+    console.log("⏩ Adjusted end time to be after start:", adjustedDateTime.format());
+  }
 
-  const updateEndDateTime = (newDateTime: Dayjs) => {
-    let adjustedDateTime = newDateTime;
+  // Ensure time is within 5 AM - 10 PM
+  const hour = adjustedDateTime.hour();
+  if (hour < 5) {
+    adjustedDateTime = adjustedDateTime.hour(5).minute(0);
+    console.log("🌅 Adjusted to 5 AM:", adjustedDateTime.format());
+  } else if (hour >= 22) {
+    adjustedDateTime = adjustedDateTime.hour(21).minute(55);
+    console.log("🌙 Adjusted to 9:55 PM:", adjustedDateTime.format());
+  }
 
-    // Ensure end time is after start time
-    if (startTime && newDateTime.isBefore(startTime)) {
-      adjustedDateTime = startTime.add(1, 'hour');
-    }
+  // Store in clean formats
+  setEndDate(adjustedDateTime.format("YYYY-MM-DD"));
+  setEndTime(adjustedDateTime);
 
-    // Ensure time is within 5 AM - 10 PM
-    const hour = adjustedDateTime.hour();
-    if (hour < 5) {
-      adjustedDateTime = adjustedDateTime.hour(5).minute(0);
-    } else if (hour >= 22) {
-      adjustedDateTime = adjustedDateTime.hour(21).minute(55);
-    }
+  console.log("💾 Stored end data:");
+  console.log("   - Date:", adjustedDateTime.format("YYYY-MM-DD"));
+  console.log("   - Time (24h):", adjustedDateTime.format("HH:mm"));
+  console.log("   - Full datetime:", adjustedDateTime.format());
+};
 
-    setEndDate(adjustedDateTime.toISOString());
-    setEndTime(adjustedDateTime);
-  };
+  // const updateStartDateTime = (newDateTime: Dayjs) => {
+  //   const now = dayjs();
+  //   let adjustedDateTime = newDateTime;
+
+  //   // Ensure start time is at least 30 minutes from now if it's today
+  //   if (newDateTime.isSame(now, 'day') && newDateTime.isBefore(now.add(30, 'minute'))) {
+  //     adjustedDateTime = now.add(30, 'minute');
+  //   }
+
+  //   // Ensure time is within 5 AM - 10 PM
+  //   const hour = adjustedDateTime.hour();
+  //   if (hour < 5) {
+  //     adjustedDateTime = adjustedDateTime.hour(5).minute(0);
+  //   } else if (hour >= 22) {
+  //     adjustedDateTime = adjustedDateTime.hour(21).minute(55);
+  //   }
+
+  //   setStartDate(adjustedDateTime.toISOString());
+  //   setStartTime(adjustedDateTime);
+
+  //   // Set default end time based on booking option
+  //   if (selectedOption === "Date") {
+  //     const defaultEnd = adjustedDateTime.add(1, "hour");
+  //     // Ensure end time doesn't go beyond 10 PM
+  //     let finalEnd = defaultEnd;
+  //     if (defaultEnd.hour() >= 22) {
+  //       finalEnd = adjustedDateTime.hour(21).minute(55);
+  //     }
+  //     setEndDate(finalEnd.toISOString());
+  //     setEndTime(finalEnd);
+  //   } else if (selectedOption === "Monthly") {
+  //     const endDateValue = adjustedDateTime.add(1, "month");
+  //     setEndDate(endDateValue.toISOString());
+  //     setEndTime(endDateValue);
+  //   }
+  // };
+
+  // const updateEndDateTime = (newDateTime: Dayjs) => {
+  //   let adjustedDateTime = newDateTime;
+
+  //   // Ensure end time is after start time
+  //   if (startTime && newDateTime.isBefore(startTime)) {
+  //     adjustedDateTime = startTime.add(1, 'hour');
+  //   }
+
+  //   // Ensure time is within 5 AM - 10 PM
+  //   const hour = adjustedDateTime.hour();
+  //   if (hour < 5) {
+  //     adjustedDateTime = adjustedDateTime.hour(5).minute(0);
+  //   } else if (hour >= 22) {
+  //     adjustedDateTime = adjustedDateTime.hour(21).minute(55);
+  //   }
+
+  //   setEndDate(adjustedDateTime.toISOString());
+  //   setEndTime(adjustedDateTime);
+  // };
 
   const isConfirmDisabled = () => {
     if (selectedOption === "Date") {

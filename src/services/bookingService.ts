@@ -1,3 +1,4 @@
+// BookingService.ts
 /* eslint-disable */
 import PaymentInstance from "./paymentInstance";
 import store from "../store/userStore";
@@ -12,7 +13,7 @@ export interface BookingPayload {
   booking_type: string;
   service_type: string;
   base_amount: number;
-  payment_mode?: "razorpay" | "UPI" | "CASH" | string; // Add string to allow any value
+  payment_mode?: "razorpay" | "UPI" | "CASH" | string;
   latitude?: number;
   longitude?: number;
   [key: string]: any;
@@ -23,6 +24,17 @@ export interface RazorpayPaymentResponse {
   razorpay_order_id: string;
   razorpay_signature: string;
   engagementId: number;
+}
+
+// Location data interface
+export interface LocationData {
+  formatted_address: string;
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
+    };
+  };
 }
 
 // Error types for better error handling
@@ -58,9 +70,9 @@ export const BookingService = {
     return new Promise((resolve, reject) => {
       const options = {
         description: "Booking Payment",
-        image: "https://your-logo-url.com/logo.png", // Replace with your actual logo URL
+        image: "https://your-logo-url.com/logo.png",
         currency,
-        key: "rzp_test_lTdgjtSRlEwreA", // Replace with your actual Razorpay key
+        key: "rzp_test_lTdgjtSRlEwreA",
         amount: amountPaise,
         name: "Serveaso",
         order_id: orderId,
@@ -70,20 +82,13 @@ export const BookingService = {
           name: "Test User",
         },
         theme: { color: "#0ea5e9" },
-        // Additional options for better UX
         notes: {
           booking: "service_booking"
         },
-        // modal: {
-        //   ondismiss: function() {
-        //     reject({code: 0, description: "Payment cancelled by user"});
-        //   }
-        // }
       };
 
       RazorpayCheckout.open(options)
         .then((data: any) => {
-          // Validate response data
           if (!data.razorpay_payment_id || !data.razorpay_order_id || !data.razorpay_signature) {
             reject({
               code: -1,
@@ -96,7 +101,7 @@ export const BookingService = {
             razorpay_payment_id: data.razorpay_payment_id,
             razorpay_order_id: data.razorpay_order_id,
             razorpay_signature: data.razorpay_signature,
-            engagementId: 0, // Will be set later in bookAndPay flow
+            engagementId: 0,
           };
           resolve(resp);
         })
@@ -123,34 +128,50 @@ export const BookingService = {
   },
 
   /**
-   * Complete booking and payment flow
+   * Complete booking and payment flow with location data
    */
-  bookAndPay: async (payload: BookingPayload) => {
+  bookAndPay: async (payload: BookingPayload, locationData?: { latitude: number; longitude: number } | LocationData) => {
     try {
-      const state: any = store.getState();
-
-      // Safe access to geoLocation
-      const location = state?.geoLocation?.value ?? null;
-
       let latitude = 0;
       let longitude = 0;
 
-      // Extract coordinates from location object
-      if (location?.geometry?.location) {
-        latitude = location.geometry.location.lat;
-        longitude = location.geometry.location.lng;
-      } else if (location?.lat && location?.lng) {
-        latitude = location.lat;
-        longitude = location.lng;
-      }
+      // Use provided location data first (preferred method)
+      if (locationData) {
+        if ('geometry' in locationData) {
+          // It's a LocationData object
+          latitude = locationData.geometry.location.lat;
+          longitude = locationData.geometry.location.lng;
+        } else {
+          // It's a simple coordinates object
+          latitude = locationData.latitude;
+          longitude = locationData.longitude;
+        }
+        console.log("Using provided location coordinates - lat:", latitude, "lng:", longitude);
+      } else {
+        // Fallback to Redux store (backward compatibility)
+        const state: any = store.getState();
+        const location = state?.geoLocation?.value ?? null;
 
-      console.log("Location payload:", location);
-      console.log("Extracted coordinates - lat:", latitude, "lng:", longitude);
+        if (location?.geometry?.location) {
+          latitude = location.geometry.location.lat;
+          longitude = location.geometry.location.lng;
+        } else if (location?.lat && location?.lng) {
+          latitude = location.lat;
+          longitude = location.lng;
+        }
+        console.log("Using Redux store coordinates - lat:", latitude, "lng:", longitude);
+      }
 
       // Process payload
       payload.serviceproviderid = payload.serviceproviderid === 0 ? null : payload.serviceproviderid;
       payload.latitude = latitude;
       payload.longitude = longitude;
+
+      console.log("Final payload with coordinates:", {
+        ...payload,
+        latitude,
+        longitude
+      });
 
       // Create engagement
       const engagementData = await BookingService.createEngagement(payload);
@@ -203,20 +224,33 @@ export const BookingService = {
   /**
    * Alternative method for cash/UPI payments without Razorpay
    */
-  bookWithoutOnlinePayment: async (payload: BookingPayload) => {
+  bookWithoutOnlinePayment: async (payload: BookingPayload, locationData?: { latitude: number; longitude: number } | LocationData) => {
     try {
-      const state: any = store.getState();
-      const location = state?.geoLocation?.value ?? null;
-
       let latitude = 0;
       let longitude = 0;
 
-      if (location?.geometry?.location) {
-        latitude = location.geometry.location.lat;
-        longitude = location.geometry.location.lng;
-      } else if (location?.lat && location?.lng) {
-        latitude = location.lat;
-        longitude = location.lng;
+      // Use provided location data first
+      if (locationData) {
+        if ('geometry' in locationData) {
+          latitude = locationData.geometry.location.lat;
+          longitude = locationData.geometry.location.lng;
+        } else {
+          latitude = locationData.latitude;
+          longitude = locationData.longitude;
+        }
+        console.log("Using provided location coordinates for cash payment - lat:", latitude, "lng:", longitude);
+      } else {
+        // Fallback to Redux store
+        const state: any = store.getState();
+        const location = state?.geoLocation?.value ?? null;
+
+        if (location?.geometry?.location) {
+          latitude = location.geometry.location.lat;
+          longitude = location.geometry.location.lng;
+        } else if (location?.lat && location?.lng) {
+          latitude = location.lat;
+          longitude = location.lng;
+        }
       }
 
       payload.serviceproviderid = payload.serviceproviderid === 0 ? null : payload.serviceproviderid;

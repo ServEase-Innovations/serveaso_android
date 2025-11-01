@@ -26,6 +26,7 @@ import { useAuth0 } from 'react-native-auth0';
 import { usePricingFilterService } from './utils/PricingFilter';
 import { useAppUser } from './context/AppUserContext';
 import BookingService from './services/bookingService';
+import { CartDialog } from './CartDialog'; // Import CartDialog
 
 // Type definitions (keep the same)
 type PackageType = 'day' | 'night' | 'fullTime';
@@ -108,6 +109,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
+  const [showCartDialog, setShowCartDialog] = useState(false); // Add CartDialog state
   const { user: auth0User } = useAuth0();
   const { setAppUser, appUser } = useAppUser();
   
@@ -417,7 +419,51 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     Alert.alert('Voucher Applied', 'Your voucher has been applied successfully');
   };
 
-  // ✅ INTEGRATED handleCheckout FUNCTION
+  // ✅ NEW: Prepare cart for checkout (similar to DemoCook)
+  const prepareCartForCheckout = () => {
+    // Clear all existing cart items of type 'nanny'
+    dispatch(removeFromCart({ type: 'nanny' }));
+
+    // Add only the currently selected packages
+    Object.entries(packages).forEach(([key, pkg]) => {
+      if (pkg.selected) {
+        const packageType: "day" | "night" | "fullTime" = key.includes("day") ? "day" 
+                          : key.includes("night") ? "night" 
+                          : "fullTime";
+
+        const careType: "baby" | "elderly" = pkg.category.toLowerCase().includes("baby") 
+          ? "baby" 
+          : "elderly";
+
+        dispatch(addToCart({
+          type: 'nanny',
+          id: key.toUpperCase(),
+          careType: careType,
+          packageType: packageType,
+          age: pkg.age,
+          price: pkg.calculatedPrice,
+          description: pkg.description.join(", "),
+          providerId: providerDetails?.serviceproviderId || '',
+          providerName: providerFullName,
+          activeTab: activeTab
+        }));
+      }
+    });
+  };
+
+  // ✅ NEW: Handle opening cart dialog (similar to DemoCook)
+  const handleOpenCartDialog = () => {
+    const selectedPackages = Object.entries(packages).filter(([_, pkg]) => pkg.selected);
+    if (selectedPackages.length === 0) {
+      Alert.alert("Please select at least one package");
+      return;
+    }
+
+    prepareCartForCheckout();
+    setShowCartDialog(true);
+  };
+
+  // ✅ INTEGRATED handleCheckout FUNCTION (for CartDialog)
   const handleCheckout = async () => {
     try {
       setLoading(true);
@@ -452,7 +498,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         careType: activeTab,
       }));
 
-       console.log("console booking:", bookingType);
+      console.log("console booking:", bookingType);
 
       const payload = {
         customerid: appUser.customerid,
@@ -490,6 +536,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
               dispatch(removeFromCart({ type: 'meal' }));
               dispatch(removeFromCart({ type: 'maid' }));
               dispatch(removeFromCart({ type: 'nanny' }));
+              setShowCartDialog(false);
               handleClose();
               if (sendDataToParent) {
                 sendDataToParent('BOOKINGS');
@@ -740,7 +787,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
                   styles.checkoutButton,
                   (getSelectedPackagesCount === 0 || loading) && styles.disabledButton
                 ]}
-                onPress={handleCheckout}
+                onPress={handleOpenCartDialog} // Changed from handleCheckout to handleOpenCartDialog
                 disabled={getSelectedPackagesCount === 0 || loading}
               >
                 {loading ? (
@@ -753,6 +800,13 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           </View>
         </View>
       </View>
+
+      {/* ✅ ADDED: Cart Dialog Integration (similar to DemoCook) */}
+      <CartDialog
+        open={showCartDialog}
+        handleClose={() => setShowCartDialog(false)}
+        handleCheckout={handleCheckout}
+      />
     </Modal>
   );
 };

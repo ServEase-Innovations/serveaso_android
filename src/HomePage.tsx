@@ -246,6 +246,58 @@ const HomePage: React.FC<ChildComponentProps> = ({
     setOpen(false);
   };
 
+// const handleSave = (bookingDetails: any) => {
+//   const formatDate = (value: any) => {
+//     if (!value) return "";
+//     const date = new Date(value);
+//     if (isNaN(date.getTime())) return value; // already formatted string
+//     return date.toISOString().split("T")[0]; // "YYYY-MM-DD"
+//   };
+
+//   const formatTime = (value: any) => {
+//     if (!value) return "";
+//     const date = new Date(value);
+//     if (isNaN(date.getTime())) return value; // already formatted string
+//     return date.toTimeString().slice(0, 5); // "HH:mm"
+//   };
+
+//   const booking = {
+//     start_date: formatDate(bookingDetails.startDate),
+//     start_time: formatTime(bookingDetails.startTime),
+//     end_date: formatDate(bookingDetails.endDate || bookingDetails.startDate),
+//     end_time: formatTime(bookingDetails.endTime),
+//     timeRange:
+//       bookingDetails.startTime && bookingDetails.endTime
+//         ? `${formatTime(bookingDetails.startTime)} - ${formatTime(bookingDetails.endTime)}`
+//         : formatTime(bookingDetails.startTime) || "",
+//     bookingPreference: selectedRadioButtonValue,
+//     housekeepingRole: selectedType,
+//   };
+
+//   console.log("Dispatching booking:", booking);
+
+//   if (selectedRadioButtonValue === "Date") {
+//     switch (selectedType) {
+//       case "COOK":
+//         setShowCookDialog(true);
+//         break;
+//       case "MAID":
+//         setShowMaidServiceDialog(true);
+//         break;
+//       case "NANNY":
+//         setShowNannyServicesDialog(true);
+//         break;
+//       default:
+//         sendDataToParent(DETAILS);
+//     }
+//   } else {
+//     sendDataToParent(DETAILS);
+//   }
+
+//   setOpen(false);
+//   dispatch(add(booking));
+// };
+
 const handleSave = (bookingDetails: any) => {
   const formatDate = (value: any) => {
     if (!value) return "";
@@ -256,9 +308,52 @@ const handleSave = (bookingDetails: any) => {
 
   const formatTime = (value: any) => {
     if (!value) return "";
-    const date = new Date(value);
-    if (isNaN(date.getTime())) return value; // already formatted string
-    return date.toTimeString().slice(0, 5); // "HH:mm"
+    
+    console.log("🔧 formatTime input:", value, typeof value);
+    
+    // If it's a dayjs object, use it directly
+    if (value && typeof value === 'object' && value.format) {
+      console.log("📅 Using dayjs format");
+      return value.format("HH:mm"); // 24-hour format
+    }
+    
+    // If it's a Date object
+    if (value instanceof Date) {
+      console.log("📅 Using Date object");
+      return value.toTimeString().slice(0, 5); // "HH:mm"
+    }
+    
+    // If it's already a string, clean it up
+    if (typeof value === 'string') {
+      console.log("📅 Processing string time:", value);
+      
+      let timeStr = value.trim();
+      
+      // Handle 12-hour format with AM/PM
+      if (timeStr.includes('AM') || timeStr.includes('PM')) {
+        console.log("🕒 Converting 12-hour to 24-hour format");
+        const [timePart, period] = timeStr.split(/\s+/);
+        let [hours, minutes] = timePart.split(':').map(Number);
+        
+        if (period === 'PM' && hours < 12) {
+          hours += 12;
+        } else if (period === 'AM' && hours === 12) {
+          hours = 0;
+        }
+        
+        const result = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        console.log("🔄 Converted:", timeStr, "→", result);
+        return result;
+      }
+      
+      // If it's already in 24-hour format, clean and return
+      const cleaned = timeStr.replace(/\s+/g, '');
+      console.log("🧹 Cleaned time:", timeStr, "→", cleaned);
+      return cleaned;
+    }
+    
+    console.log("❌ Unhandled time format");
+    return "";
   };
 
   const booking = {
@@ -274,7 +369,7 @@ const handleSave = (bookingDetails: any) => {
     housekeepingRole: selectedType,
   };
 
-  console.log("Dispatching booking:", booking);
+  console.log("✅ Final booking object:", JSON.stringify(booking, null, 2));
 
   if (selectedRadioButtonValue === "Date") {
     switch (selectedType) {
@@ -297,8 +392,6 @@ const handleSave = (bookingDetails: any) => {
   setOpen(false);
   dispatch(add(booking));
 };
-
-
 
   const handleLearnMore = (service: string) => {
     switch (service) {

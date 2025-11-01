@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,15 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { removeFromCart, selectCartItems, updateCartItem } from './features/addToSlice';
 import { CartItem, isMaidCartItem, isMealCartItem, isNannyCartItem } from './types/cartSlice';
+import { TermsCheckboxes } from './common/TermsCheckboxes';
 
 interface CartDialogProps {
   open: boolean;
   handleClose: () => void;
-  handleCheckout: () => void;
+  handleCheckout?: () => void;
+  handleCookCheckout?: () => void;
+  handleMaidCheckout?: () => void;
+  handleNannyCheckout?: () => void;
 }
 
 // Utility functions for houseSize handling
@@ -35,6 +39,9 @@ export const CartDialog: React.FC<CartDialogProps> = ({
   open, 
   handleClose, 
   handleCheckout,
+  handleCookCheckout,
+  handleMaidCheckout,
+  handleNannyCheckout
 }) => {
   const dispatch = useDispatch();
   const allCartItems = useSelector(selectCartItems);
@@ -44,38 +51,77 @@ export const CartDialog: React.FC<CartDialogProps> = ({
   const maidCartItems = allCartItems.filter(isMaidCartItem);
   const nannyCartItems = allCartItems.filter(isNannyCartItem);
   
-  // Calculate totals
-  const mealCartTotal = mealCartItems.reduce((sum, item) => sum + item.price, 0);
-  const maidCartTotal = maidCartItems.reduce((sum, item) => sum + item.price, 0);
-  const nannyCartTotal = nannyCartItems.reduce((sum, item) => sum + item.price, 0);
+  // Calculate totals - Updated with proper null checks
+  const mealCartTotal = mealCartItems.reduce((sum, item) => sum + (item.price || 0), 0);
+  const maidCartTotal = maidCartItems.reduce((sum, item) => sum + (item.price || 0), 0);
+  const nannyCartTotal = nannyCartItems.reduce((sum, item) => sum + (item.price || 0), 0);
   const totalPrice = mealCartTotal + maidCartTotal + nannyCartTotal;
-  const tax = totalPrice * 0.05;
-  const grandTotal = totalPrice + tax;
+  const tax = totalPrice * 0.18; // Updated from 5% to 18%
+  const platformFee = totalPrice * 0.06; // New platform fee
+  const grandTotal = totalPrice + tax + platformFee;
 
   const handleRemoveItem = (id: string, itemType: CartItem['type']) => {
     dispatch(removeFromCart({ id, type: itemType }));
   };
 
-  const [termsAccepted, setTermsAccepted] = useState({
-    keyFacts: false,
-    termsConditions: false, 
-    privacyPolicy: false
-  });
+  const [allTermsAccepted, setAllTermsAccepted] = useState(false);
 
-  const allTermsAccepted = termsAccepted.keyFacts && 
-                          termsAccepted.termsConditions && 
-                          termsAccepted.privacyPolicy;
+  // Reset checkboxes whenever dialog closes - New useEffect
+  useEffect(() => {
+    if (!open) {
+      setAllTermsAccepted(false);
+    }
+  }, [open]);
 
-  const handleCheckboxChange = (term: keyof typeof termsAccepted) => {
-    setTermsAccepted(prev => ({
-      ...prev,
-      [term]: !prev[term]
-    }));
+  // Debug: Log when terms acceptance changes
+  useEffect(() => {
+    console.log('All terms accepted:', allTermsAccepted);
+  }, [allTermsAccepted]);
+
+  // RENAMED: Handle checkout button click to avoid conflict with prop
+  const handleCheckoutClick = () => {
+    console.log('Checkout clicked, terms accepted:', allTermsAccepted);
+    
+    // Use the generic handleCheckout first if provided
+    if (handleCheckout) {
+      console.log('Using generic handleCheckout');
+      handleCheckout();
+      return;
+    }
+    
+    // Fall back to type-specific handlers
+    if (mealCartItems.length > 0 && handleCookCheckout) {
+      console.log('Using handleCookCheckout');
+      handleCookCheckout();
+    } else if (maidCartItems.length > 0 && handleMaidCheckout) {
+      console.log('Using handleMaidCheckout');
+      handleMaidCheckout();
+    } else if (nannyCartItems.length > 0 && handleNannyCheckout) {
+      console.log('Using handleNannyCheckout');
+      handleNannyCheckout();
+    } else {
+      console.error("No checkout handler available for cart items");
+    }
+  };
+
+  // Check if checkout is available for current cart items - Updated
+  const isCheckoutAvailable = () => {
+    if (handleCheckout) return true; // Generic handler available
+    
+    if (mealCartItems.length > 0 && !handleCookCheckout) return false;
+    if (maidCartItems.length > 0 && !handleMaidCheckout) return false;
+    if (nannyCartItems.length > 0 && !handleNannyCheckout) return false;
+    return true;
   };
 
   const openLink = (url: string) => {
     Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
   };
+
+  // Check if checkout button should be enabled
+  const isCheckoutEnabled = allCartItems.length > 0 && allTermsAccepted && isCheckoutAvailable();
+
+  console.log('Checkout enabled:', isCheckoutEnabled, 'Items:', allCartItems.length, 'Terms:', allTermsAccepted, 'Available:', isCheckoutAvailable());
 
   return (
     <Modal
@@ -88,10 +134,15 @@ export const CartDialog: React.FC<CartDialogProps> = ({
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.dialogHeader}>
-            <Text style={styles.dialogTitle}>Your Order Summary</Text>
-            <Text style={styles.itemCountText}>
-              {allCartItems.length} item{allCartItems.length !== 1 ? 's' : ''} in cart
-            </Text>
+            <View style={styles.headerContent}>
+              <Text style={styles.dialogTitle}>Your Order Summary</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={handleClose}
+              >
+                <Icon name="close" size={24} color="#718096" />
+              </TouchableOpacity>
+            </View>
           </View>
           
           {/* Content */}
@@ -157,15 +208,19 @@ export const CartDialog: React.FC<CartDialogProps> = ({
                   )}
                 </View>
 
-                {/* Pricing Summary */}
+                {/* Pricing Summary - Updated with platform fee */}
                 <View style={styles.pricingContainer}>
                   <View style={styles.pricingRow}>
                     <Text style={styles.pricingLabel}>Subtotal:</Text>
                     <Text style={styles.pricingValue}>₹{totalPrice.toFixed(2)}</Text>
                   </View>
                   <View style={styles.pricingRow}>
-                    <Text style={styles.pricingLabel}>Tax (5%):</Text>
+                    <Text style={styles.pricingLabel}>Tax (18%):</Text>
                     <Text style={styles.pricingValue}>₹{tax.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.pricingRow}>
+                    <Text style={styles.pricingLabel}>Platform Fee (6%):</Text>
+                    <Text style={styles.pricingValue}>₹{platformFee.toFixed(2)}</Text>
                   </View>
                   
                   <View style={styles.divider} />
@@ -177,105 +232,44 @@ export const CartDialog: React.FC<CartDialogProps> = ({
                   
                   <View style={styles.termsDivider} />
 
+                  {/* Terms Checkboxes - Updated to use TermsCheckboxes component */}
                   <View style={styles.termsContainer}>
-                    <Text style={styles.termsHeader}>
-                      We kindly ask you to review and agree to the following policies before proceeding:
-                    </Text>
-
-                    <View style={styles.termItem}>
-                      <TouchableOpacity 
-                        style={styles.checkbox}
-                        onPress={() => handleCheckboxChange('keyFacts')}
-                      >
-                        {termsAccepted.keyFacts ? (
-                          <Icon name="check-box" size={24} color="#3182ce" />
-                        ) : (
-                          <Icon name="check-box-outline-blank" size={24} color="#718096" />
-                        )}
-                      </TouchableOpacity>
-                      <Text style={styles.termText}>
-                        I agree to the ServEaso{' '}
-                        <Text 
-                          style={styles.linkText}
-                          onPress={() => openLink('http://localhost:3000/KeyFactsStatement')}
-                        >
-                          Key Facts Statement
-                        </Text>
-                        <Icon name="open-in-new" size={16} color="#3182ce" />
-                      </Text>
-                    </View>
-
-                    <View style={styles.termItem}>
-                      <TouchableOpacity 
-                        style={styles.checkbox}
-                        onPress={() => handleCheckboxChange('termsConditions')}
-                      >
-                        {termsAccepted.termsConditions ? (
-                          <Icon name="check-box" size={24} color="#3182ce" />
-                        ) : (
-                          <Icon name="check-box-outline-blank" size={24} color="#718096" />
-                        )}
-                      </TouchableOpacity>
-                      <Text style={styles.termText}>
-                        I agree to the ServEaso{' '}
-                        <Text 
-                          style={styles.linkText}
-                          onPress={() => openLink('http://localhost:3000/TnC')}
-                        >
-                          Terms and Conditions
-                        </Text>
-                        <Icon name="open-in-new" size={16} color="#3182ce" />
-                      </Text>
-                    </View>
-
-                    <View style={styles.termItem}>
-                      <TouchableOpacity 
-                        style={styles.checkbox}
-                        onPress={() => handleCheckboxChange('privacyPolicy')}
-                      >
-                        {termsAccepted.privacyPolicy ? (
-                          <Icon name="check-box" size={24} color="#3182ce" />
-                        ) : (
-                          <Icon name="check-box-outline-blank" size={24} color="#718096" />
-                        )}
-                      </TouchableOpacity>
-                      <Text style={styles.termText}>
-                        I agree to the ServEaso{' '}
-                        <Text 
-                          style={styles.linkText}
-                          onPress={() => openLink('http://localhost:3000/Privacy')}
-                        >
-                          Privacy Statement
-                        </Text>
-                        <Icon name="open-in-new" size={16} color="#3182ce" />
-                      </Text>
-                    </View>
+                    <TermsCheckboxes onChange={setAllTermsAccepted} />
                   </View>
                 </View>
               </>
             )}
           </ScrollView>
           
-          {/* Footer */}
+          {/* Footer - Fixed layout */}
           {allCartItems.length > 0 && (
             <View style={styles.dialogFooter}>
+              <View style={styles.footerTopRow}>
+                <Text style={styles.itemCountText}>
+                  {allCartItems.length} item{allCartItems.length !== 1 ? 's' : ''} selected
+                </Text>
+              </View>
+              
               <View style={styles.footerButtons}>
                 <TouchableOpacity 
-                  style={styles.continueButton}
+                  style={styles.modifyButton}
                   onPress={handleClose}
                 >
-                  <Text style={styles.continueButtonText}>Continue Booking</Text>
+                  <Text style={styles.modifyButtonText}>Modify Booking</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
                   style={[
                     styles.checkoutButton,
-                    (allCartItems.length === 0 || !allTermsAccepted) && styles.disabledButton
+                    !isCheckoutEnabled && styles.disabledButton
                   ]}
-                  onPress={handleCheckout}
-                  disabled={allCartItems.length === 0 || !allTermsAccepted}
+                  onPress={handleCheckoutClick}
+                  disabled={!isCheckoutEnabled}
                 >
-                  <Text style={styles.checkoutButtonText}>
+                  <Text style={[
+                    styles.checkoutButtonText,
+                    !isCheckoutEnabled && styles.disabledButtonText
+                  ]}>
                     Proceed to Checkout (₹{grandTotal.toFixed(2)})
                   </Text>
                 </TouchableOpacity>
@@ -514,24 +508,33 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     width: '90%',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   dialogHeader: {
     backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
     paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   dialogTitle: {
     fontWeight: '600',
     fontSize: 20,
     color: '#2d3748',
-    marginBottom: 4,
   },
-  itemCountText: {
-    color: '#4a5568',
-    fontWeight: '500',
-    fontSize: 14,
+  closeButton: {
+    padding: 4,
   },
   dialogContent: {
     padding: 0,
@@ -540,7 +543,7 @@ const styles = StyleSheet.create({
   emptyCartContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 48,
     backgroundColor: '#ffffff',
   },
   emptyCartText: {
@@ -552,14 +555,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#4299e1',
     borderRadius: 6,
     paddingHorizontal: 24,
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
   browseButtonText: {
     color: 'white',
     fontSize: 14,
+    fontWeight: '500',
   },
   itemsContainer: {
-    padding: 24,
+    padding: 20,
     backgroundColor: '#ffffff',
   },
   sectionTitle: {
@@ -578,7 +582,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: '#edf2f7',
-    padding: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
   },
   pricingRow: {
     flexDirection: 'row',
@@ -611,69 +620,62 @@ const styles = StyleSheet.create({
   termsContainer: {
     marginTop: 8,
   },
-  termsHeader: {
-    fontSize: 14,
-    color: '#4a5568',
-    fontWeight: '500',
-    marginBottom: 12,
-  },
-  termItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  checkbox: {
-    marginRight: 8,
-  },
-  termText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#4a5568',
-  },
-  linkText: {
-    color: '#3182ce',
-    textDecorationLine: 'underline',
-  },
   dialogFooter: {
-    padding: 24,
-    // flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    padding: 20,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#edf2f7',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  footerTopRow: {
+    marginBottom: 12,
+  },
+  itemCountText: {
+    color: '#4a5568',
+    fontWeight: '500',
+    fontSize: 14,
   },
   footerButtons: {
-     flexDirection: 'column',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     gap: 12,
   },
-  continueButton: {
+  modifyButton: {
+    flex: 1,
     backgroundColor: '#ebf8ff',
     borderWidth: 1,
     borderColor: '#bee3f8',
     borderRadius: 6,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
-  continueButtonText: {
+  modifyButtonText: {
     color: '#2b6cb0',
     fontSize: 14,
     fontWeight: '500',
   },
   checkoutButton: {
+    flex: 2,
     backgroundColor: '#4299e1',
     borderRadius: 6,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
   checkoutButtonText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '500',
+    textAlign: 'center',
   },
   disabledButton: {
     backgroundColor: '#e2e8f0',
+  },
+  disabledButtonText: {
+    color: '#a0aec0',
   },
   itemCard: {
     marginBottom: 16,
@@ -693,11 +695,9 @@ const styles = StyleSheet.create({
     right: 8,
     top: 8,
     zIndex: 1,
+    padding: 4,
   },
   itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 12,
   },
   itemTitle: {
@@ -710,12 +710,13 @@ const styles = StyleSheet.create({
   counterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginVertical: 8,
   },
   counterLabel: {
-    marginRight: 15,
     color: '#2d3436',
     fontSize: 14,
+    flex: 1,
   },
   counterWrapper: {
     flexDirection: 'row',
@@ -725,20 +726,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   counterButton: {
-    padding: 5,
+    padding: 8,
     backgroundColor: '#f5f5f5',
-    borderRightWidth: 1,
-    borderColor: '#dfe6e9',
   },
   counterButtonText: {
     fontSize: 16,
-    paddingHorizontal: 5,
+    fontWeight: '500',
+    paddingHorizontal: 8,
   },
   counterValue: {
-    paddingHorizontal: 15,
-    minWidth: 20,
+    paddingHorizontal: 16,
+    minWidth: 40,
     textAlign: 'center',
     fontSize: 14,
+    fontWeight: '500',
   },
   includesLabel: {
     marginTop: 12,

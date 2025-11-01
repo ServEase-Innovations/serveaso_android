@@ -70,6 +70,50 @@ type PackageState = {
   bathroomCleaning: { bathrooms: number };
 };
 
+// --- Pricing helper ---
+const getBasePrice = (service: any, bookingType: any) => {
+  const basePrice =
+    bookingType?.bookingPreference?.toLowerCase() === 'date'
+      ? service?.["Price /Day (INR)"]
+      : service?.["Price /Month (INR)"];
+  return basePrice || 0;
+};
+
+// --- Types that mirror the pricing dataset ---
+interface MaidPricingRow {
+  _id?: string;
+  Service?: string; // e.g. "Maid"
+  Type?: string;    // e.g. "On Demand" | "Monthly" | etc.
+  Categories?: string; // e.g. "Utensil Cleaning"
+  'Sub-Categories'?: string; // e.g. "People" | "House Size" | "Bathrooms"
+  'Numbers/Size'?: string; // e.g. "<=3", "4-6", "2BHK"
+  'Price /Day (INR)'?: number;
+  'Price /Month (INR)'?: number;
+  'Price /Visit (INR)'?: number;
+  'Price /Week (INR)'?: number;
+  'Job Description'?: string;
+}
+
+const monthlyFromDaily = (daily?: number) => (daily ? Math.round(daily * 26) : 0); // business days heuristic
+const monthlyFromWeekly = (weekly?: number) => (weekly ? Math.round(weekly * 4) : 0);
+const monthlyFromVisit = (perVisit?: number, visitsPerMonth = 8) => (perVisit ? Math.round(perVisit * visitsPerMonth) : 0); // fallback
+
+// checks if a numeric value satisfies a textual range like "<=3", ">=7", "4-6"
+const matchesNumericBand = (band: string, value: number) => {
+  const s = band.trim();
+  if (/^<=\s*\d+$/i.test(s)) return value <= parseInt(s.replace(/[^\d]/g, ''), 10);
+  if (/^>=\s*\d+$/i.test(s)) return value >= parseInt(s.replace(/[^\d]/g, ''), 10);
+  const range = s.match(/^(\d+)\s*-\s*(\d+)$/);
+  if (range) {
+    const min = parseInt(range[1], 10);
+    const max = parseInt(range[2], 10);
+    return value >= min && value <= max;
+  }
+  // If band is a single number, compare directly
+  if (/^\d+$/.test(s)) return value === parseInt(s, 10);
+  return false;
+};
+
 const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({ 
   open, 
   handleClose, 
@@ -85,7 +129,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   
   // Use the pricing filter service
   const { getFilteredPricing } = usePricingFilterService();
-  const maidPricing = getFilteredPricing('MAID');
+  const maidPricing = getFilteredPricing('maid');
   console.log('Maid Pricing Data:', maidPricing);
 
   const [cartItems, setCartItems] = useState<CartItemsType>(() => {
@@ -123,6 +167,24 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
   const customerId = appUser?.customerid || user?.customerid || 19;
 
+  // Normalize pricing source
+  const maidPricingRows: MaidPricingRow[] = useMemo(() => {
+    const asArray = (data: any): MaidPricingRow[] => {
+      if (!data) return [];
+      if (Array.isArray(data)) return data as MaidPricingRow[];
+      // Some stores keep it grouped by category; flatten if needed
+      if (typeof data === 'object') {
+        const flat: MaidPricingRow[] = [];
+        Object.values(data).forEach((v: any) => {
+          if (Array.isArray(v)) flat.push(...(v as MaidPricingRow[]));
+        });
+        return flat;
+      }
+      return [];
+    };
+    return asArray(maidPricing);
+  }, [maidPricing]);
+
   // Get booking type from preference
   const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
     if (!bookingPreference) return 'MONTHLY';
@@ -132,117 +194,166 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     return 'MONTHLY';
   };
 
-  // Booking details using passed props
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+  };
 
-  // Get pricing for specific services with proper matching
-  const getPackagePrice = (packageName: CartItemKey): number => {
-    if (!maidPricing || maidPricing.length === 0) {
-      console.log('No maid pricing data available');
-      // Fallback prices if no pricing data available
-      switch(packageName) {
-        case 'utensilCleaning': return 1200;
-        case 'sweepingMopping': return 1200;
-        case 'bathroomCleaning': return 600;
-        default: return 0;
+  const handlePersonChange = (operation: string) => {
+    setPackageStates(prev => ({
+      ...prev,
+      utensilCleaning: {
+        ...prev.utensilCleaning,
+        persons: operation === 'increment' 
+          ? Math.min(prev.utensilCleaning.persons + 1, 10)
+          : Math.max(prev.utensilCleaning.persons - 1, 1)
+      }
+    }));
+  };
+
+  const handleHouseSizeChange = (operation: string) => {
+    const sizes: HouseSize[] = ['1BHK', '2BHK', '3BHK', '4BHK+'];
+    const currentIndex = sizes.indexOf(packageStates.sweepingMopping.houseSize);
+    
+    setPackageStates(prev => ({
+      ...prev,
+      sweepingMopping: {
+        ...prev.sweepingMopping,
+        houseSize: operation === 'increment' 
+          ? sizes[Math.min(currentIndex + 1, sizes.length - 1)]
+          : sizes[Math.max(currentIndex - 1, 0)]
+      }
+    }));
+  };
+
+  const handleBathroomChange = (operation: string) => {
+    setPackageStates(prev => ({
+      ...prev,
+      bathroomCleaning: {
+        ...prev.bathroomCleaning,
+        bathrooms: operation === 'increment' 
+          ? Math.min(prev.bathroomCleaning.bathrooms + 1, 5)
+          : Math.max(prev.bathroomCleaning.bathrooms - 1, 1)
+      }
+    }));
+  };
+
+  // ------- DYNAMIC PRICING HELPERS -------
+  const findRow = (
+    category: string,
+    subCategory?: string,
+    sizeLabelOrBand?: string,
+    numericForBand?: number,
+    preferOnDemand: boolean = false
+  ): MaidPricingRow | undefined => {
+    if (!maidPricingRows.length) return undefined;
+
+    // base rows for the category
+    const rows = maidPricingRows.filter(
+      (r) =>
+        String(r.Service || '').toLowerCase() === 'maid' &&
+        String(r.Categories || '').toLowerCase() === category.toLowerCase()
+    );
+
+    if (!rows.length) return undefined;
+
+    // filter by sub-category if provided
+    const rowsSub = subCategory
+      ? rows.filter((r) => String(r['Sub-Categories'] || '').toLowerCase() === subCategory.toLowerCase())
+      : rows;
+
+    if (!rowsSub.length) return undefined;
+
+    // prefer rows based on booking type
+    const prefStr = preferOnDemand ? 'on demand' : 'regular';
+    const prefCandidates = rowsSub.filter(
+      (r) => String(r.Type || '').toLowerCase().includes(prefStr)
+    );
+
+    const candidates = prefCandidates.length ? prefCandidates : rowsSub;
+
+    // Prefer exact size label match
+    if (sizeLabelOrBand) {
+      const exact = candidates.find(
+        (r) => String(r['Numbers/Size'] || '').toLowerCase() === String(sizeLabelOrBand).toLowerCase()
+      );
+      if (exact) return exact;
+
+      if (numericForBand) {
+        const bandHit = candidates.find(
+          (r) =>
+            r['Numbers/Size'] &&
+            matchesNumericBand(String(r['Numbers/Size']), numericForBand)
+        );
+        if (bandHit) return bandHit;
       }
     }
 
-    console.log('Available maid pricing:', maidPricing);
-    
-    // Map package names to service name patterns
-    const servicePatterns: Record<CartItemKey, string[]> = {
-      utensilCleaning: ['utensil', 'cleaning', 'utensils'],
-      sweepingMopping: ['sweeping', 'mopping', 'floor'],
-      bathroomCleaning: ['bathroom', 'cleaning', 'toilet'],
-      bathroomDeepCleaning: [],
-      normalDusting: [],
-      deepDusting: [],
-      utensilDrying: [],
-      clothesDrying: []
-    };
+    return candidates[0];
+  };
 
-    const patterns = servicePatterns[packageName] || [];
-    
-    const service = maidPricing.find((item: any) => {
-      const serviceName = item.ServiceName?.toLowerCase();
-      return patterns.some(pattern => serviceName?.includes(pattern));
-    });
+  const priceToMonthly = (row?: MaidPricingRow): number => {
+    if (!row) return 0;
+    if (row['Price /Month (INR)']) return row['Price /Month (INR)'] as number;
+    if (row['Price /Week (INR)']) return monthlyFromWeekly(row['Price /Week (INR)']);
+    if (row['Price /Visit (INR)']) return monthlyFromVisit(row['Price /Visit (INR)']);
+    if (row['Price /Day (INR)']) return monthlyFromDaily(row['Price /Day (INR)']);
+    return 0;
+  };
 
-    console.log(`Found service for ${packageName}:`, service);
+  // Updated pricing functions using the same logic as React code
+  const getPackagePrice = (packageName: CartItemKey): number => {
+    const preferOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
 
-    if (service) {
-      // Use appropriate price based on booking type
-      const isOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
-      const price = isOnDemand ? service['Price /Day (INR)'] : service['Price /Month (INR)'];
-      console.log(`Price for ${packageName}:`, price);
-      return price || 0;
-    }
+    switch (packageName) {
+      case 'utensilCleaning': {
+        const persons = packageStates.utensilCleaning.persons;
+        const row = findRow('Utensil Cleaning', 'People', undefined, persons, preferOnDemand);
+        return getBasePrice(row, bookingType) || 1200;
+      }
+      case 'sweepingMopping': {
+        const size = packageStates.sweepingMopping.houseSize;
+        const preferOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
 
-    console.log(`No matching service found for ${packageName}, using fallback`);
-    
-    // Fallback prices
-    switch(packageName) {
-      case 'utensilCleaning': return 1200;
-      case 'sweepingMopping': return 1200;
-      case 'bathroomCleaning': return 600;
-      default: return 0;
+        // use "House" instead of "House Size"
+        const row = findRow('Sweeping & Mopping', 'House', size, undefined, preferOnDemand);
+
+        return getBasePrice(row, bookingType) || 1200;
+      }
+      case 'bathroomCleaning': {
+        const bathrooms = packageStates.bathroomCleaning.bathrooms;
+        const preferOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
+
+        const row = findRow('Bathroom', 'Number', undefined, bathrooms, preferOnDemand);
+
+        return getBasePrice(row, bookingType) || 600;
+      }
+      default:
+        return 0;
     }
   };
 
   const getAddOnPrice = (addOnName: CartItemKey): number => {
-    if (!maidPricing || maidPricing.length === 0) {
-      console.log('No maid pricing data available for addons');
-      // Fallback prices if no pricing data available
-      switch(addOnName) {
-        case 'bathroomDeepCleaning': return 1000;
-        case 'normalDusting': return 1000;
-        case 'deepDusting': return 1500;
-        case 'utensilDrying': return 1000;
-        case 'clothesDrying': return 1000;
-        default: return 0;
-      }
-    }
-
-    console.log('Available maid pricing for addons:', maidPricing);
-    
-    // Map addon names to service name patterns
-    const addOnPatterns: Record<CartItemKey, string[]> = {
-      bathroomDeepCleaning: ['deep', 'bathroom', 'deep cleaning'],
-      normalDusting: ['dusting', 'normal dusting', 'furniture'],
-      deepDusting: ['deep dusting', 'chemical', 'décor'],
-      utensilDrying: ['utensil drying', 'drying', 'utensils'],
-      clothesDrying: ['clothes', 'drying', 'laundry'],
-      utensilCleaning: [],
-      sweepingMopping: [],
-      bathroomCleaning: []
+    const map: Record<string, { cat: string; sub?: string; size?: string }> = {
+      bathroomDeepCleaning: { cat: 'Bathroom -Deep Cleaning', sub: 'Number' },
+      normalDusting:        { cat: 'Normal Dusting', sub: 'House' },
+      deepDusting:          { cat: 'Deep Dusting', sub: 'House' },
+      utensilDrying:        { cat: 'Utensil Drying & Arrangements', sub: 'People', size: '<=3' },
+      clothesDrying:        { cat: 'Clothes Drying and Folding', sub: 'People', size: '<=3' },
     };
 
-    const patterns = addOnPatterns[addOnName] || [];
-    
-    const service = maidPricing.find((item: any) => {
-      const serviceName = item.ServiceName?.toLowerCase();
-      return patterns.some(pattern => serviceName?.includes(pattern));
-    });
+    const meta = map[addOnName];
+    if (!meta) return 0;
 
-    console.log(`Found service for addon ${addOnName}:`, service);
+    const preferOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
+    const row = findRow(meta.cat, meta.sub, meta.size, undefined, preferOnDemand);
 
-    if (service) {
-      const isOnDemand = bookingType?.bookingPreference?.toLowerCase() === 'date';
-      const price = isOnDemand ? service['Price /Day (INR)'] : service['Price /Month (INR)'];
-      console.log(`Price for addon ${addOnName}:`, price);
-      return price || 0;
-    }
+    const price = getBasePrice(row, bookingType);
+    if (price && price > 0) return price;
 
-    console.log(`No matching service found for addon ${addOnName}, using fallback`);
-    
-    // Fallback prices
-    switch(addOnName) {
-      case 'bathroomDeepCleaning': return 1000;
-      case 'normalDusting': return 1000;
+    // fallback defaults
+    switch (addOnName) {
       case 'deepDusting': return 1500;
-      case 'utensilDrying': return 1000;
-      case 'clothesDrying': return 1000;
-      default: return 0;
+      default: return 1000;
     }
   };
 
@@ -300,49 +411,6 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     return () => backHandler.remove();
   }, []);
 
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-  };
-
-  const handlePersonChange = (operation: string) => {
-    setPackageStates(prev => ({
-      ...prev,
-      utensilCleaning: {
-        ...prev.utensilCleaning,
-        persons: operation === 'increment' 
-          ? Math.min(prev.utensilCleaning.persons + 1, 10)
-          : Math.max(prev.utensilCleaning.persons - 1, 1)
-      }
-    }));
-  };
-
-  const handleHouseSizeChange = (operation: string) => {
-    const sizes: HouseSize[] = ['1BHK', '2BHK', '3BHK', '4BHK+'];
-    const currentIndex = sizes.indexOf(packageStates.sweepingMopping.houseSize);
-    
-    setPackageStates(prev => ({
-      ...prev,
-      sweepingMopping: {
-        ...prev.sweepingMopping,
-        houseSize: operation === 'increment' 
-          ? sizes[Math.min(currentIndex + 1, sizes.length - 1)]
-          : sizes[Math.max(currentIndex - 1, 0)]
-      }
-    }));
-  };
-
-  const handleBathroomChange = (operation: string) => {
-    setPackageStates(prev => ({
-      ...prev,
-      bathroomCleaning: {
-        ...prev.bathroomCleaning,
-        bathrooms: operation === 'increment' 
-          ? Math.min(prev.bathroomCleaning.bathrooms + 1, 5)
-          : Math.max(prev.bathroomCleaning.bathrooms - 1, 1)
-      }
-    }));
-  };
-
   const handleAddPackageToCart = (packageName: CartItemKey) => {
     const packageDetails = {
       id: `package_${packageName}`,
@@ -365,8 +433,6 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
       [packageName]: !prev[packageName]
     }));
   };
-
-     console.log("Formatted bookingType Time:", bookingType);
 
   const handleAddAddOnToCart = (addOnName: CartItemKey) => {
     const addOnDetails = {
@@ -407,228 +473,14 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
     
     return total;
   };
-
   const countSelectedItems = () => {
     return Object.values(cartItems).filter(item => item).length;
   };
-// const handleCheckout = async () => {
-//   try {
-//     setLoading(true);
 
-//     const selectedServices = maidCartItems.filter(isMaidCartItem);
-//     const baseTotal = selectedServices.reduce((sum, item) => sum + (item.price || 0), 0);
-    
-//     if (baseTotal <= 0) {
-//       Alert.alert('Warning', 'No items selected for checkout');
-//       setLoading(false);
-//       return;
-//     }
-
-//     const customerId = appUser?.customerid || user?.customerid || "guest-id";
-    
-//     // Separate packages and add-ons
-//     const packages = selectedServices.filter(item => item.serviceType === "package");
-//     const addOns = selectedServices.filter(item => item.serviceType === "addon");
-
-//     // Format responsibilities
-//     const responsibilities = {
-//       tasks: packages.map(item => {
-//         // Map package names to task types with their details
-//         if (item.name === "utensilCleaning") {
-//           return { 
-//             taskType: "Utensil Cleaning", 
-//             persons: item.details?.persons || 1 
-//           };
-//         }
-//         if (item.name === "sweepingMopping") {
-//           return { 
-//             taskType: "Sweeping & Mopping", 
-//             houseSize: item.details?.houseSize || "2BHK" 
-//           };
-//         }
-//         if (item.name === "bathroomCleaning") {
-//           return { 
-//             taskType: "Bathroom Cleaning", 
-//             bathrooms: item.details?.bathrooms || 1 
-//           };
-//         }
-//         return { taskType: item.name };
-//       }),
-//       add_ons: addOns.map(item => ({ 
-//         taskType: item.name 
-//       }))
-//     };
-
-//     // Get booking type
-//     const currentBookingType = getBookingTypeFromPreference(bookingType?.bookingPreference);
-//     const isOnDemand = currentBookingType === "ON_DEMAND";
-    
-//     // Handle serviceproviderid properly
-//     let serviceproviderid: number | null = null;
-//     if (!isOnDemand && providerDetails?.serviceproviderId) {
-//       serviceproviderid = Number(providerDetails.serviceproviderId);
-//     }
-
-//     // Format time properly
-//     const formatTimeForBackend = (timeString: string): string => {
-//       if (!timeString) return '10:00:00';
-      
-//       try {
-//         let timeToFormat = timeString;
-        
-//         if (timeString.includes(' - ')) {
-//           timeToFormat = timeString.split(' - ')[0].trim();
-//         }
-        
-//         if (/^\d{2}:\d{2}:\d{2}$/.test(timeToFormat)) {
-//           return timeToFormat;
-//         }
-        
-//         const timeRegex = /(\d{1,2}):(\d{2})\s*(AM|PM)/i;
-//         const match = timeToFormat.match(timeRegex);
-        
-//         if (match) {
-//           let [_, hours, minutes, modifier] = match;
-//           let hourNum = parseInt(hours);
-          
-//           if (modifier.toUpperCase() === 'PM' && hourNum !== 12) {
-//             hourNum += 12;
-//           } else if (modifier.toUpperCase() === 'AM' && hourNum === 12) {
-//             hourNum = 0;
-//           }
-          
-//           return `${hourNum.toString().padStart(2, '0')}:${minutes}:00`;
-//         }
-        
-//         if (timeToFormat.includes(':')) {
-//           const parts = timeToFormat.split(':');
-//           if (parts.length === 2) {
-//             return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
-//           }
-//         }
-        
-//         return '10:00:00';
-//       } catch (error) {
-//         console.error("Error formatting time:", error);
-//         return '10:00:00';
-//       }
-//     };
-
-//     const startTime = formatTimeForBackend(bookingType?.timeRange);
- 
-
-//     // Prepare the final payload
-//     const payload: BookingPayload = {
-//       customerid: customerId,
-//       // serviceproviderid: serviceproviderid,
-//       serviceproviderid: providerDetails?.serviceproviderId
-//           ? Number(providerDetails.serviceproviderId)
-//           : 0,
-//       start_date: bookingType?.start_Date || new Date().toISOString().split("T")[0],
-//       end_date: bookingType?.end_Date || new Date().toISOString().split("T")[0],
-//       start_time: bookingType?.start_Time,
-//       responsibilities: responsibilities,
-//       booking_type: currentBookingType,
-//       taskStatus: "NOT_STARTED",
-//       service_type: "MAID",
-//       base_amount: baseTotal,
-//       payment_mode: "razorpay",
-//       latitude: currentLocation?.latitude || 24.5235712, // Use actual location
-//       longitude: currentLocation?.longitude || 88.0214016, // Use actual location
-//       // ...(isOnDemand && {
-//       //   end_time: bookingType?.end_Time ,
-//       // }),
-//       ...(bookingType?.bookingPreference?.toLowerCase() === "date" && {
-//           end_time: bookingType?.end_Time , // || ""
-//         }),
-//     };
-//     // || formatTimeForBackend('06:00 PM')
-
-//     console.log("Final Maid Service Payload:", JSON.stringify(payload, null, 2));
-
-//     // Create Razorpay order
-//     const orderResponse = await axios.post(
-//       "https://utils-ndt3.onrender.com/create-order",
-//       { amount: baseTotal * 100 }, // amount in paise
-//       {
-//         headers: { "Content-Type": "application/json" },
-//       }
-//     );
-
-//     if (orderResponse.status === 200) {
-//       const { id: orderId, currency, amount } = orderResponse.data;
-
-//       const options = {
-//         key: "rzp_test_lTdgjtSRlEwreA",
-//         amount: amount,
-//         currency: currency,
-//         name: "Serveaso",
-//         description: "Maid Service Booking",
-//         order_id: orderId,
-//         prefill: {
-//           name: users?.customerDetails?.firstName || user?.customerDetails?.firstName || "",
-//           email: users?.customerDetails?.email || user?.customerDetails?.email || "",
-//           contact: users?.customerDetails?.mobileNo || user?.customerDetails?.mobileNo || "",
-//         },
-//         theme: { color: "#3399cc" },
-//       };
-
-//       RazorpayCheckout.open(options)
-//         .then(async (razorpayResponse) => {
-//           try {
-//             // Call booking service after successful payment
-//             const result = await BookingService.bookAndPay(payload);
-            
-//             Alert.alert(
-//               "Success ✅", 
-//               result?.verifyResult?.message || "Maid Service Booking & Payment Successful",
-//               [
-//                 {
-//                   text: "OK",
-//                   onPress: () => {
-//                     if (sendDataToParent) {
-//                       sendDataToParent(BOOKINGS);
-//                     }
-//                     handleClose();
-//                   }
-//                 }
-//               ]
-//             );
-
-//           } catch (bookingError) {
-//             console.error("Booking error after payment:", bookingError);
-//             Alert.alert("Error", "Payment successful but booking failed. Please contact support.");
-//           } finally {
-//             setLoading(false);
-//           }
-//         })
-//         .catch((error) => {
-//           console.error("Razorpay payment error:", error);
-//           Alert.alert("Payment Failed", error.description || "Unknown error");
-//           setLoading(false);
-//         });
-//     }
-
-//   } catch (error: any) {
-//     console.error("Checkout error:", error);
-
-//     let backendMessage = "Failed to initiate payment";
-//     if (error?.response?.data) {
-//       if (typeof error.response.data === "string") {
-//         backendMessage = error.response.data;
-//       } else if (error.response.data.error) {
-//         backendMessage = error.response.data.error;
-//       } else if (error.response.data.message) {
-//         backendMessage = error.response.data.message;
-//       }
-//     } else if (error.message) {
-//       backendMessage = error.message;
-//     }
-
-//     Alert.alert("Error", backendMessage);
-//     setLoading(false);
-//   }
-// };
+  // Get price display text based on booking type
+  const getPriceDisplayText = () => {
+    return bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service';
+  };
 const handleCheckout = async () => {
   try {
     setLoading(true);
@@ -759,8 +611,8 @@ const handleCheckout = async () => {
       service_type: "MAID",
       base_amount: baseTotal,
       payment_mode: "razorpay",
-      latitude: currentLocation?.latitude || 24.5235712,
-      longitude: currentLocation?.longitude || 88.0214016,
+      // latitude: currentLocation?.latitude || 24.5235712,
+      // longitude: currentLocation?.longitude || 88.0214016,
       ...(isOnDemand && {
         end_time: endTime,
       }),
@@ -873,24 +725,26 @@ const handleCheckout = async () => {
             </View>
             
             <View style={styles.packagesContainer}>
-              {/* Regular Utensil Cleaning */}
+              {/* Utensil Cleaning Package */}
               <View style={[
                 styles.packageCard, 
                 cartItems.utensilCleaning && styles.selectedPackage,
-                { borderLeftColor: '#3399cc' }
+                { borderLeftColor: '#e17055' }
               ]}>
                 <View style={styles.packageHeader}>
                   <View>
                     <Text style={styles.packageTitle}>Utensil Cleaning</Text>
                     <View style={styles.ratingContainer}>
-                      <Text style={[styles.ratingValue, { color: '#3399cc' }]}>4.7</Text>
+                      <Text style={[styles.ratingValue, { color: '#e17055' }]}>4.7</Text>
                       <Text style={styles.reviewsText}>(1.2M reviews)</Text>
                     </View>
                   </View>
                   <View style={styles.priceContainer}>
-                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹{getPackagePrice('utensilCleaning').toLocaleString('en-IN')}</Text>
+                    <Text style={[styles.priceValue, { color: '#e17055' }]}>
+                      ₹{getPackagePrice('utensilCleaning').toLocaleString('en-IN')}
+                    </Text>
                     <Text style={styles.preparationTime}>
-                      {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
+                      {getPriceDisplayText()}
                     </Text>
                   </View>
                 </View>
@@ -930,42 +784,46 @@ const handleCheckout = async () => {
                 <TouchableOpacity
                   style={[
                     styles.cartButton,
-                    cartItems.utensilCleaning && styles.selectedCartButton
+                    cartItems.utensilCleaning && styles.selectedCartButton,
+                    { borderColor: '#e17055' }
                   ]}
                   onPress={() => handleAddPackageToCart('utensilCleaning')}
                 >
                   {cartItems.utensilCleaning ? (
                     <Icon name="remove-shopping-cart" size={20} color="white" />
                   ) : (
-                    <Icon name="add-shopping-cart" size={20} color="#3399cc" />
+                    <Icon name="add-shopping-cart" size={20} color="#e17055" />
                   )}
                   <Text style={[
                     styles.cartButtonText,
-                    cartItems.utensilCleaning && styles.selectedCartButtonText
+                    cartItems.utensilCleaning && styles.selectedCartButtonText,
+                    { color: cartItems.utensilCleaning ? 'white' : '#e17055' }
                   ]}>
-                    {cartItems.utensilCleaning ? 'REMOVE FROM CART' : 'ADD TO CART'}
+                    {cartItems.utensilCleaning ? 'ADDED TO CART' : 'ADD TO CART'}
                   </Text>
                 </TouchableOpacity>
               </View>
               
-              {/* Sweeping & Mopping */}
+              {/* Sweeping & Mopping Package */}
               <View style={[
                 styles.packageCard, 
                 cartItems.sweepingMopping && styles.selectedPackage,
-                { borderLeftColor: '#3399cc' }
+                { borderLeftColor: '#00b894' }
               ]}>
                 <View style={styles.packageHeader}>
                   <View>
                     <Text style={styles.packageTitle}>Sweeping & Mopping</Text>
                     <View style={styles.ratingContainer}>
-                      <Text style={[styles.ratingValue, { color: '#3399cc' }]}>4.8</Text>
+                      <Text style={[styles.ratingValue, { color: '#00b894' }]}>4.8</Text>
                       <Text style={styles.reviewsText}>(1.5M reviews)</Text>
                     </View>
                   </View>
                   <View style={styles.priceContainer}>
-                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹{getPackagePrice('sweepingMopping').toLocaleString('en-IN')}</Text>
+                    <Text style={[styles.priceValue, { color: '#00b894' }]}>
+                      ₹{getPackagePrice('sweepingMopping').toLocaleString('en-IN')}
+                    </Text>
                     <Text style={styles.preparationTime}>
-                      {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
+                      {getPriceDisplayText()}
                     </Text>
                   </View>
                 </View>
@@ -1001,42 +859,46 @@ const handleCheckout = async () => {
                 <TouchableOpacity
                   style={[
                     styles.cartButton,
-                    cartItems.sweepingMopping && styles.selectedCartButton
+                    cartItems.sweepingMopping && styles.selectedCartButton,
+                    { borderColor: '#00b894' }
                   ]}
                   onPress={() => handleAddPackageToCart('sweepingMopping')}
                 >
                   {cartItems.sweepingMopping ? (
                     <Icon name="remove-shopping-cart" size={20} color="white" />
                   ) : (
-                    <Icon name="add-shopping-cart" size={20} color="#3399cc" />
+                    <Icon name="add-shopping-cart" size={20} color="#00b894" />
                   )}
                   <Text style={[
                     styles.cartButtonText,
-                    cartItems.sweepingMopping && styles.selectedCartButtonText
+                    cartItems.sweepingMopping && styles.selectedCartButtonText,
+                    { color: cartItems.sweepingMopping ? 'white' : '#00b894' }
                   ]}>
-                    {cartItems.sweepingMopping ? 'REMOVE FROM CART' : 'ADD TO CART'}
+                    {cartItems.sweepingMopping ? 'ADDED TO CART' : 'ADD TO CART'}
                   </Text>
                 </TouchableOpacity>
               </View>
               
-              {/* Bathroom Cleaning */}
+              {/* Bathroom Cleaning Package */}
               <View style={[
                 styles.packageCard, 
                 cartItems.bathroomCleaning && styles.selectedPackage,
-                { borderLeftColor: '#3399cc' }
+                { borderLeftColor: '#0984e3' }
               ]}>
                 <View style={styles.packageHeader}>
                   <View>
                     <Text style={styles.packageTitle}>Bathroom Cleaning</Text>
                     <View style={styles.ratingContainer}>
-                      <Text style={[styles.ratingValue, { color: '#3399cc' }]}>4.6</Text>
+                      <Text style={[styles.ratingValue, { color: '#0984e3' }]}>4.6</Text>
                       <Text style={styles.reviewsText}>(980K reviews)</Text>
                     </View>
                   </View>
                   <View style={styles.priceContainer}>
-                    <Text style={[styles.priceValue, { color: '#3399cc' }]}>₹{getPackagePrice('bathroomCleaning').toLocaleString('en-IN')}</Text>
+                    <Text style={[styles.priceValue, { color: '#0984e3' }]}>
+                      ₹{getPackagePrice('bathroomCleaning').toLocaleString('en-IN')}
+                    </Text>
                     <Text style={styles.preparationTime}>
-                      {bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service'}
+                      {getPriceDisplayText()}
                     </Text>
                   </View>
                 </View>
@@ -1072,20 +934,22 @@ const handleCheckout = async () => {
                 <TouchableOpacity
                   style={[
                     styles.cartButton,
-                    cartItems.bathroomCleaning && styles.selectedCartButton
+                    cartItems.bathroomCleaning && styles.selectedCartButton,
+                    { borderColor: '#0984e3' }
                   ]}
                   onPress={() => handleAddPackageToCart('bathroomCleaning')}
                 >
                   {cartItems.bathroomCleaning ? (
                     <Icon name="remove-shopping-cart" size={20} color="white" />
                   ) : (
-                    <Icon name="add-shopping-cart" size={20} color="#3399cc" />
+                    <Icon name="add-shopping-cart" size={20} color="#0984e3" />
                   )}
                   <Text style={[
                     styles.cartButtonText,
-                    cartItems.bathroomCleaning && styles.selectedCartButtonText
+                    cartItems.bathroomCleaning && styles.selectedCartButtonText,
+                    { color: cartItems.bathroomCleaning ? 'white' : '#0984e3' }
                   ]}>
-                    {cartItems.bathroomCleaning ? 'REMOVE FROM CART' : 'ADD TO CART'}
+                    {cartItems.bathroomCleaning ? 'ADDED TO CART' : 'ADD TO CART'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1098,11 +962,13 @@ const handleCheckout = async () => {
                   <View style={[
                     styles.addOnCard, 
                     cartItems.bathroomDeepCleaning && styles.selectedAddOn,
-                    { borderLeftColor: '#3399cc' }
+                    { borderLeftColor: '#00b894' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Bathroom Deep Cleaning</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('bathroomDeepCleaning').toLocaleString('en-IN')}</Text>
+                      <Text style={[styles.addOnPrice, { color: '#00b894' }]}>
+                        +₹{getAddOnPrice('bathroomDeepCleaning').toLocaleString('en-IN')}
+                      </Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Weekly cleaning of bathrooms, all bathroom walls cleaned
@@ -1110,15 +976,17 @@ const handleCheckout = async () => {
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        cartItems.bathroomDeepCleaning && styles.selectedAddOnButton
+                        cartItems.bathroomDeepCleaning && styles.selectedAddOnButton,
+                        { borderColor: '#00b894' }
                       ]}
                       onPress={() => handleAddAddOnToCart('bathroomDeepCleaning')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        cartItems.bathroomDeepCleaning && styles.selectedAddOnButtonText
+                        cartItems.bathroomDeepCleaning && styles.selectedAddOnButtonText,
+                        { color: cartItems.bathroomDeepCleaning ? 'white' : '#00b894' }
                       ]}>
-                        {cartItems.bathroomDeepCleaning ? 'REMOVE' : 'ADD TO CART'}
+                        {cartItems.bathroomDeepCleaning ? 'ADDED' : '+ Add This Service'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1127,11 +995,13 @@ const handleCheckout = async () => {
                   <View style={[
                     styles.addOnCard, 
                     cartItems.normalDusting && styles.selectedAddOn,
-                    { borderLeftColor: '#3399cc' }
+                    { borderLeftColor: '#0984e3' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Normal Dusting</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('normalDusting').toLocaleString('en-IN')}</Text>
+                      <Text style={[styles.addOnPrice, { color: '#0984e3' }]}>
+                        +₹{getAddOnPrice('normalDusting').toLocaleString('en-IN')}
+                      </Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Daily furniture dusting, doors, carpet, bed making
@@ -1139,15 +1009,17 @@ const handleCheckout = async () => {
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        cartItems.normalDusting && styles.selectedAddOnButton
+                        cartItems.normalDusting && styles.selectedAddOnButton,
+                        { borderColor: '#0984e3' }
                       ]}
                       onPress={() => handleAddAddOnToCart('normalDusting')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        cartItems.normalDusting && styles.selectedAddOnButtonText
+                        cartItems.normalDusting && styles.selectedAddOnButtonText,
+                        { color: cartItems.normalDusting ? 'white' : '#0984e3' }
                       ]}>
-                        {cartItems.normalDusting ? 'REMOVE' : 'ADD TO CART'}
+                        {cartItems.normalDusting ? 'ADDED' : '+ Add This Service'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1156,11 +1028,13 @@ const handleCheckout = async () => {
                   <View style={[
                     styles.addOnCard, 
                     cartItems.deepDusting && styles.selectedAddOn,
-                    { borderLeftColor: '#3399cc' }
+                    { borderLeftColor: '#e17055' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Deep Dusting</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('deepDusting').toLocaleString('en-IN')}</Text>
+                      <Text style={[styles.addOnPrice, { color: '#e17055' }]}>
+                        +₹{getAddOnPrice('deepDusting').toLocaleString('en-IN')}
+                      </Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Includes chemical agents cleaning: décor items, furniture
@@ -1168,15 +1042,17 @@ const handleCheckout = async () => {
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        cartItems.deepDusting && styles.selectedAddOnButton
+                        cartItems.deepDusting && styles.selectedAddOnButton,
+                        { borderColor: '#e17055' }
                       ]}
                       onPress={() => handleAddAddOnToCart('deepDusting')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        cartItems.deepDusting && styles.selectedAddOnButtonText
+                        cartItems.deepDusting && styles.selectedAddOnButtonText,
+                        { color: cartItems.deepDusting ? 'white' : '#e17055' }
                       ]}>
-                        {cartItems.deepDusting ? 'REMOVE' : 'ADD TO CART'}
+                        {cartItems.deepDusting ? 'ADDED' : '+ Add This Service'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1185,11 +1061,13 @@ const handleCheckout = async () => {
                   <View style={[
                     styles.addOnCard, 
                     cartItems.utensilDrying && styles.selectedAddOn,
-                    { borderLeftColor: '#3399cc' }
+                    { borderLeftColor: '#00b894' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Utensil Drying</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('utensilDrying').toLocaleString('en-IN')}</Text>
+                      <Text style={[styles.addOnPrice, { color: '#00b894' }]}>
+                        +₹{getAddOnPrice('utensilDrying').toLocaleString('en-IN')}
+                      </Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Househelp will dry and make proper arrangements
@@ -1197,15 +1075,17 @@ const handleCheckout = async () => {
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        cartItems.utensilDrying && styles.selectedAddOnButton
+                        cartItems.utensilDrying && styles.selectedAddOnButton,
+                        { borderColor: '#00b894' }
                       ]}
                       onPress={() => handleAddAddOnToCart('utensilDrying')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        cartItems.utensilDrying && styles.selectedAddOnButtonText
+                        cartItems.utensilDrying && styles.selectedAddOnButtonText,
+                        { color: cartItems.utensilDrying ? 'white' : '#00b894' }
                       ]}>
-                        {cartItems.utensilDrying ? 'REMOVE' : 'ADD TO CART'}
+                        {cartItems.utensilDrying ? 'ADDED' : '+ Add This Service'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1214,11 +1094,13 @@ const handleCheckout = async () => {
                   <View style={[
                     styles.addOnCard, 
                     cartItems.clothesDrying && styles.selectedAddOn,
-                    { borderLeftColor: '#3399cc' }
+                    { borderLeftColor: '#0984e3' }
                   ]}>
                     <View style={styles.addOnHeader}>
                       <Text style={styles.addOnTitle}>Clothes Drying</Text>
-                      <Text style={[styles.addOnPrice, { color: '#3399cc' }]}>+₹{getAddOnPrice('clothesDrying').toLocaleString('en-IN')}</Text>
+                      <Text style={[styles.addOnPrice, { color: '#0984e3' }]}>
+                        +₹{getAddOnPrice('clothesDrying').toLocaleString('en-IN')}
+                      </Text>
                     </View>
                     <Text style={styles.addOnDescription}>
                       Househelp will get clothes from/to drying place
@@ -1226,25 +1108,25 @@ const handleCheckout = async () => {
                     <TouchableOpacity
                       style={[
                         styles.addOnButton,
-                        cartItems.clothesDrying && styles.selectedAddOnButton
+                        cartItems.clothesDrying && styles.selectedAddOnButton,
+                        { borderColor: '#0984e3' }
                       ]}
                       onPress={() => handleAddAddOnToCart('clothesDrying')}
                     >
                       <Text style={[
                         styles.addOnButtonText,
-                        cartItems.clothesDrying && styles.selectedAddOnButtonText
+                        cartItems.clothesDrying && styles.selectedAddOnButtonText,
+                        { color: cartItems.clothesDrying ? 'white' : '#0984e3' }
                       ]}>
-                        {cartItems.clothesDrying ? 'REMOVE' : 'ADD TO CART'}
+                        {cartItems.clothesDrying ? 'ADDED' : '+ Add This Service'}
                       </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               </View>
-            </View>
-          </ScrollView>
-          
-          {/* Footer with Checkout */}
-          <View style={styles.footerContainer}>
+
+              {/* Voucher Section */}
+              <View style={styles.footerContainer}>
             <View style={styles.voucherContainer}>
               <TextInput
                 style={styles.voucherInput}
@@ -1280,6 +1162,44 @@ const handleCheckout = async () => {
                 ]}
                 onPress={handleCheckout}
                 disabled={countSelectedItems() === 0}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.checkoutButtonText}>CHECKOUT</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+            </View>
+          </ScrollView>
+          
+          {/* Footer with Checkout */}
+          <View style={styles.footerContainer}>
+            <View style={styles.totalContainer}>
+              <Text style={styles.footerText}>
+                Total for {countSelectedItems()} services
+              </Text>
+              <Text style={styles.footerPrice}>
+                ₹{calculateTotal().toLocaleString('en-IN')}
+              </Text>
+            </View>
+            
+            <View style={styles.footerButtons}>
+              <TouchableOpacity 
+                style={styles.closeFooterButton}
+                onPress={handleClose}
+              >
+                <Text style={styles.closeFooterButtonText}>CLOSE</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.checkoutButton,
+                  countSelectedItems() === 0 && styles.disabledButton
+                ]}
+                onPress={handleCheckout}
+                disabled={countSelectedItems() === 0 || loading}
               >
                 {loading ? (
                   <ActivityIndicator size="small" color="white" />

@@ -1,4 +1,4 @@
-// LocationSelector.tsx
+// LocationSelector.tsx - Updated version
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -25,25 +25,36 @@ import { NativeModules } from "react-native";
 import Geolocation from "@react-native-community/geolocation";
 import { useDispatch, useSelector } from "react-redux";
 import { add } from "./features/userSlice";
+import { useAppUser } from "./context/AppUserContext";
 
 Geocoder.init(keys.api_key);
 
 const { width } = Dimensions.get("window");
 
+// Updated interface to include location data
+interface LocationData {
+  formatted_address: string;
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
+    };
+  };
+}
+
 interface LocationSelectorProps {
-  auth0User: any;
   userPreference: any;
   setUserPreference: (preference: any) => void;
-  onLocationChange?: (location: string) => void;
+  onLocationChange?: (location: string, locationData?: LocationData) => void;
 }
 
 const LocationSelector: React.FC<LocationSelectorProps> = ({
-  auth0User,
   userPreference,
   setUserPreference,
   onLocationChange,
 }) => {
   const dispatch = useDispatch();
+  const { appUser } = useAppUser(); // Using AppUser context
   
   const [location, setLocation] = useState("");
   const [locationAs, setLocationAs] = useState("");
@@ -52,7 +63,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     { name: "Detect Location", index: 1 },
     { name: "Add Address", index: 2 },
   ]);
-  const [dataFromMap, setDataFromMap] = useState<any>([]);
+  const [dataFromMap, setDataFromMap] = useState<LocationData[]>([]);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [address, setAddress] = useState("");
@@ -80,6 +91,22 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchInputFocused, setSearchInputFocused] = useState(false);
+
+  // Check if user is authenticated
+  const isAuthenticated = appUser && appUser.customerid;
+
+  // Helper function to create location data object
+  const createLocationData = (lat: number, lng: number, addr: string): LocationData => {
+    return {
+      formatted_address: addr,
+      geometry: {
+        location: {
+          lat: lat,
+          lng: lng
+        }
+      }
+    };
+  };
 
   // Search location function
   const searchLocation = async (query: string) => {
@@ -123,7 +150,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   }, [searchQuery]);
 
   // Handle location selection from search results
-  const handleLocationSelect = (location: any) => {
+  const handleLocationSelect = async (location: any) => {
     const { lat, lon, display_name } = location;
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lon);
@@ -138,6 +165,10 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     // Update map region to show selected location
     setLatitude(latitude);
     setLongitude(longitude);
+
+    // Create location data and notify parent
+    const locationData = createLocationData(latitude, longitude, display_name);
+    onLocationChange?.(display_name, locationData);
   };
 
   const checkLocationPermission = async (): Promise<boolean> => {
@@ -264,10 +295,15 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
             const newLocation = res.data.display_name;
             setLocation(newLocation);
             setAddress(newLocation);
-            onLocationChange?.(newLocation);
+            
+            // Create location data object with coordinates
+            const locationData = createLocationData(latitude, longitude, newLocation);
+            onLocationChange?.(newLocation, locationData);
           }
         } catch (error) {
           console.error("Error getting address:", error);
+        } finally {
+          setLoading(false);
         }
       },
       (error) => {
@@ -293,6 +329,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         }
 
         Alert.alert("Location Error", errorMessage);
+        setLoading(false);
       },
       {
         enableHighAccuracy: true,
@@ -345,15 +382,12 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const handleOpenSettings = async () => {
     if (Platform.OS === 'android') {
       try {
-        // Open device location settings directly
         await Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS');
       } catch (error) {
         console.warn('Error opening location settings:', error);
-        // Fallback to app settings if location settings can't be opened
         await Linking.openSettings();
       }
     } else {
-      // For iOS, open app settings (iOS doesn't have direct location settings deep link)
       await Linking.openSettings();
     }
   };
@@ -421,7 +455,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       setShowGPSButton(true);
     } finally {
       setIsCheckingLocation(false);
-      setLoading(false);
     }
   };
 
@@ -429,20 +462,23 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     await fetchLocationWithChecks();
   };
 
-  const handleMapPress = (event: any) => {
+  const handleMapPress = async (event: any) => {
     const { coordinate } = event.nativeEvent;
     setSelectedPinLocation(coordinate);
     setIsPinSelected(true);
     
-    getAddressFromCoords(coordinate.latitude, coordinate.longitude)
-      .then((address) => {
-        setSelectedPinAddress(address);
-        setAddress(address);
-      })
-      .catch((error) => {
-        console.warn("Error getting address for selected pin:", error);
-        setSelectedPinAddress("Address not available");
-      });
+    try {
+      const address = await getAddressFromCoords(coordinate.latitude, coordinate.longitude);
+      setSelectedPinAddress(address);
+      setAddress(address);
+
+      // Create location data and notify parent
+      const locationData = createLocationData(coordinate.latitude, coordinate.longitude, address);
+      onLocationChange?.(address, locationData);
+    } catch (error) {
+      console.warn("Error getting address for selected pin:", error);
+      setSelectedPinAddress("Address not available");
+    }
   };
 
   const handleUseCurrentLocation = () => {
@@ -456,6 +492,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       getAddressFromCoords(latitude, longitude)
         .then((addr) => {
           setAddress(addr);
+          const locationData = createLocationData(latitude, longitude, addr);
+          onLocationChange?.(addr, locationData);
         })
         .catch(console.error);
     }
@@ -463,6 +501,17 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   const handleChange = (newValue: any) => {
     if (newValue === "Add Address") {
+      // Check authentication before opening address modal
+      if (!isAuthenticated) {
+        Alert.alert(
+          "Authentication Required",
+          "Please login to save locations.",
+          [
+            { text: "OK", style: "default" }
+          ]
+        );
+        return;
+      }
       setOpen(true);
       setIsPinSelected(false);
       setSelectedPinLocation(null);
@@ -481,7 +530,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         const newLocation = loc.location.formatted_address;
         setLocation(newLocation);
         dispatch(add(loc));
-        onLocationChange?.(newLocation);
+        // Pass the saved location data to parent
+        onLocationChange?.(newLocation, loc.location);
       } else {
         console.warn("No matching location found for:", newValue);
       }
@@ -489,40 +539,46 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   };
 
   const handleLocationSave = () => {
+    let locationData: LocationData | null = null;
+
     if (isPinSelected && selectedPinLocation) {
       setLatitude(selectedPinLocation.latitude);
       setLongitude(selectedPinLocation.longitude);
       const newLocation = selectedPinAddress;
       setLocation(newLocation);
       setAddress(newLocation);
-      setDataFromMap([{
-        formatted_address: selectedPinAddress,
-        geometry: {
-          location: {
-            lat: selectedPinLocation.latitude,
-            lng: selectedPinLocation.longitude
-          }
-        }
-      }]);
-      onLocationChange?.(newLocation);
+      
+      locationData = createLocationData(
+        selectedPinLocation.latitude, 
+        selectedPinLocation.longitude, 
+        selectedPinAddress
+      );
+      
+      setDataFromMap([locationData]);
+      onLocationChange?.(newLocation, locationData);
     } else {
-      if (address) {
+      if (address && latitude && longitude) {
         setLocation(address);
-        onLocationChange?.(address);
-        if (latitude && longitude) {
-          setDataFromMap([{
-            formatted_address: address,
-            geometry: {
-              location: {
-                lat: latitude,
-                lng: longitude
-              }
-            }
-          }]);
-        }
+        locationData = createLocationData(latitude, longitude, address);
+        setDataFromMap([locationData]);
+        onLocationChange?.(address, locationData);
       }
     }
+    
     setOpen(false);
+    
+    // Check authentication before showing save options
+    if (!isAuthenticated) {
+      Alert.alert(
+        "Authentication Required",
+        "Please login to save locations.",
+        [
+          { text: "OK", style: "default" }
+        ]
+      );
+      return;
+    }
+    
     setOpenSaveOptionForSave(true);
     setIsPinSelected(false);
     setSearchQuery("");
@@ -536,12 +592,13 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   };
 
   const updateUserSetting = async () => {
-    if (!auth0User) {
+    // Use appUser for authentication check
+    if (!appUser) {
       Alert.alert("Error", "User authentication required. Please login again.");
       return;
     }
 
-    if (!auth0User.customerid) {
+    if (!appUser.customerid) {
       Alert.alert("Error", "User profile not loaded properly. Please try again.");
       return;
     }
@@ -562,15 +619,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     let locationData = dataFromMap && dataFromMap.length > 0 ? dataFromMap[0] : null;
     
     if (!locationData && hasValidCoordinates) {
-      locationData = {
-        formatted_address: address || "Selected Location",
-        geometry: {
-          location: {
-            lat: latitude,
-            lng: longitude
-          }
-        }
-      };
+      locationData = createLocationData(latitude, longitude, address || "Selected Location");
     }
 
     if (!locationData) {
@@ -600,7 +649,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     }
 
     const payload = {
-      customerId: auth0User.customerid,
+      customerId: appUser.customerid,
       savedLocations: updatedLocations,
     };
 
@@ -608,13 +657,13 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       console.log("Updating user settings with payload:", payload);
       
       const response = await axios.put(
-        `https://utils-ndt3.onrender.com/user-settings/${auth0User.customerid}`,
+        `https://utils-ndt3.onrender.com/user-settings/${appUser.customerid}`,
         payload
       );
 
       if (response.status === 200 || response.status === 201) {
         setUserPreference({
-          customerId: auth0User.customerid,
+          customerId: appUser.customerid,
           savedLocations: updatedLocations,
         });
         setOpenSaveOptionForSave(false);
@@ -661,6 +710,23 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       }
     };
   }, [locationWatchId]);
+
+  // Update suggestions when userPreference changes
+  useEffect(() => {
+    const baseSuggestions = [
+      { name: "Detect Location", index: 1 },
+      { name: "Add Address", index: 2 },
+    ];
+    
+    const savedLocationSuggestions = Array.isArray(userPreference?.savedLocations) 
+      ? userPreference.savedLocations.map((loc: any, i: number) => ({
+          name: loc.name,
+          index: i + 3,
+        }))
+      : [];
+
+    setSuggestions([...baseSuggestions, ...savedLocationSuggestions]);
+  }, [userPreference]);
 
   const renderLocationModalContent = () => {
     if (isCheckingLocation) {
@@ -1017,6 +1083,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   );
 };
 
+// ... (keep all your existing styles the same)
 const styles = StyleSheet.create({
   locationSection: {
     flex: 2,

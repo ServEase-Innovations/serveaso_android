@@ -14,7 +14,7 @@ import Icon from "react-native-vector-icons/FontAwesome";
 import MaterialIcon from "react-native-vector-icons/MaterialIcons";
 import FeatherIcon from "react-native-vector-icons/Feather";
 import { useSelector, useDispatch } from "react-redux";
-import { remove } from "./features/userSlice";
+import { add, remove } from "./features/userSlice";
 import {
   ADMIN,
   BOOKINGS,
@@ -35,7 +35,17 @@ import NotificationsDialog from "./Notifications/NotificationsPage";
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
-  
+}
+
+// Location data interface
+interface LocationData {
+  formatted_address: string;
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
+    };
+  };
 }
 
 const { width } = Dimensions.get("window");
@@ -59,6 +69,9 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   const [showAboutUs, setShowAboutUs] = useState(false);
   const [showContactUs, setShowContactUs] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  
+  // State to store current location data
+  const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
 
   // Snackbar helper functions
   const showSuccessSnackbar = (message: string) => {
@@ -86,6 +99,32 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
       backgroundColor: "#3b82f6",
       textColor: "#ffffff",
     });
+  };
+
+  // Function to get current location data for booking service
+  const getCurrentLocationData = (): { latitude: number; longitude: number } | null => {
+    if (!currentLocation) return null;
+    
+    return {
+      latitude: currentLocation.geometry.location.lat,
+      longitude: currentLocation.geometry.location.lng
+    };
+  };
+
+  // Updated location change handler
+  const handleLocationChange = (location: string, locationData?: LocationData) => {
+    console.log("Location changed to:", location);
+    console.log("Location data:", locationData);
+    
+    if (locationData) {
+      setCurrentLocation(locationData);
+      
+      // Store in Redux for backward compatibility
+      dispatch(add({ 
+        type: 'LOCATION_UPDATE', 
+        payload: locationData 
+      }));
+    }
   };
 
   const handleNotificationClick = () => {
@@ -279,6 +318,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
 
       dispatch(remove());
       setMenuVisible(false);
+      setCurrentLocation(null); // Clear location on sign out
       handleClick("sign_out");
       showInfoSnackbar("Signed out successfully");
     } catch (e) {
@@ -331,9 +371,8 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
     setMenuVisible(false);
   };
 
-  const handleLocationChange = (location: string) => {
-    console.log("Location changed to:", location);
-  };
+  // Export function to get location data (can be used by other components)
+  const getLocationData = () => currentLocation;
 
   // Render menu items based on user authentication and role
   const renderMenuItems = () => {
@@ -561,9 +600,9 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
           />
         </TouchableOpacity>
 
-        {/* Location Selector */}
+        {/* Location Selector - Updated to handle location data */}
         <LocationSelector
-          auth0User={auth0User}
+          // auth0User={auth0User}
           userPreference={userPreference}
           setUserPreference={setUserPreference}
           onLocationChange={handleLocationChange}
@@ -763,4 +802,6 @@ const styles = StyleSheet.create({
   },
 });
 
+// Export the Head component with additional location functionality
 export default Head;
+export type { LocationData };
