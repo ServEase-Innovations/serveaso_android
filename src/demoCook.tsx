@@ -26,6 +26,7 @@ import { CartDialog } from './CartDialog';
 import axios from 'axios';
 import { useAppUser } from './context/AppUserContext';
 import BookingService, { BookingPayload } from './services/bookingService';
+import LinearGradient from 'react-native-linear-gradient';
 
 interface Package {
   name: string;
@@ -555,15 +556,22 @@ const handleCheckout = async () => {
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
+           <LinearGradient
+                                  colors={["#0a2a66ff", "#004aadff"]}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
+                                  style={styles.linearGradient}
+                                >
+          {/* <View style={styles.header}> */}
+            {/* <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
               <Icon name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
-            <Text style={styles.dialogTitle}>MEAL PACKAGES</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeIcon}>
+            </TouchableOpacity> */}
+            <Text style={styles.headtitle}>MEAL PACKAGES</Text>
+            {/* <TouchableOpacity onPress={onClose} style={styles.closeIcon}>
               <Icon name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
+            </TouchableOpacity> */}
+          {/* </View> */}
+          </LinearGradient>
           
           <ScrollView style={styles.scrollView}>
             <View style={styles.packagesContainer}>
@@ -637,6 +645,7 @@ const handleCheckout = async () => {
                           <Text style={styles.descriptionText}>{item}</Text>
                         </View>
                       ))}
+
                     </View>
 
                     <TouchableOpacity
@@ -771,14 +780,25 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+     linearGradient: {
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
+  headtitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+  },
+  // header: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   alignItems: 'center',
+  //   padding: 20,
+  //   borderBottomWidth: 1,
+  //   borderBottomColor: '#eee',
+  // },
   dialogTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -990,14 +1010,16 @@ const styles = StyleSheet.create({
   closeFooterButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 5,
+    borderRadius: 9,
     backgroundColor: '#f0f0f0',
+       borderWidth: 1,
+     borderColor: "#007AFF",
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   closeFooterButtonText: {
-    color: '#333',
+    color: '#007AFF',
     fontWeight: 'bold',
   },
   checkoutButton: {

@@ -25,6 +25,7 @@ import RazorpayCheckout from 'react-native-razorpay';
 import { usePricingFilterService } from './utils/PricingFilter';
 import BookingService, { BookingPayload } from './services/bookingService';
 import { useAppUser } from './context/AppUserContext';
+import LinearGradient from "react-native-linear-gradient";
 
 interface MaidServiceDialogProps {
   open: boolean;
@@ -694,15 +695,23 @@ const handleCheckout = async () => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
+           <LinearGradient
+                        colors={["#0a2a66ff", "#004aadff"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.linearGradient}
+                      >
+          {/* <View style={styles.header}>   */}
+
+            {/* <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
               <Icon name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
-            <Text style={styles.dialogTitle}>MAID SERVICE PACKAGES</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeIcon}>
+            </TouchableOpacity> */}
+            <Text style={styles.headtitle}>MAID SERVICE PACKAGES</Text>
+            {/* <TouchableOpacity onPress={handleClose} style={styles.closeIcon}>
               <Icon name="close" size={24} color="#333" />
             </TouchableOpacity>
-          </View>
+          </View> */}
+          </LinearGradient>
           
           <ScrollView style={styles.scrollView}>
             <View style={styles.tabsContainer}>
@@ -714,14 +723,14 @@ const handleCheckout = async () => {
                   Regular Services
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              {/* <TouchableOpacity 
                 style={[styles.tabButton, activeTab === 'premium' && styles.activeTab]}
                 onPress={() => handleTabChange('premium')}
               >
                 <Text style={[styles.tabText, activeTab === 'premium' && styles.activeTabText]}>
                   Premium Services
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
             
             <View style={styles.packagesContainer}>
@@ -1233,14 +1242,25 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+   linearGradient: {
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
+  headtitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+  },
+  // header: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   alignItems: 'center',
+  //   padding: 20,
+  //   borderBottomWidth: 1,
+  //   borderBottomColor: '#eee',
+  // },
   backIcon: {
     padding: 5,
     marginRight: 10,
@@ -1518,14 +1538,17 @@ const styles = StyleSheet.create({
   closeFooterButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 5,
+    borderRadius: 9,
     backgroundColor: '#f0f0f0',
+    // borderRadius: 8,
+    borderWidth: 1,
+     borderColor: "#007AFF",
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   closeFooterButtonText: {
-    color: '#333',
+    color: '#007AFF',
     fontWeight: 'bold',
   },
   checkoutButton: {

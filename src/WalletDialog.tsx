@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'axios';
+import LinearGradient from 'react-native-linear-gradient';
 
 interface WalletDialogProps {
   open: boolean;
@@ -137,12 +138,23 @@ const WalletDialog: React.FC<WalletDialogProps> = ({ open, onClose }) => {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           {/* Header */}
+           <LinearGradient
+                                  colors={["#0a2a66ff", "#004aadff"]}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
+                                  style={styles.linearGradient}
+                                >
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Wallet</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Icon name="close" size={24} color="#6b7280" />
+             <TouchableOpacity onPress={onClose}
+             style={styles.closeButton}
+             >
+              <Icon name="close" size={30} color="#f2f2f2ff" />
             </TouchableOpacity>
+            <Text style={styles.headtitle}>Wallet</Text>
+          
           </View>
+          </LinearGradient>
+         
 
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -247,18 +259,26 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     overflow: 'hidden',
   },
+    linearGradient: {
+    // padding: 20,
+    // borderTopLeftRadius: 12,
+    // borderTopRightRadius: 12,
+  },
+  headtitle: {
+    paddingTop: 6,
+    paddingLeft: 110,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+  },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
   },
   closeButton: {
     padding: 4,

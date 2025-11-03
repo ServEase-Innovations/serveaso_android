@@ -13,6 +13,8 @@ import {
 import axios from 'axios'; // Or use your axiosInstance
 import { useAppUser } from './context/AppUserContext';
 import axiosInstance from './axiosInstance';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface ValidationState {
   loading: boolean;
@@ -331,16 +333,29 @@ const MobileNumberDialog: React.FC<MobileNumberDialogProps> = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
+ <LinearGradient
+                        colors={["#0a2a66ff", "#004aadff"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.linearGradient}
+                      >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Update Contact Numbers</Text>
-            <TouchableOpacity
+           <TouchableOpacity onPress={onClose}
+                       style={styles.closeButton}
+                       >
+                        <Icon name="close" size={30} color="#f2f2f2ff" />
+                      </TouchableOpacity>
+            <Text style={styles.headtitle}>Update Contact Numbers</Text>
+
+            {/* <TouchableOpacity
               onPress={onClose}
               style={styles.closeButton}
             >
               <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
+          </LinearGradient>
 
           {/* Content */}
           <View style={styles.content}>
@@ -463,20 +478,26 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+     linearGradient: {
+    // padding: 20,
+    // borderTopLeftRadius: 12,
+    // borderTopRightRadius: 12,
+  },
+  headtitle: {
+    paddingTop: 6,
+    paddingLeft: 40,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+  },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: 'white',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
   closeButton: {
     padding: 4,
@@ -573,7 +594,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#cacfd3ff',
   },
   cancelButtonText: {
     color: '#374151',

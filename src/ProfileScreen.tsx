@@ -18,6 +18,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from "react-native-vector-icons/Feather";
 import axios from "axios";
 import { useAppUser } from "./context/AppUserContext";
+import MobileNumberDialog from "./MobileNumberDialog";
+import axiosInstance from "./axiosInstance";
 
 const { width } = Dimensions.get('window');
 
@@ -57,6 +59,15 @@ interface ServiceProvider {
   nearbyLocation: string;
 }
 
+interface CustomerDetails {
+  customerid: number;
+  firstName: string;
+  lastName: string;
+  mobileNo: string | null;
+  altMobileNo: string | null;
+  email: string;
+}
+
 const ProfileScreen = () => {
   const { user: auth0User, isLoading: auth0Loading } = useAuth0();
   const { appUser } = useAppUser();
@@ -69,8 +80,10 @@ const ProfileScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [userRole, setUserRole] = useState<string>("CUSTOMER");
   const [serviceProviderData, setServiceProviderData] = useState<ServiceProvider | null>(null);
+  const [customerData, setCustomerData] = useState<CustomerDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedAddressIds, setExpandedAddressIds] = useState<string[]>([]);
+  const [showMobileDialog, setShowMobileDialog] = useState(false);
 
   const [userData, setUserData] = useState<UserData>({
     firstName: "",
@@ -138,6 +151,68 @@ const ProfileScreen = () => {
     return userName || appUser?.nickname || "User";
   };
 
+  // Check if customer has valid mobile numbers
+  const hasValidMobileNumbers = () => {
+    if (userRole !== "CUSTOMER") return true;
+    
+    return customerData?.mobileNo && 
+           customerData.mobileNo !== null && 
+           customerData.mobileNo !== "" &&
+           customerData.mobileNo !== "null";
+  };
+
+  // Format mobile number for display
+  const formatMobileNumber = (number: string | null) => {
+    if (!number || number === "null" || number === "undefined") return "";
+    return number;
+  };
+
+  // Fetch customer details
+  const fetchCustomerDetails = async (customerId: number) => {
+    try {
+      console.log("Fetching customer details for ID:", customerId);
+      const response = await axiosInstance.get(`/api/customer/get-customer-by-id/${customerId}`);
+      console.log("API Response:", response.data);
+      
+      const customer = response.data;
+
+      // Enhanced field mapping with fallbacks
+      const mobileNo = customer?.mobileNo ?? 
+                      customer?.mobileNumber ?? 
+                      customer?.phoneNumber ?? 
+                      customer?.contactNumber ?? 
+                      customer?.phone ?? 
+                      "";
+      
+      const altMobileNo = customer?.altMobileNo ?? 
+                         customer?.alternateMobileNo ?? 
+                         customer?.altPhoneNumber ?? 
+                         customer?.alternateContactNumber ?? 
+                         "";
+
+      console.log("Mapped mobile numbers:", { mobileNo, altMobileNo });
+
+      setCustomerData(customer);
+      setUserData(prev => ({
+        ...prev,
+        contactNumber: mobileNo ? mobileNo.toString() : "",
+        altContactNumber: altMobileNo ? altMobileNo.toString() : ""
+      }));
+
+      return customer;
+    } catch (error) {
+      console.error("Error fetching customer details:", error);
+      return null;
+    }
+  };
+
+  // Handle mobile number update success
+  const handleMobileNumberUpdateSuccess = () => {
+    if (userId) {
+      fetchCustomerDetails(userId); // Refresh customer data
+    }
+  };
+
   useEffect(() => {
     const initializeProfile = async () => {
       setIsLoading(true);
@@ -193,6 +268,7 @@ const ProfileScreen = () => {
           if (role === "SERVICE_PROVIDER" && id) {
             await fetchServiceProviderData(id.toString());
           } else if (role === "CUSTOMER" && id) {
+            await fetchCustomerDetails(Number(id));
             await fetchCustomerAddresses(Number(id));
           }
         } catch (err) {
@@ -570,6 +646,13 @@ const ProfileScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Mobile Number Dialog */}
+      <MobileNumberDialog 
+        open={showMobileDialog}
+        onClose={() => setShowMobileDialog(false)}
+        onSuccess={handleMobileNumberUpdateSuccess}
+      />
+
       {/* Header with Linear Gradient */}
       <LinearGradient
         colors={['rgba(177, 213, 232, 0.8)', 'rgba(255, 255, 255, 1)']}
@@ -586,10 +669,10 @@ const ProfileScreen = () => {
                 Hello, {getDisplayName()}
               </Text>
               <Text style={styles.roleText}>
-                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}  {appUser?.serviceProviderId ||
-     appUser?.customerid ||
-     userId?.toString() ||
-     "ID: N/A"} 
+                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}
+                {userRole === "CUSTOMER" && !hasValidMobileNumbers() && (
+                  <Text style={styles.mobileWarning}> ⚠️ Mobile required</Text>
+                )}
               </Text>    
               {/* Edit Profile Button */}
               <View style={styles.editButtonContainer}>
@@ -634,6 +717,14 @@ const ProfileScreen = () => {
           {/* Form Header */}
           <View style={styles.formHeader}>
             <Text style={styles.formTitle}>My account</Text>
+            {userRole === "CUSTOMER" && !hasValidMobileNumbers() && (
+              <TouchableOpacity
+                onPress={() => setShowMobileDialog(true)}
+                style={styles.addMobileButton}
+              >
+                <Text style={styles.addMobileButtonText}>Add Mobile Number</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* User Info Section */}
@@ -659,69 +750,29 @@ const ProfileScreen = () => {
               </View>
             </View>
 
-            {/* First Name and Last Name in one row */}
-            {/* <View style={styles.nameRow}>
-              <View style={styles.nameInput}>
-                <Text style={styles.inputLabel}>First name</Text>
+            {/* First Name and Last Name in one row - Ultra Compact */}
+            <View style={styles.ultraCompactNameRow}>
+              <View style={styles.ultraCompactNameInput}>
+                <Text style={styles.compactLabel}>First name</Text>
                 <TextInput
-                  style={[styles.input, !isEditing && styles.readOnlyInput]}
+                  style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
                   value={userData.firstName}
                   onChangeText={(value) => handleInputChange("firstName", value)}
                   editable={isEditing}
-                  placeholder="First name"
+                  placeholder="First"
                 />
               </View>
-              <View style={styles.nameInput}>
-                <Text style={styles.inputLabel}>Last name</Text>
+              <View style={styles.ultraCompactNameInput}>
+                <Text style={styles.compactLabel}>Last name</Text>
                 <TextInput
-                  style={[styles.input, !isEditing && styles.readOnlyInput]}
+                  style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
                   value={userData.lastName}
                   onChangeText={(value) => handleInputChange("lastName", value)}
                   editable={isEditing}
-                  placeholder="Last name"
+                  placeholder="Last"
                 />
               </View>
-            </View> */}
-            {/* First Name and Last Name in one row - Ultra Compact */}
-<View style={styles.ultraCompactNameRow}>
-  <View style={styles.ultraCompactNameInput}>
-    <Text style={styles.compactLabel}>First name</Text>
-    <TextInput
-      style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
-      value={userData.firstName}
-      onChangeText={(value) => handleInputChange("firstName", value)}
-      editable={isEditing}
-      placeholder="First"
-    />
-  </View>
-  <View style={styles.ultraCompactNameInput}>
-    <Text style={styles.compactLabel}>Last name</Text>
-    <TextInput
-      style={[styles.ultraCompactInput, !isEditing && styles.readOnlyInput]}
-      value={userData.lastName}
-      onChangeText={(value) => handleInputChange("lastName", value)}
-      editable={isEditing}
-      placeholder="Last"
-    />
-  </View>
-</View>
-            {/* <View style={styles.inputRow}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>
-                  {userRole === "SERVICE_PROVIDER" ? "Provider ID" : "User ID"}
-                </Text>
-                <TextInput
-                  style={[styles.input, styles.readOnlyInput]}
-                  value={
-                    appUser?.serviceProviderId ||
-                    appUser?.customerid ||
-                    userId?.toString() ||
-                    "N/A"
-                  }
-                  editable={false}
-                />
-              </View>
-            </View> */}
+            </View>
           </View>
 
           <View style={styles.divider} />
@@ -732,7 +783,14 @@ const ProfileScreen = () => {
           <View style={styles.inputRow}>
             {/* Contact Number */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Contact Number</Text>
+              <Text style={styles.inputLabel}>
+                Contact Number
+                {userRole === "CUSTOMER" && (
+                  <Text style={!hasValidMobileNumbers() ? styles.mobileWarningSmall : styles.mobileSuccess}>
+                    {!hasValidMobileNumbers() ? ' ⚠️' : ' ✓'}
+                  </Text>
+                )}
+              </Text>
               <View style={styles.phoneInputContainer}>
                 {isEditing ? (
                   <TouchableOpacity
@@ -748,14 +806,23 @@ const ProfileScreen = () => {
                   </View>
                 )}
                 <TextInput
-                  style={[styles.phoneInput, !isEditing && styles.readOnlyInput]}
-                  value={userData.contactNumber || ""}
+                  style={[
+                    styles.phoneInput, 
+                    !isEditing && styles.readOnlyInput,
+                    !hasValidMobileNumbers() && userRole === "CUSTOMER" && styles.invalidInput
+                  ]}
+                  value={formatMobileNumber(userData.contactNumber)}
                   onChangeText={(value) => handleInputChange("contactNumber", value)}
                   placeholder="No contact number provided"
                   editable={isEditing}
                   keyboardType="phone-pad"
                 />
               </View>
+              {userRole === "CUSTOMER" && !hasValidMobileNumbers() && (
+                <Text style={styles.mobileRequiredText}>
+                  Mobile number is required for bookings and notifications
+                </Text>
+              )}
             </View>
 
             {/* Alternative Contact Number */}
@@ -777,7 +844,7 @@ const ProfileScreen = () => {
                 )}
                 <TextInput
                   style={[styles.phoneInput, !isEditing && styles.readOnlyInput]}
-                  value={userData.altContactNumber || ""}
+                  value={formatMobileNumber(userData.altContactNumber)}
                   onChangeText={(value) => handleInputChange("altContactNumber", value)}
                   placeholder="No alternative number"
                   editable={isEditing}
@@ -1243,6 +1310,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 12,
   },
+  mobileWarning: {
+    color: "#dc2626",
+    fontSize: 12,
+  },
+  mobileWarningSmall: {
+    color: "#dc2626",
+    fontSize: 12,
+  },
+  mobileSuccess: {
+    color: "#16a34a",
+    fontSize: 12,
+  },
+  mobileRequiredText: {
+    color: "#dc2626",
+    fontSize: 12,
+    marginTop: 4,
+  },
   editButtonContainer: {
     alignSelf: 'flex-start',
   },
@@ -1293,6 +1377,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   formHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
     paddingBottom: 12,
@@ -1302,6 +1389,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
     color: "#2d3748",
+  },
+  addMobileButton: {
+    backgroundColor: "#fee2e2",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  addMobileButtonText: {
+    color: "#dc2626",
+    fontSize: 12,
+    fontWeight: "600",
   },
   sectionTitle: {
     fontSize: 14,
@@ -1348,6 +1446,9 @@ const styles = StyleSheet.create({
   },
   readOnlyInput: {
     backgroundColor: "#f7fafc",
+  },
+  invalidInput: {
+    borderColor: "#dc2626",
   },
   divider: {
     height: 1,
@@ -1815,34 +1916,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // Ultra compact styles
-ultraCompactNameRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  marginBottom: 16,
-  gap: 8, // Even smaller gap
-},
-ultraCompactNameInput: {
-  flex: 1,
-  
-},
-ultraCompactInput: {
-  width: "100%",
-  // padding: 8, // Even smaller padding
-   paddingStart: 10,
-  borderWidth: 1,
-  borderColor: "#e2e8f0",
-  borderRadius: 6, // Slightly smaller border radius
-  fontSize: 14,
-  minHeight: 40, // Smaller height
-},
-compactLabel: {
-  fontSize: 14, // Smaller label
-  fontWeight: "600",
-  color: "#4a5568",
-  marginBottom: 6,
-},
-
-
+  ultraCompactNameRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 8, // Even smaller gap
+  },
+  ultraCompactNameInput: {
+    flex: 1,
+    
+  },
+  ultraCompactInput: {
+    width: "100%",
+    // padding: 8, // Even smaller padding
+     paddingStart: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 6, // Slightly smaller border radius
+    fontSize: 14,
+    minHeight: 40, // Smaller height
+  },
+  compactLabel: {
+    fontSize: 14, // Smaller label
+    fontWeight: "600",
+    color: "#4a5568",
+    marginBottom: 6,
+  },
 });
 
 export default ProfileScreen;

@@ -27,6 +27,7 @@ import { usePricingFilterService } from './utils/PricingFilter';
 import { useAppUser } from './context/AppUserContext';
 import BookingService from './services/bookingService';
 import { CartDialog } from './CartDialog'; // Import CartDialog
+import LinearGradient from 'react-native-linear-gradient';
 
 // Type definitions (keep the same)
 type PackageType = 'day' | 'night' | 'fullTime';
@@ -707,23 +708,32 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       transparent={true}
       onRequestClose={handleClose}
     >
-      <View style={[styles.modalOverlay, { 
+      {/* <View style={[styles.modalOverlay, { 
         paddingTop: SCREEN_HEIGHT * 0.15,
         paddingBottom: SCREEN_HEIGHT * 0.15
       }]}>
         <View style={[styles.modalContainer, { 
           maxHeight: SCREEN_HEIGHT * 0.7,
           paddingVertical: 10
-        }]}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
+        }]}> */}
+         <View style={styles.modalOver}>
+                <View style={styles.modalContain}>
+           <LinearGradient
+                                            colors={["#0a2a66ff", "#004aadff"]}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={styles.linearGradient}
+                                          >
+          {/* <View style={styles.header}> */}
+            {/* <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
               <Icon name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
-            <Text style={styles.dialogTitle}>❤️ Caregiver Service</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeIcon}>
+            </TouchableOpacity> */}
+            <Text style={styles.headtitle}>Caregiver Service</Text>
+            {/* <TouchableOpacity onPress={handleClose} style={styles.closeIcon}>
               <Icon name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
+            </TouchableOpacity> */}
+          {/* </View> */}
+          </LinearGradient>
           
           <View style={styles.tabsContainer}>
             <TouchableOpacity 
@@ -825,15 +835,44 @@ const styles = StyleSheet.create({
     width: '100%',
     overflow: 'hidden',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#1e40af',
+   modalOver: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
+
+  modalContain: {
+    backgroundColor: 'white',
+    marginHorizontal: 15,
+    borderRadius: 15,
+    maxHeight: '80%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+     linearGradient: {
+    padding: 20,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  headtitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+  },
+  // header: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   alignItems: 'center',
+  //   padding: 20,
+  //   borderBottomWidth: 1,
+  //   borderBottomColor: '#eee',
+  //   backgroundColor: '#1e40af',
+  // },
   dialogTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -1078,14 +1117,16 @@ const styles = StyleSheet.create({
   closeFooterButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 5,
+    borderRadius: 9,
     backgroundColor: '#f0f0f0',
+     borderWidth: 1,
+     borderColor: "#007AFF",
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   closeFooterButtonText: {
-    color: '#333',
+    color: '#007AFF',
     fontWeight: 'bold',
   },
   checkoutButton: {
