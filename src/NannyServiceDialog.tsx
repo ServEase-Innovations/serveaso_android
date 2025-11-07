@@ -26,10 +26,10 @@ import { useAuth0 } from 'react-native-auth0';
 import { usePricingFilterService } from './utils/PricingFilter';
 import { useAppUser } from './context/AppUserContext';
 import BookingService from './services/bookingService';
-import { CartDialog } from './CartDialog'; // Import CartDialog
+import { CartDialog } from './CartDialog';
 import LinearGradient from 'react-native-linear-gradient';
 
-// Type definitions (keep the same)
+// Type definitions
 type PackageType = 'day' | 'night' | 'fullTime';
 type CareType = 'baby' | 'elderly';
 type BookingType = "On_demand" | "REGULAR";
@@ -46,27 +46,44 @@ interface NannyPackage {
   remarks: string;
   bookingType: BookingType;
   inCart: boolean;
+  numbersSize?: string;
 }
 
 interface PackagesState {
   [key: string]: NannyPackage;
 }
 
-// ✅ Helper to check DB "Numbers/Size" conditions (same as web version)
+// ✅ Helper to check DB "Numbers/Size" conditions
 const matchAgeToSize = (numbersSize: string, age: number): boolean => {
   if (!numbersSize) return false;
+  
   if (numbersSize.startsWith("<=")) {
     const limit = parseInt(numbersSize.replace("<=", "").trim(), 10);
     return age <= limit;
+  }
+  if (numbersSize.startsWith(">=")) {
+    const limit = parseInt(numbersSize.replace(">=", "").trim(), 10);
+    return age >= limit;
   }
   if (numbersSize.startsWith(">")) {
     const limit = parseInt(numbersSize.replace(">", "").trim(), 10);
     return age > limit;
   }
-  return false;
+  if (numbersSize.startsWith("<")) {
+    const limit = parseInt(numbersSize.replace("<", "").trim(), 10);
+    return age < limit;
+  }
+  
+  if (numbersSize.includes("-")) {
+    const [min, max] = numbersSize.split("-").map(num => parseInt(num.trim(), 10));
+    return age >= min && age <= max;
+  }
+  
+  const exactAge = parseInt(numbersSize, 10);
+  return age === exactAge;
 };
 
-// ✅ Compute price dynamically from DB (same as web version)
+// ✅ Compute price dynamically from DB
 const getPackagePrice = (
   allServices: any[],
   category: string,
@@ -74,17 +91,23 @@ const getPackagePrice = (
   age: number
 ): number => {
   const matched = allServices.find(service => {
-    return (
-      service.Categories.toLowerCase() === category.toLowerCase() &&
-      matchAgeToSize(service["Numbers/Size"], age)
-    );
+    const categoryMatch = service.Categories.toLowerCase() === category.toLowerCase();
+    const ageMatch = matchAgeToSize(service["Numbers/Size"], age);
+    
+    return categoryMatch && ageMatch;
   });
 
-  if (!matched) return 0;
+  if (!matched) {
+    console.log(`No matching service found for category: ${category}, age: ${age}`);
+    return 0;
+  }
 
-  return bookingType === "On_demand"
+  const price = bookingType === "On_demand"
     ? matched["Price /Day (INR)"]
     : matched["Price /Month (INR)"];
+
+  console.log(`Price calculated: ${price} for ${category}, age: ${age}, type: ${bookingType}`);
+  return price || 0;
 };
 
 interface NannyServicesDialogProps {
@@ -110,14 +133,11 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [voucherCode, setVoucherCode] = useState('');
-  const [showCartDialog, setShowCartDialog] = useState(false); // Add CartDialog state
+  const [showCartDialog, setShowCartDialog] = useState(false);
   const { user: auth0User } = useAuth0();
   const { setAppUser, appUser } = useAppUser();
   
-  // Get pricing filter service
   const { getFilteredPricing } = usePricingFilterService();
-  
-  // Get screen dimensions
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
   const bookingTypeFromRedux = useSelector((state: any) => state.bookingType?.value);
@@ -127,23 +147,18 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
 
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
 
-  // Memoize the booking type calculation
   const bookingTypeLabel = useMemo((): BookingType => {
     const isOnDemand = bookingType?.bookingPreference?.toLowerCase() === "date";
     return isOnDemand ? "On_demand" : "REGULAR";
   }, [bookingType?.bookingPreference]);
 
-  // FIXED: Memoize nanny pricing data to prevent unnecessary re-renders
   const nannyPricing = useMemo(() => {
     return getFilteredPricing('nanny');
   }, [getFilteredPricing]);
 
-  // FIXED: Use ref to track initialization and prevent infinite loops
   const isInitialized = useRef(false);
 
-  // FIXED: Single initialization effect with proper dependency handling
   useEffect(() => {
-    // Only initialize once when nannyPricing is available and dialog is open
     if (open && nannyPricing && nannyPricing.length > 0 && !isInitialized.current) {
       const updatedNannyServices = nannyPricing;
       const newPackages: PackagesState = {};
@@ -151,17 +166,20 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       updatedNannyServices.forEach((service: any) => {
         const key = `${service.Categories.toLowerCase()}_${service["Type"].toLowerCase()}_${bookingTypeLabel.toLowerCase()}`;
         const defaultAge = service.Categories.toLowerCase().includes("baby") ? 1 : 60;
+        const numbersSize = service["Numbers/Size"];
         
+        const initialPrice = getPackagePrice(
+          updatedNannyServices,
+          service.Categories,
+          bookingTypeLabel,
+          defaultAge
+        );
+
         newPackages[key] = {
-          selected: false,
-          inCart: false,
-          age: defaultAge,
-          calculatedPrice: getPackagePrice(
-            updatedNannyServices,
-            service.Categories,
-            bookingTypeLabel,
-            defaultAge
-          ),
+          selected: packages[key]?.selected || false,
+          inCart: packages[key]?.inCart || false,
+          age: packages[key]?.age || defaultAge,
+          calculatedPrice: packages[key]?.calculatedPrice || initialPrice,
           description: service["Job Description"]?.split("\n").filter(Boolean) || [],
           rating: 4.7,
           reviews: "(1M reviews)",
@@ -169,23 +187,23 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           jobDescription: service["Job Description"],
           remarks: service["Remarks/Conditions"] || "",
           bookingType: bookingTypeLabel,
+          numbersSize: numbersSize
         };
       });
 
       setPackages(newPackages);
       setAllServices(updatedNannyServices);
       isInitialized.current = true;
+      console.log('Packages initialized with pricing:', newPackages);
     }
-  }, [open, nannyPricing, bookingTypeLabel]);
+  }, [open, nannyPricing, bookingTypeLabel, packages]);
 
-  // Reset initialization when dialog closes
   useEffect(() => {
     if (!open) {
       isInitialized.current = false;
     }
   }, [open]);
 
-  // Clear cart items when switching tabs
   useEffect(() => {
     if (nannyCartItems.length === 0) return;
     
@@ -199,7 +217,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       dispatch(removeFromCart({ id: item.id, type: "nanny" }));
     });
 
-    // Update packages state
     setPackages(prev => {
       const updated = { ...prev };
       let hasChanges = false;
@@ -220,17 +237,15 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     });
   }, [activeTab, dispatch, nannyCartItems]);
 
-  // Initialize cart items from Redux
   useEffect(() => {
     if (nannyCartItems.length === 0 && Object.values(packages).every(pkg => !pkg.inCart)) {
-      return; // No changes needed
+      return;
     }
 
     setPackages(prevPackages => {
       const updatedPackages = { ...prevPackages };
       let hasChanges = false;
 
-      // Mark packages as in cart based on Redux state
       nannyCartItems.forEach(item => {
         const packageKey = item.id.toLowerCase();
         if (updatedPackages[packageKey] && !updatedPackages[packageKey].inCart) {
@@ -243,7 +258,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         }
       });
 
-      // Mark packages as not in cart if they're not in Redux
       Object.keys(updatedPackages).forEach(key => {
         const isInCart = nannyCartItems.some(item => item.id.toLowerCase() === key);
         if (updatedPackages[key].inCart !== isInCart) {
@@ -268,7 +282,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     return 'MONTHLY';
   }, []);
 
-  // Back handler effect
   useEffect(() => {
     if (!open) return;
 
@@ -285,7 +298,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     return () => backHandler.remove();
   }, [open, handleClose]);
 
-  // FIXED: useCallback for age change handler to prevent unnecessary re-renders
+  // ✅ FIXED: Age change handler with proper increment/decrement
   const handleAgeChange = useCallback((key: string, increment: number) => {
     setPackages(prev => {
       const currentPkg = prev[key];
@@ -297,10 +310,9 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       const minAge = isBaby ? 1 : 60;
       const maxAge = isBaby ? 6 : 80;
 
-      const newAge = Math.max(minAge, Math.min(maxAge, currentPkg.age + increment));
+      const newAge = currentPkg.age + increment;
       
-      // Only update if age actually changed
-      if (newAge === currentPkg.age) {
+      if (newAge < minAge || newAge > maxAge) {
         return prev;
       }
 
@@ -322,15 +334,12 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     });
   }, [allServices]);
 
-  // FIXED: useCallback for toggleCart to prevent unnecessary re-renders
   const toggleCart = useCallback((key: string, pkg: NannyPackage) => {
-    // Detect package type from key and cast to specific literal type
-    const packageType: "day" | "night" | "fullTime" = key.includes("day") ? "day" 
+    const packageType: PackageType = key.includes("day") ? "day" 
                       : key.includes("night") ? "night" 
                       : "fullTime";
 
-    // Detect care type from category and cast it to the correct type
-    const careType: "baby" | "elderly" = pkg.category.toLowerCase().includes("baby") 
+    const careType: CareType = pkg.category.toLowerCase().includes("baby") 
       ? "baby" 
       : "elderly";
 
@@ -347,13 +356,11 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       activeTab: activeTab
     };
 
-    // Check if this item is already in the cart
     const isAlreadyInCart = nannyCartItems.some(item => 
       item.id === cartItem.id
     );
 
     if (isAlreadyInCart) {
-      // Remove from cart
       dispatch(removeFromCart({ id: cartItem.id, type: 'nanny' }));
       setPackages(prev => ({
         ...prev,
@@ -364,7 +371,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         }
       }));
     } else {
-      // Clear other nanny services from different tabs
       const itemsToRemove = nannyCartItems.filter(item => 
         item.type === 'nanny' && item.activeTab !== activeTab
       );
@@ -373,11 +379,9 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         dispatch(removeFromCart({ id: item.id, type: 'nanny' }));
       });
 
-      // Also clear other service types
       dispatch(removeFromCart({ type: 'meal' }));
       dispatch(removeFromCart({ type: 'maid' }));
       
-      // Add to cart
       dispatch(addToCart(cartItem));
       setPackages(prev => ({
         ...prev,
@@ -390,11 +394,9 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }
   }, [activeTab, dispatch, nannyCartItems, providerDetails, providerFullName]);
 
-  // FIXED: Memoize calculations
   const calculateTotal = useMemo((): number => {
     return Object.entries(packages)
       .filter(([key, pkg]) => {
-        // Only include packages from current active tab
         const isCurrentTab = activeTab === 'baby' 
           ? key.includes('baby') 
           : key.includes('elderly');
@@ -420,19 +422,16 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     Alert.alert('Voucher Applied', 'Your voucher has been applied successfully');
   };
 
-  // ✅ NEW: Prepare cart for checkout (similar to DemoCook)
   const prepareCartForCheckout = () => {
-    // Clear all existing cart items of type 'nanny'
     dispatch(removeFromCart({ type: 'nanny' }));
 
-    // Add only the currently selected packages
     Object.entries(packages).forEach(([key, pkg]) => {
       if (pkg.selected) {
-        const packageType: "day" | "night" | "fullTime" = key.includes("day") ? "day" 
+        const packageType: PackageType = key.includes("day") ? "day" 
                           : key.includes("night") ? "night" 
                           : "fullTime";
 
-        const careType: "baby" | "elderly" = pkg.category.toLowerCase().includes("baby") 
+        const careType: CareType = pkg.category.toLowerCase().includes("baby") 
           ? "baby" 
           : "elderly";
 
@@ -452,11 +451,10 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     });
   };
 
-  // ✅ NEW: Handle opening cart dialog (similar to DemoCook)
   const handleOpenCartDialog = () => {
     const selectedPackages = Object.entries(packages).filter(([_, pkg]) => pkg.selected);
     if (selectedPackages.length === 0) {
-      Alert.alert("Please select at least one package");
+      Alert.alert("Selection Required", "Please select at least one package");
       return;
     }
 
@@ -464,12 +462,10 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     setShowCartDialog(true);
   };
 
-  // ✅ INTEGRATED handleCheckout FUNCTION (for CartDialog)
   const handleCheckout = async () => {
     try {
       setLoading(true);
 
-      // 1. Filter selected packages
       const selectedPackages = Object.entries(packages)
         .filter(([_, pkg]) => pkg.selected)
         .map(([key, pkg]) => ({
@@ -522,10 +518,8 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
 
       console.log("Final Nanny Payload:", payload);
 
-      // ✅ Use the same BookingService as React web version
       const result = await BookingService.bookAndPay(payload);
 
-      // ✅ Show success message like React web version
       Alert.alert(
         "Success ✅", 
         result?.verifyResult?.message || "Booking & Payment Successful!",
@@ -533,7 +527,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           {
             text: "OK",
             onPress: () => {
-              // Clear cart + close like React web version
               dispatch(removeFromCart({ type: 'meal' }));
               dispatch(removeFromCart({ type: 'maid' }));
               dispatch(removeFromCart({ type: 'nanny' }));
@@ -550,7 +543,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     } catch (err: any) {
       console.error("Checkout error:", err);
 
-      // ✅ Extract proper backend message like React web version
       let backendMessage = "Payment failed. Please try again.";
       if (err?.response?.data) {
         if (typeof err.response.data === "string") {
@@ -570,14 +562,18 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     }
   };
 
-  // FIXED: Memoize package rendering to prevent unnecessary re-renders
+  // ✅ FIXED: Package rendering with simple age validation
   const renderPackage = useCallback((key: string, pkg: NannyPackage) => {
     const packageType = key.includes("day") ? "day" 
-                      : key.includes("night") ? "night" 
-                      : "fullTime";
-                      
+                    : key.includes("night") ? "night" 
+                    : "fullTime";
+                    
     const displayPackageType = packageType.charAt(0).toUpperCase() + packageType.slice(1);
     const color = activeTab === 'baby' ? '#e17055' : '#0984e3';
+    
+    const isBaby = activeTab === 'baby';
+    const minAge = isBaby ? 1 : 60;
+    const maxAge = isBaby ? 6 : 80;
 
     return (
       <View key={key} style={[
@@ -586,14 +582,14 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         { borderLeftColor: color }
       ]}>
         <View style={styles.packageHeader}>
-          <View>
+          <View style={styles.packageInfo}>
             <Text style={styles.packageTitle}>{pkg.category} - {displayPackageType}</Text>
             <View style={styles.ratingContainer}>
               <Text style={[styles.ratingValue, { color }]}>{pkg.rating}</Text>
               <Text style={styles.reviewsText}>{pkg.reviews}</Text>
             </View>
             <Text style={styles.bookingTypeText}>
-              {pkg.bookingType === "On_demand" ? 'Per Day' : 'Monthly service'} • On Demand
+              {pkg.bookingType === "On_demand" ? 'Per Day' : 'Monthly service'}
             </Text>
           </View>
           <View style={styles.priceContainer}>
@@ -602,28 +598,40 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           </View>
         </View>
 
+        {/* ✅ FIXED: Age Control with Simple Limits */}
         <View style={styles.personsControl}>
           <Text style={styles.personsLabel}>Age:</Text>
           <View style={styles.personsInput}>
             <TouchableOpacity 
-              style={styles.ageButton}
+              style={[
+                styles.ageButton,
+                pkg.age <= minAge && styles.disabledAgeButton
+              ]}
               onPress={() => handleAgeChange(key, -1)}
-              disabled={activeTab === 'baby' ? pkg.age <= 1 : pkg.age <= 60}
+              disabled={pkg.age <= minAge}
             >
               <Text style={[
                 styles.ageButtonText, 
-                (activeTab === 'baby' ? pkg.age <= 1 : pkg.age <= 60) && styles.disabledAgeButton
+                pkg.age <= minAge && styles.disabledAgeButtonText
               ]}>-</Text>
             </TouchableOpacity>
-            <Text style={styles.personsValue}>{pkg.age}</Text>
+            
+            <View style={styles.ageValueContainer}>
+              <Text style={styles.personsValue}>{pkg.age}</Text>
+              <Text style={styles.ageRangeText}>Range: {minAge}-{maxAge}</Text>
+            </View>
+            
             <TouchableOpacity 
-              style={styles.ageButton}
+              style={[
+                styles.ageButton,
+                pkg.age >= maxAge && styles.disabledAgeButton
+              ]}
               onPress={() => handleAgeChange(key, 1)}
-              disabled={activeTab === 'baby' ? pkg.age >= 6 : pkg.age >= 80}
+              disabled={pkg.age >= maxAge}
             >
               <Text style={[
                 styles.ageButtonText,
-                (activeTab === 'baby' ? pkg.age >= 6 : pkg.age >= 80) && styles.disabledAgeButton
+                pkg.age >= maxAge && styles.disabledAgeButtonText
               ]}>+</Text>
             </TouchableOpacity>
           </View>
@@ -648,7 +656,8 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         <TouchableOpacity
           style={[
             styles.cartButton,
-            pkg.inCart && styles.selectedCartButton
+            pkg.inCart && styles.selectedCartButton,
+            { borderColor: color }
           ]}
           onPress={() => toggleCart(key, pkg)}
         >
@@ -659,7 +668,8 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
           )}
           <Text style={[
             styles.cartButtonText,
-            pkg.inCart && styles.selectedCartButtonText
+            pkg.inCart && styles.selectedCartButtonText,
+            !pkg.inCart && { color }
           ]}>
             {pkg.inCart ? 'REMOVE FROM CART' : 'ADD TO CART'}
           </Text>
@@ -668,7 +678,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
     );
   }, [activeTab, handleAgeChange, toggleCart]);
 
-  // FIXED: Memoize package lists
   const babyPackages = useMemo(() => {
     const packagesList = Object.entries(packages)
       .filter(([key]) => key.includes('baby'))
@@ -708,31 +717,15 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
       transparent={true}
       onRequestClose={handleClose}
     >
-      {/* <View style={[styles.modalOverlay, { 
-        paddingTop: SCREEN_HEIGHT * 0.15,
-        paddingBottom: SCREEN_HEIGHT * 0.15
-      }]}>
-        <View style={[styles.modalContainer, { 
-          maxHeight: SCREEN_HEIGHT * 0.7,
-          paddingVertical: 10
-        }]}> */}
-         <View style={styles.modalOver}>
-                <View style={styles.modalContain}>
-           <LinearGradient
-                                            colors={["#0a2a66ff", "#004aadff"]}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                            style={styles.linearGradient}
-                                          >
-          {/* <View style={styles.header}> */}
-            {/* <TouchableOpacity onPress={handleClose} style={styles.backIcon}>
-              <Icon name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity> */}
+      <View style={styles.modalOver}>
+        <View style={styles.modalContain}>
+          <LinearGradient
+            colors={["#0a2a66ff", "#004aadff"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.linearGradient}
+          >
             <Text style={styles.headtitle}>Caregiver Service</Text>
-            {/* <TouchableOpacity onPress={handleClose} style={styles.closeIcon}>
-              <Icon name="close" size={24} color="#333" />
-            </TouchableOpacity> */}
-          {/* </View> */}
           </LinearGradient>
           
           <View style={styles.tabsContainer}>
@@ -797,7 +790,7 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
                   styles.checkoutButton,
                   (getSelectedPackagesCount === 0 || loading) && styles.disabledButton
                 ]}
-                onPress={handleOpenCartDialog} // Changed from handleCheckout to handleOpenCartDialog
+                onPress={handleOpenCartDialog}
                 disabled={getSelectedPackagesCount === 0 || loading}
               >
                 {loading ? (
@@ -811,7 +804,6 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         </View>
       </View>
 
-      {/* ✅ ADDED: Cart Dialog Integration (similar to DemoCook) */}
       <CartDialog
         open={showCartDialog}
         handleClose={() => setShowCartDialog(false)}
@@ -821,26 +813,12 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   );
 };
 
-// Your styles remain the same...
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-  },
-  modalContainer: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    width: '100%',
-    overflow: 'hidden',
-  },
-   modalOver: {
+  modalOver: {
     flex: 1,
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-
   modalContain: {
     backgroundColor: 'white',
     marginHorizontal: 15,
@@ -853,7 +831,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-     linearGradient: {
+  linearGradient: {
     padding: 20,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
@@ -863,28 +841,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#fff",
     textAlign: "center",
-  },
-  // header: {
-  //   flexDirection: 'row',
-  //   justifyContent: 'space-between',
-  //   alignItems: 'center',
-  //   padding: 20,
-  //   borderBottomWidth: 1,
-  //   borderBottomColor: '#eee',
-  //   backgroundColor: '#1e40af',
-  // },
-  dialogTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-    flex: 1,
-    textAlign: 'center',
-  },
-  backIcon: {
-    padding: 5,
-  },
-  closeIcon: {
-    padding: 5,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -940,6 +896,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 15,
   },
+  packageInfo: {
+    flex: 1,
+  },
   packageTitle: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -949,6 +908,7 @@ const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 3,
   },
   ratingValue: {
     fontSize: 14,
@@ -962,7 +922,6 @@ const styles = StyleSheet.create({
   bookingTypeText: {
     fontSize: 12,
     color: '#666',
-    marginTop: 3,
   },
   priceContainer: {
     alignItems: 'flex-end',
@@ -986,40 +945,60 @@ const styles = StyleSheet.create({
     marginRight: 10,
     color: '#333',
     fontWeight: '500',
+    width: 40,
   },
   personsInput: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   ageButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  disabledAgeButton: {
+    backgroundColor: '#f9f9f9',
+    borderColor: '#eee',
   },
   ageButtonText: {
     fontSize: 18,
     color: '#333',
     fontWeight: 'bold',
   },
-  disabledAgeButton: {
+  disabledAgeButtonText: {
     color: '#ccc',
   },
-  personsValue: {
+  ageValueContainer: {
+    alignItems: 'center',
     marginHorizontal: 15,
+    minWidth: 60,
+  },
+  personsValue: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    minWidth: 20,
     textAlign: 'center',
+  },
+  ageRangeText: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2,
   },
   ageInfoText: {
     fontSize: 12,
     color: '#666',
     fontStyle: 'italic',
     marginBottom: 10,
+    textAlign: 'center',
+    backgroundColor: '#f9f9f9',
+    padding: 5,
+    borderRadius: 5,
   },
   descriptionList: {
     marginBottom: 15,
@@ -1049,7 +1028,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#3399cc',
   },
   selectedCartButton: {
     backgroundColor: '#3399cc',
@@ -1059,7 +1037,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 5,
-    color: '#3399cc',
   },
   selectedCartButtonText: {
     color: 'white',
@@ -1119,8 +1096,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 9,
     backgroundColor: '#f0f0f0',
-     borderWidth: 1,
-     borderColor: "#007AFF",
+    borderWidth: 1,
+    borderColor: "#007AFF",
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,

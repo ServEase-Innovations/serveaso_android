@@ -669,10 +669,10 @@ const ProfileScreen = () => {
                 Hello, {getDisplayName()}
               </Text>
               <Text style={styles.roleText}>
-                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}
-                {userRole === "CUSTOMER" && !hasValidMobileNumbers() && (
-                  <Text style={styles.mobileWarning}> ⚠️ Mobile required</Text>
-                )}
+                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}, {appUser?.serviceProviderId ||
+                  appUser?.customerid ||
+                  userId?.toString() ||
+                  "ID: N/A"}
               </Text>    
               {/* Edit Profile Button */}
               <View style={styles.editButtonContainer}>
@@ -1218,7 +1218,7 @@ const ProfileScreen = () => {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>© 2025 MyApp. All rights reserved.</Text>
+        <Text style={styles.footerText}>© 2024 ServEaso All rights reserved.</Text>
       </View>
     </ScrollView>
   );

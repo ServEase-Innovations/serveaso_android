@@ -384,6 +384,7 @@ const MainApp = () => {
         <View style={styles.headerWrapper}>
           <Head sendDataToParent={handleViewChange} />
         </View>
+        
 
         {appUser && appUser.role?.toUpperCase() === "SERVICE_PROVIDER" && (
           <View style={styles.notificationButtonContainer}>
