@@ -26,7 +26,7 @@ import axios from 'axios';
 // Import existing components
 import UserHoliday from './UserHoliday';
 import ModifyBookingDialog from './ModifyBookingDialog';
-import VacationManagement from './VacationManagement';
+import VacationManagementDialog from './VacationManagement';
 
 // Import new components
 import ConfirmationDialog from './ConfirmationDialog';
@@ -35,6 +35,7 @@ import WalletDialog from './WalletDialog';
 import LinearGradient from 'react-native-linear-gradient';
 import PaymentInstance from './services/paymentInstance';
 import { useAppUser } from './context/AppUserContext';
+
 
 // Implement Card component
 const Card: React.FC<{ children: React.ReactNode; style?: StyleProp<ViewStyle> }> = ({ children, style }) => {
@@ -103,6 +104,21 @@ interface Responsibilities {
   add_ons?: Task[];
 }
 
+interface Modification {
+  date: string;
+  action: string;
+  changes?: {
+    new_start_date?: string;
+    new_end_date?: string;
+    new_start_time?: string;
+    start_date?: { from: string; to: string };
+    end_date?: { from: string; to: string };
+    start_time?: { from: string; to: string };
+  };
+  refund?: number;
+  penalty?: number;
+}
+
 interface Booking {
   id: number;
   name: string;
@@ -111,6 +127,8 @@ interface Booking {
   date: string;
   startDate: string;
   endDate: string;
+  start_time: string;
+  end_time: string;
   bookingType: string;
   monthlyAmount: number;
   paymentMode: string;
@@ -139,6 +157,7 @@ interface Booking {
     end_date?: string;
     start_date?: string;
   };
+  modifications: Modification[];
 }
 
 const getServiceIcon = (type: string) => {
@@ -248,6 +267,110 @@ const hasVacation = (booking: Booking): boolean => {
   return booking.hasVacation || false;
 };
 
+// NEW: Modification restriction functions from React code
+const isModificationTimeAllowed = (startDate: string, timeSlot: string): boolean => {
+  const now = dayjs();
+  const [time, period] = timeSlot.split(' ');
+  const [hoursStr, minutesStr] = time.split(':');
+  let hours = parseInt(hoursStr, 10);
+  const minutes = parseInt(minutesStr, 10);
+  
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  
+  const bookingDateTime = dayjs(startDate)
+    .set('hour', hours)
+    .set('minute', minutes)
+    .set('second', 0);
+  
+  return now.isBefore(bookingDateTime.subtract(30, 'minute'));
+};
+
+const isBookingAlreadyModified = (booking: Booking | null): boolean => {
+  if (!booking) return false;
+  
+  const hasExplicitModifications = booking.modifications && 
+    booking.modifications.length > 0 && 
+    booking.modifications.some(mod => 
+      mod.action === "Date Rescheduled" || 
+      mod.action === "Time Rescheduled" ||
+      mod.action === "Modified" || 
+      mod.action?.includes("Modified") ||
+      mod.action?.includes("modified") ||
+      mod.action === "Rescheduled" ||
+      mod.action?.includes("Reschedule")
+    );
+  
+  return !!hasExplicitModifications;
+};
+
+const isModificationDisabled = (booking: Booking | null): boolean => {
+  if (!booking) return true;
+  
+  return !isModificationTimeAllowed(booking.startDate, booking.timeSlot) || 
+         isBookingAlreadyModified(booking);
+};
+
+const getModificationTooltip = (booking: Booking | null): string => {
+  if (!booking) return "";
+  
+  if (isBookingAlreadyModified(booking)) {
+    return "This booking has already been modified and cannot be modified again.";
+  }
+  if (!isModificationTimeAllowed(booking.startDate, booking.timeSlot)) {
+    return "Modification is only allowed at least 30 minutes before the scheduled time.";
+  }
+  return "Modify this booking";
+};
+
+// NEW: Get detailed modification information for display
+const getModificationDetails = (booking: Booking): string => {
+  if (!booking.modifications || booking.modifications.length === 0) return "";
+  
+  const lastMod = booking.modifications[booking.modifications.length - 1];
+  
+  if (lastMod.action === "Date Rescheduled" && lastMod.changes) {
+    if (lastMod.changes.new_start_date && lastMod.changes.new_end_date) {
+      return `Date rescheduled to ${lastMod.changes.new_start_date}`;
+    } else if (lastMod.changes.start_date) {
+      return `Date changed from ${dayjs(lastMod.changes.start_date.from).format('MMM D, YYYY')} to ${dayjs(lastMod.changes.start_date.to).format('MMM D, YYYY')}`;
+    }
+  } else if (lastMod.action === "Time Rescheduled" && lastMod.changes) {
+    if (lastMod.changes.new_start_time) {
+      return `Time rescheduled to ${lastMod.changes.new_start_time}`;
+    } else if (lastMod.changes.start_time) {
+      return `Time changed from ${lastMod.changes.start_time.from} to ${lastMod.changes.start_time.to}`;
+    }
+  }
+  
+  return `Last modified: ${lastMod.action}`;
+};
+
+// NEW: Time formatting utilities from React code
+const formatTimeToAMPM = (timeString: string): string => {
+  if (!timeString) return '';
+  
+  try {
+    // Handle both "HH:mm:ss" and "HH:mm" formats
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours, 10);
+    const minute = parseInt(minutes, 10);
+    
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12; // Convert 0 to 12, 13 to 1, etc.
+    const displayMinute = minute.toString().padStart(2, '0');
+    
+    return `${displayHour}:${displayMinute} ${period}`;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return timeString; // Return original if parsing fails
+  }
+};
+
+const formatTimeRange = (startTime: string, endTime: string): string => {
+  return `${formatTimeToAMPM(startTime)} - ${formatTimeToAMPM(endTime)}`;
+};
+
 const Booking: React.FC = () => {
   // STATE VARIABLES
   const [currentBookings, setCurrentBookings] = useState<Booking[]>([]);
@@ -269,6 +392,8 @@ const Booking: React.FC = () => {
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [reviewedBookings, setReviewedBookings] = useState<number[]>([]);
+  const [vacationManagementDialogOpen, setVacationManagementDialogOpen] = useState(false);
+  const [selectedBookingForVacationManagement, setSelectedBookingForVacationManagement] = useState<Booking | null>(null);
 
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
@@ -365,22 +490,30 @@ const Booking: React.FC = () => {
     }
   };
 
-  // Improved mapBookingData function
+  // Improved mapBookingData function with modifications support
   const mapBookingData = (data: any[]) => {
     return Array.isArray(data)
       ? data.map((item) => {
           const hasVacation = item?.vacation?.leave_days > 0;
           const serviceType = item.service_type?.toLowerCase() || item.serviceType?.toLowerCase() || 'other';
-          
+          const modifications = item.modifications || [];
+          const hasModifications = modifications.length > 0;
+
+          // Use the current dates from API (which should reflect modifications)
+          const effectiveStartDate = item.start_date;
+          const effectiveEndDate = item.end_date;
+
           return {
             id: item.engagement_id,
             customerId: item.customerId,
             serviceProviderId: item.serviceProviderId,
             name: item.customerName,
             timeSlot: item.start_time,
-            date: item.start_date,
-            startDate: item.start_date,
-            endDate: item.end_date,
+            date: effectiveStartDate,
+            startDate: effectiveStartDate,
+            endDate: effectiveEndDate,
+            start_time: item.start_time,
+            end_time: item.end_time,
             bookingType: item.booking_type,
             monthlyAmount: item.monthlyAmount,
             paymentMode: item.paymentMode,
@@ -396,8 +529,8 @@ const Booking: React.FC = () => {
             experience: item.experience,
             noOfPersons: item.noOfPersons,
             mealType: item.mealType,
-            modifiedDate: Array.isArray(item.modifications) && item.modifications.length > 0
-              ? item.modifications[item.modifications.length - 1]?.created_at
+            modifiedDate: hasModifications
+              ? modifications[modifications.length - 1]?.date || item.created_at
               : item.created_at,
             responsibilities: item.responsibilities,
             customerHolidays: item.customerHolidays || [],
@@ -408,7 +541,8 @@ const Booking: React.FC = () => {
                   leave_start_date: item.vacation.start_date || item.vacation.leave_start_date,
                   leave_end_date: item.vacation.end_date || item.vacation.leave_end_date,
                 }
-              : null
+              : null,
+            modifications: modifications
           };
         })
       : [];
@@ -453,6 +587,18 @@ const Booking: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  // NEW: Vacation success handler from React code
+  const handleVacationSuccess = async () => {
+    setOpenSnackbar(true);
+    await refreshBookings();
+  };
+
+  // NEW: Handle modify vacation click from React code
+  const handleModifyVacationClick = (booking: Booking) => {
+    setSelectedBookingForVacationManagement(booking);
+    setVacationManagementDialogOpen(true);
   };
 
   // ACTION HANDLERS - CONFIRMATION DIALOG
@@ -539,8 +685,8 @@ const Booking: React.FC = () => {
   };
 
   const handleVacationClick = (booking: Booking) => {
-    setSelectedBookingForVacation(booking);
-    setVacationDialogOpen(true);
+    setSelectedBookingForLeave(booking);
+    setHolidayDialogOpen(true);
   };
 
   const handleApplyLeaveClick = (booking: Booking) => {
@@ -629,10 +775,155 @@ const Booking: React.FC = () => {
     }
   };
 
-  // Vacation success handler
-  const handleVacationSuccess = () => {
-    refreshBookings();
-    setOpenSnackbar(true);
+  // NEW: Improved renderActionButtons function from React code
+  const renderActionButtons = (booking: Booking) => {
+    const modificationDisabled = isModificationDisabled(booking);
+    const modificationTooltip = getModificationTooltip(booking);
+    const hasExistingVacation = hasVacation(booking);
+
+    switch (booking.taskStatus) {
+      case 'NOT_STARTED':
+        return (
+          <>
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="phone" size={16} color="#000" />
+              <Text>Call Provider</Text>
+            </Button>
+
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="message-text" size={16} color="#000" />
+              <Text>Message</Text>
+            </Button>
+
+            <Button 
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={() => handleCancelClick(booking)}
+            >
+              <Icon name="close-circle" size={16} color="#fff" />
+              <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+            </Button>
+
+            {booking.bookingType === "MONTHLY" && (
+              <Button
+                style={styles.actionButton}
+                onPress={() => handleModifyClick(booking)}
+                disabled={modificationDisabled}
+              >
+                <Icon name="pencil" size={16} color="#000" />
+                <Text>{modificationDisabled ? "Modify (Unavailable)" : "Modify Booking"}</Text>
+              </Button>
+            )}
+
+            {booking.bookingType === "MONTHLY" && (
+              <>
+                {hasExistingVacation ? (
+                  <Button
+                    style={[styles.actionButton, styles.vacationModifiedButton]}
+                    onPress={() => handleModifyVacationClick(booking)}
+                    disabled={isRefreshing}
+                  >
+                    <Icon name="pencil" size={16} color="#1e40af" />
+                    <Text style={styles.vacationModifiedText}>Modify Vacation</Text>
+                  </Button>
+                ) : (
+                  <Button
+                    style={styles.actionButton}
+                    onPress={() => handleVacationClick(booking)}
+                    disabled={isRefreshing}
+                  >
+                    <Icon name="calendar" size={16} color="#000" />
+                    <Text>Add Vacation</Text>
+                  </Button>
+                )}
+              </>
+            )}
+          </>
+        );
+
+      case 'IN_PROGRESS':
+        return (
+          <>
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="phone" size={16} color="#000" />
+              <Text>Call Provider</Text>
+            </Button>
+
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Icon name="message-text" size={16} color="#000" />
+              <Text>Message</Text>
+            </Button>
+
+            <Button 
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={() => handleCancelClick(booking)}
+            >
+              <Icon name="close-circle" size={16} color="#fff" />
+              <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+            </Button>
+
+            {booking.bookingType === "MONTHLY" && (
+              <>
+                {hasExistingVacation ? (
+                  <Button
+                    style={[styles.actionButton, styles.vacationModifiedButton]}
+                    onPress={() => handleModifyVacationClick(booking)}
+                    disabled={isRefreshing}
+                  >
+                    <Icon name="pencil" size={16} color="#1e40af" />
+                    <Text style={styles.vacationModifiedText}>Modify Vacation</Text>
+                  </Button>
+                ) : (
+                  <Button
+                    style={styles.actionButton}
+                    onPress={() => handleVacationClick(booking)}
+                    disabled={isRefreshing}
+                  >
+                    <Icon name="calendar" size={16} color="#000" />
+                    <Text>Add Vacation</Text>
+                  </Button>
+                )}
+              </>
+            )}
+          </>
+        );
+
+      case 'COMPLETED':
+        return (
+          <>
+            {hasReview(booking) ? (
+              <Button
+                style={[styles.actionButton, styles.disabledButton]}
+                disabled={true}
+              >
+                <Icon name="check-circle" size={16} color="#000" />
+                <Text>Review Submitted</Text>
+              </Button>
+            ) : (
+              <Button
+                style={styles.actionButton}
+                onPress={() => handleLeaveReviewClick(booking)}
+              >
+                <Icon name="message-text" size={16} color="#000" />
+                <Text>Leave Review</Text>
+              </Button>
+            )}
+
+            <Button style={styles.actionButton} onPress={() => {}}>
+              <Text>Book Again</Text>
+            </Button>
+          </>
+        );
+
+      case 'CANCELLED':
+        return (
+          <Button style={styles.actionButton} onPress={() => {}}>
+            <Text>Book Again</Text>
+          </Button>
+        );
+
+      default:
+        return null;
+    }
   };
 
   // DATA PROCESSING
@@ -665,6 +956,8 @@ const Booking: React.FC = () => {
   // Improved renderBookingItem with new action buttons logic
   const renderBookingItem = ({ item }: { item: Booking }) => {
     const serviceType = item.serviceType || item.service_type;
+    const hasModifications = item.modifications && item.modifications.length > 0;
+    const modificationDetails = getModificationDetails(item);
     
     return (
       <Card style={styles.bookingCard}>
@@ -687,6 +980,11 @@ const Booking: React.FC = () => {
           <View style={styles.badgeContainer}>
             {getBookingTypeBadge(item.bookingType)}
             {getStatusBadge(item.taskStatus)}
+            {hasModifications && (
+              <Badge style={styles.modifiedBadge}>
+                <Text style={styles.modifiedBadgeText}>Modified</Text>
+              </Badge>
+            )}
           </View>
         </View>
 
@@ -694,16 +992,30 @@ const Booking: React.FC = () => {
           <View style={styles.bookingDetails}>
             <View style={styles.detailRow}>
               <Icon name="calendar" size={18} color="#6b7280" />
-              <Text style={styles.detailText}>{formatDate(item.date)}</Text>
+              <Text style={styles.detailText}>
+                {formatDate(item.date)}
+                {hasModifications && (
+                  <Text style={styles.rescheduledText}> (Rescheduled)</Text>
+                )}
+              </Text>
             </View>
             <View style={styles.detailRow}>
               <Icon name="clock" size={18} color="#6b7280" />
-              <Text style={styles.detailText}>{item.timeSlot}</Text>
+              <Text style={styles.detailText}>
+                {formatTimeRange(item.start_time, item.end_time)}
+              </Text>
             </View>
             <View style={styles.detailRow}>
               <Icon name="map-marker" size={18} color="#6b7280" />
               <Text style={styles.detailText}>{item.address}</Text>
             </View>
+
+            {/* Show modification details if available */}
+            {modificationDetails ? (
+              <View style={styles.modificationDetails}>
+                <Text style={styles.modificationText}>{modificationDetails}</Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.providerInfo}>
@@ -716,6 +1028,7 @@ const Booking: React.FC = () => {
             </View>
             <Text style={styles.priceText}>₹{item.monthlyAmount}</Text>
           </View>
+          
           {item.responsibilities && (
             <View style={styles.responsibilitiesContainer}>
               <Text style={styles.responsibilitiesTitle}>Responsibilities:</Text>
@@ -753,142 +1066,7 @@ const Booking: React.FC = () => {
         <Separator style={styles.separator} />
 
         <View style={styles.actionButtons}>
-          {/* NOT_STARTED Status */}
-          {item.taskStatus === 'NOT_STARTED' && (
-            <>
-              <Button style={styles.actionButton} onPress={() => {}}>
-                <Icon name="phone" size={16} color="#000" />
-                <Text>Call Provider</Text>
-              </Button>
-
-              <Button style={styles.actionButton} onPress={() => {}}>
-                <Icon name="message-text" size={16} color="#000" />
-                <Text>Message</Text>
-              </Button>
-
-              <Button 
-                style={[styles.actionButton, styles.cancelButton]}
-                onPress={() => handleCancelClick(item)}
-              >
-                <Icon name="close-circle" size={16} color="#fff" />
-                <Text style={styles.cancelButtonText}>Cancel Booking</Text>
-              </Button>
-
-              {item.bookingType === "MONTHLY" && (
-                <Button
-                  style={styles.actionButton}
-                  onPress={() => handleModifyClick(item)}
-                >
-                  <Icon name="pencil" size={16} color="#000" />
-                  <Text>Modify Booking</Text>
-                </Button>
-              )}
-
-              {item.bookingType === "MONTHLY" && (
-                <Button
-                  style={styles.actionButton}
-                  onPress={() => handleVacationClick(item)}
-                  disabled={hasVacation(item) || isRefreshing}
-                >
-                  <Text>
-                    {hasVacation(item) ? "Vacation Added" : "Add Vacation"}
-                  </Text>
-                </Button>
-              )}
-            </>
-          )}
-
-          {/* IN_PROGRESS Status */}
-          {item.taskStatus === 'IN_PROGRESS' && (
-            <>
-              <Button style={styles.actionButton} onPress={() => {}}>
-                <Icon name="phone" size={16} color="#000" />
-                <Text>Call Provider</Text>
-              </Button>
-
-              <Button style={styles.actionButton} onPress={() => {}}>
-                <Icon name="message-text" size={16} color="#000" />
-                <Text>Message</Text>
-              </Button>
-
-              <Button 
-                style={[styles.actionButton, styles.cancelButton]}
-                onPress={() => handleCancelClick(item)}
-              >
-                <Icon name="close-circle" size={16} color="#fff" />
-                <Text style={styles.cancelButtonText}>Cancel Booking</Text>
-              </Button>
-
-              {item.bookingType === "MONTHLY" && (
-                <Button
-                  style={styles.actionButton}
-                  onPress={() => handleVacationClick(item)}
-                  disabled={hasVacation(item) || isRefreshing}
-                >
-                  <Text>
-                    {hasVacation(item) ? "Vacation Added" : "Add Vacation"}
-                  </Text>
-                </Button>
-              )}
-            </>
-          )}
-
-          {/* COMPLETED Status */}
-          {item.taskStatus === 'COMPLETED' && (
-            <>
-              {hasReview(item) ? (
-                <Button
-                  style={[styles.actionButton, styles.disabledButton]}
-                  disabled={true}
-                >
-                  <Icon name="check-circle" size={16} color="#000" />
-                  <Text>Review Submitted</Text>
-                </Button>
-              ) : (
-                <Button
-                  style={styles.actionButton}
-                  onPress={() => handleLeaveReviewClick(item)}
-                >
-                  <Icon name="message-text" size={16} color="#000" />
-                  <Text>Leave Review</Text>
-                </Button>
-              )}
-
-              <Button style={styles.actionButton} onPress={() => {}}>
-                <Text>Book Again</Text>
-              </Button>
-            </>
-          )}
-
-          {/* CANCELLED Status */}
-          {item.taskStatus === 'CANCELLED' && (
-            <Button style={styles.actionButton} onPress={() => {}}>
-              <Text>Book Again</Text>
-            </Button>
-          )}
-
-          {/* ACTIVE Status (fallback) */}
-          {item.taskStatus === 'ACTIVE' && (
-            <>
-              <Button style={styles.actionButton} onPress={() => {}}>
-                <Icon name="phone" size={16} color="#000" />
-                <Text>Call Provider</Text>
-              </Button>
-
-              <Button style={styles.actionButton} onPress={() => {}}>
-                <Icon name="message-text" size={16} color="#000" />
-                <Text>Message</Text>
-              </Button>
-
-              <Button 
-                style={[styles.actionButton, styles.cancelButton]}
-                onPress={() => handleCancelClick(item)}
-              >
-                <Icon name="close-circle" size={16} color="#fff" />
-                <Text style={styles.cancelButtonText}>Cancel Booking</Text>
-              </Button>
-            </>
-          )}
+          {renderActionButtons(item)}
         </View>
       </Card>
     );
@@ -1056,6 +1234,17 @@ const Booking: React.FC = () => {
         onLeaveSubmit={handleLeaveSubmit}
       />
       
+      <VacationManagementDialog
+        open={vacationManagementDialogOpen}
+        onClose={() => {
+          setVacationManagementDialogOpen(false);
+          setSelectedBookingForVacationManagement(null);
+        }}
+        booking={convertBookingForChildComponents(selectedBookingForVacationManagement)}
+        customerId={customerId}
+        onSuccess={handleVacationSuccess}
+      />
+
       <ModifyBookingDialog
         open={modifyDialogOpen}
         onClose={() => setModifyDialogOpen(false)}
@@ -1063,8 +1252,8 @@ const Booking: React.FC = () => {
         timeSlots={timeSlots}
         onSave={handleSaveModifiedBooking}
         customerId={customerId}
-        // refreshBookings={refreshBookings}
-        // setOpenSnackbar={setOpenSnackbar}
+        refreshBookings={refreshBookings}
+        setOpenSnackbar={setOpenSnackbar}
       />
 
       <ConfirmationDialog
@@ -1076,14 +1265,6 @@ const Booking: React.FC = () => {
         confirmText={confirmationDialog.type === 'cancel' ? 'Yes, Cancel' : 'Confirm'}
         loading={actionLoading}
         severity={confirmationDialog.severity}
-      />
-
-      <VacationManagement
-        open={vacationDialogOpen}
-        booking={convertBookingForChildComponents(selectedBookingForVacation)}
-        customerId={customerId}
-        onClose={() => setVacationDialogOpen(false)}
-        onSuccess={handleVacationSuccess}
       />
 
       <AddReviewDialog
@@ -1111,7 +1292,7 @@ const Booking: React.FC = () => {
   );
 };
 
-// Styles remain the same as in your original React Native code
+// Updated Styles with new styles for modification features
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
@@ -1397,6 +1578,13 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#fff',
   },
+  vacationModifiedButton: {
+    backgroundColor: '#dbeafe',
+    borderColor: '#93c5fd',
+  },
+  vacationModifiedText: {
+    color: '#1e40af',
+  },
   emptyStateCard: {
     alignItems: 'center',
     padding: 32,
@@ -1491,6 +1679,14 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 12,
   },
+  modifiedBadge: {
+    backgroundColor: 'rgba(234, 179, 8, 0.1)',
+    borderColor: 'rgba(234, 179, 8, 0.2)',
+  },
+  modifiedBadgeText: {
+    color: '#ca8a04',
+    fontSize: 12,
+  },
   responsibilitiesContainer: {
     marginTop: 12,
   },
@@ -1514,6 +1710,22 @@ const styles = StyleSheet.create({
   responsibilityText: {
     fontSize: 12,
     color: '#4b5563',
+  },
+  modificationDetails: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#f9fafb',
+    borderRadius: 4,
+  },
+  modificationText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  rescheduledText: {
+    color: '#10b981',
+    fontSize: 12,
+    fontWeight: '600',
   },
   snackbar: {
     position: 'absolute',
