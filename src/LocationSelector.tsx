@@ -173,6 +173,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   const checkLocationPermission = async (): Promise<boolean> => {
     try {
+      
       if (Platform.OS === "android") {
         const hasPermission = await PermissionsAndroid.check(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
@@ -704,6 +705,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   };
 
   useEffect(() => {
+    requestLocationPermission()
     return () => {
       if (locationWatchId !== null) {
         Geolocation.clearWatch(locationWatchId);
@@ -956,8 +958,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           numberOfLines={1}
           ellipsizeMode="tail"
         >
-          {location || "Set Location"}
-        </Text>
+          {location || "Searching ..."}
+        </Text> 
         <MaterialIcon name="arrow-drop-down" size={18} color="#3b82f6" />
       </TouchableOpacity>
 
