@@ -531,7 +531,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       fetchLocationWithChecks();
     } else {
       console.log("Selected location:", newValue);
-      const loc = userPreference?.savedLocations?.find(
+      const loc = userPreference?.[0]?.savedLocations?.find(
         (location: any) => location.name === newValue
       );
 
