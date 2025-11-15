@@ -5,7 +5,10 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Image, 
-  Alert
+  Alert,
+  Dimensions,
+  useWindowDimensions,
+  ScrollView
 } from "react-native";
 import moment from "moment";
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -17,7 +20,8 @@ import NannyServicesDialog from "./NannyServiceDialog";
 import axiosInstance from "./axiosInstance";
 import { useAppUser } from "./context/AppUserContext";
 
-// Types
+// Types (keep your existing types)
+
 interface BookingType {
   serviceproviderId: string;
   eveningSelection: string | null;
@@ -84,6 +88,10 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const [isFavorite, setIsFavorite] = useState(false);
 
   const hasCheckedRef = useRef(false);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isSmallScreen = windowWidth < 375;
+  const isMediumScreen = windowWidth >= 375 && windowWidth < 768;
+  const isLargeScreen = windowWidth >= 768;
 
   const dietImages = {
     VEG: require("../assets/images/veg.png"),
@@ -342,8 +350,8 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
       case "NANNY":
         return (
           <NannyServicesDialog 
-            open={open} // FIXED: Changed from false to open
-            handleClose={handleClose} // FIXED: Using actual handleClose function
+            open={open}
+            handleClose={handleClose}
             providerDetails={providerDetailsData}
             sendDataToParent={handleBookingPage}
             user={user}
@@ -358,87 +366,162 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   return (
     <>
       <View style={styles.container}>
-        <View style={styles.card}>
-          {/* Header with buttons - Improved layout */}
-          <View style={styles.headerButtons}>
-            <TouchableOpacity 
-              style={styles.expandButton}
-              onPress={toggleExpand}
-            >
-              <Icon 
-                name={isExpanded ? "remove" : "add"} 
-                size={24} 
-                color="#1976d2" 
-              />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.bookNowButton}
-              onPress={handleBookNow} // FIXED: Using handleBookNow instead of handleLogin
-            >
-              <Text style={styles.bookNowText}>Book Now</Text>
-            </TouchableOpacity>
-
-            {/* Favorite Button */}
-            <TouchableOpacity
-              style={styles.favoriteButton}
-              onPress={toggleFavorite}
-            >
-              <Icon 
-                name={isFavorite ? "favorite" : "favorite-border"} 
-                size={24} 
-                color={isFavorite ? 'red' : 'gray'} 
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Provider Info - Improved layout */}
-          <View style={styles.providerInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.nameText}>
+        <View style={[
+          styles.card,
+          isSmallScreen && styles.cardSmall,
+          isMediumScreen && styles.cardMedium,
+          isLargeScreen && styles.cardLarge
+        ]}>
+          {/* Header with provider name and buttons */}
+          <View style={[
+            styles.headerContainer,
+            isSmallScreen && styles.headerContainerSmall
+          ]}>
+            {/* Provider Name */}
+            <View style={styles.providerNameContainer}>
+              <Text style={[
+                styles.nameText,
+                isSmallScreen && styles.nameTextSmall,
+                isMediumScreen && styles.nameTextMedium
+              ]} numberOfLines={1}>
                 {props.firstName} {props.middleName} {props.lastName}
               </Text>
-              <Text style={styles.genderAgeText}>
-                ({getGenderSymbol(props.gender)} {calculateAge(props.dob)})
-              </Text>
-              <Image 
-                source={dietImage} 
-                style={styles.dietIcon}
-                resizeMode="contain"
-              />
+              <View style={styles.genderAgeContainer}>
+                <Text style={[
+                  styles.genderAgeText,
+                  isSmallScreen && styles.genderAgeTextSmall
+                ]}>
+                  ({getGenderSymbol(props.gender)} {calculateAge(props.dob)})
+                </Text>
+                <Image 
+                  source={dietImage} 
+                  style={[
+                    styles.dietIcon,
+                    isSmallScreen && styles.dietIconSmall
+                  ]}
+                  resizeMode="contain"
+                />
+              </View>
             </View>
 
-            {isExpanded && (
-              <View style={styles.expandedContent}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Language: </Text>
-                  <Text style={styles.detailValue}>
-                    {props.language || "English"}
-                  </Text>
-                </View>
+            {/* Action Buttons */}
+            <View style={[
+              styles.headerButtons,
+              isSmallScreen && styles.headerButtonsSmall
+            ]}>
+              <TouchableOpacity 
+                style={[
+                  styles.expandButton,
+                  isSmallScreen && styles.expandButtonSmall
+                ]}
+                onPress={toggleExpand}
+              >
+                <Icon 
+                  name={isExpanded ? "remove" : "add"} 
+                  size={isSmallScreen ? 20 : 24} 
+                  color="#1976d2" 
+                />
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.bookNowButton,
+                  isSmallScreen && styles.bookNowButtonSmall,
+                  !isBookNowEnabled && styles.bookNowButtonDisabled
+                ]}
+                onPress={handleBookNow}
+                disabled={!isBookNowEnabled}
+              >
+                <Text style={[
+                  styles.bookNowText,
+                  isSmallScreen && styles.bookNowTextSmall,
+                  !isBookNowEnabled && styles.bookNowTextDisabled
+                ]}>
+                  Book Now
+                </Text>
+              </TouchableOpacity>
 
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Experience: </Text>
-                  <Text style={styles.detailValue}>
-                    {props.experience || "1 year"}
-                  </Text>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Other Services: </Text>
-                  <Text style={styles.detailValue}>
-                    {props.otherServices || "N/A"}
-                  </Text>
-                </View>
-
-                {warning ? (
-                  <View style={styles.warningContainer}>
-                    <Text style={styles.warningText}>{warning}</Text>
-                  </View>
-                ) : null}
-              </View>
-            )}
+              {/* Favorite Button */}
+              <TouchableOpacity
+                style={[
+                  styles.favoriteButton,
+                  isSmallScreen && styles.favoriteButtonSmall
+                ]}
+                onPress={toggleFavorite}
+              >
+                <Icon 
+                  name={isFavorite ? "favorite" : "favorite-border"} 
+                  size={isSmallScreen ? 20 : 24} 
+                  color={isFavorite ? 'red' : 'gray'} 
+                />
+              </TouchableOpacity>
+            </View>
           </View>
+
+          {/* Expanded Content */}
+          {isExpanded && (
+            <View style={styles.expandedContent}>
+              <View style={[
+                styles.detailRow,
+                isSmallScreen && styles.detailRowSmall
+              ]}>
+                <Text style={[
+                  styles.detailLabel,
+                  isSmallScreen && styles.detailLabelSmall
+                ]}>Language: </Text>
+                <Text style={[
+                  styles.detailValue,
+                  isSmallScreen && styles.detailValueSmall
+                ]} numberOfLines={2}>
+                  {props.language || "English"}
+                </Text>
+              </View>
+
+              <View style={[
+                styles.detailRow,
+                isSmallScreen && styles.detailRowSmall
+              ]}>
+                <Text style={[
+                  styles.detailLabel,
+                  isSmallScreen && styles.detailLabelSmall
+                ]}>Experience: </Text>
+                <Text style={[
+                  styles.detailValue,
+                  isSmallScreen && styles.detailValueSmall
+                ]} numberOfLines={2}>
+                  {props.experience || "1 year"}
+                </Text>
+              </View>
+
+              <View style={[
+                styles.detailRow,
+                isSmallScreen && styles.detailRowSmall
+              ]}>
+                <Text style={[
+                  styles.detailLabel,
+                  isSmallScreen && styles.detailLabelSmall
+                ]}>Other Services: </Text>
+                <Text style={[
+                  styles.detailValue,
+                  isSmallScreen && styles.detailValueSmall
+                ]} numberOfLines={3}>
+                  {props.otherServices || "N/A"}
+                </Text>
+              </View>
+
+              {warning ? (
+                <View style={[
+                  styles.warningContainer,
+                  isSmallScreen && styles.warningContainerSmall
+                ]}>
+                  <Text style={[
+                    styles.warningText,
+                    isSmallScreen && styles.warningTextSmall
+                  ]}>{warning}</Text>
+                </View>
+              ) : null}
+            </View>
+          )}
         </View>
       </View>
 
@@ -447,9 +530,11 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   );
 };
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
   container: {
-    padding: 10,
+    padding: SCREEN_WIDTH < 375 ? 6 : 10,
     backgroundColor: '#f5f5f5',
   },
   card: {
@@ -466,18 +551,54 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 10,
   },
-  headerButtons: {
+  cardSmall: {
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  cardMedium: {
+    padding: 14,
+  },
+  cardLarge: {
+    padding: 16,
+  },
+  headerContainer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  headerContainerSmall: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 8,
+  },
+  providerNameContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerButtonsSmall: {
+    gap: 6,
+    alignSelf: 'flex-end',
   },
   expandButton: {
     borderWidth: 1,
     borderColor: '#1976d2',
     borderRadius: 4,
     padding: 8,
-    marginRight: 8,
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expandButtonSmall: {
+    padding: 6,
+    minWidth: 36,
   },
   bookNowButton: {
     borderWidth: 1,
@@ -485,59 +606,106 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginRight: 8,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bookNowButtonSmall: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 70,
+  },
+  bookNowButtonDisabled: {
+    borderColor: '#ccc',
+    backgroundColor: '#f5f5f5',
   },
   bookNowText: {
     color: '#1976d2',
     fontSize: 14,
     fontWeight: '500',
   },
+  bookNowTextSmall: {
+    fontSize: 12,
+  },
+  bookNowTextDisabled: {
+    color: '#999',
+  },
   favoriteButton: {
     padding: 8,
-  },
-  providerInfo: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
+    minWidth: 40,
     alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 8,
+    justifyContent: 'center',
+  },
+  favoriteButtonSmall: {
+    padding: 6,
+    minWidth: 36,
   },
   nameText: {
     fontWeight: 'bold',
     fontSize: 18,
     color: '#333',
-    marginRight: 8,
+  },
+  nameTextSmall: {
+    fontSize: 16,
+  },
+  nameTextMedium: {
+    fontSize: 17,
+  },
+  genderAgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
   },
   genderAgeText: {
     fontWeight: 'bold',
-    fontSize: 18,
+    fontSize: 16,
     color: '#333',
-    marginRight: 8,
+  },
+  genderAgeTextSmall: {
+    fontSize: 14,
   },
   dietIcon: {
     width: 20,
     height: 20,
+  },
+  dietIconSmall: {
+    width: 18,
+    height: 18,
   },
   expandedContent: {
     marginTop: 8,
   },
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    gap: 4,
+  },
+  detailRowSmall: {
     marginBottom: 6,
-    flexWrap: 'wrap',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   detailLabel: {
     fontWeight: 'bold',
     fontSize: 14,
     color: '#333',
+    minWidth: 100,
+  },
+  detailLabelSmall: {
+    fontSize: 13,
+    minWidth: 'auto',
+    marginBottom: 2,
   },
   detailValue: {
     fontSize: 14,
     color: '#666',
     flex: 1,
+    flexWrap: 'wrap',
+  },
+  detailValueSmall: {
+    fontSize: 13,
   },
   warningContainer: {
     backgroundColor: '#ffebee',
@@ -545,9 +713,16 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginTop: 8,
   },
+  warningContainerSmall: {
+    padding: 6,
+    marginTop: 6,
+  },
   warningText: {
     color: '#d32f2f',
     fontSize: 12,
+  },
+  warningTextSmall: {
+    fontSize: 11,
   },
 });
 
