@@ -212,7 +212,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     } else {
       booking = {
         serviceproviderId: props.serviceproviderId,
-        timeRange: `${startTime} - ${endTime}`,
+        timeRange: `${startTime} `,
         duration: getHoursDifference(startTime, endTime),
         ...bookingType
       };
@@ -335,8 +335,8 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
             handleClose={handleClose}
             providerDetails={providerDetailsData}
             sendDataToParent={handleBookingPage}
-            // user={user}
-            // bookingType={bookingType}        
+            user={user}
+            bookingType={bookingType}        
           />
         );
       case "NANNY":

@@ -33,6 +33,8 @@ import ConfirmationDialog from './ConfirmationDialog';
 import AddReviewDialog from './AddReviewDialog';
 import WalletDialog from './WalletDialog';
 import LinearGradient from 'react-native-linear-gradient';
+import PaymentInstance from './services/paymentInstance';
+import { useAppUser } from './context/AppUserContext';
 
 // Implement Card component
 const Card: React.FC<{ children: React.ReactNode; style?: StyleProp<ViewStyle> }> = ({ children, style }) => {
@@ -90,7 +92,7 @@ interface CustomerHoliday {
   serviceType: string;
   active: boolean;
 }
-// Add this interface for responsibilities
+
 interface Task {
   taskType: string;
   [key: string]: any;
@@ -118,15 +120,15 @@ interface Booking {
   taskStatus: string;
   bookingDate: string;
   engagements: string;
+  service_type: string;
   serviceType: string;
   childAge: string;
   experience: string;
   noOfPersons: string;
   mealType: string;
   modifiedDate: string;
-  // responsibilities: string;
+  responsibilities: Responsibilities;
   customerHolidays?: CustomerHoliday[];
-    responsibilities: Responsibilities;
   hasVacation?: boolean;
   vacationDetails?: {
     leave_type?: string;
@@ -134,11 +136,14 @@ interface Booking {
     refund_amount?: number;
     leave_end_date?: string;
     leave_start_date?: string;
-}
+    end_date?: string;
+    start_date?: string;
+  };
 }
 
 const getServiceIcon = (type: string) => {
-  switch (type) {
+  const serviceType = type || 'other';
+  switch (serviceType) {
     case 'maid':
       return 'broom';
     case 'cleaning':
@@ -224,7 +229,8 @@ const getBookingTypeBadge = (type: string) => {
 };
 
 const getServiceTitle = (type: string) => {
-  switch (type) {
+  const serviceType = type || 'other';
+  switch (serviceType) {
     case 'cook':
       return 'Home Cook';
     case 'maid':
@@ -238,23 +244,12 @@ const getServiceTitle = (type: string) => {
   }
 };
 
-// Add this utility function to check for vacation
 const hasVacation = (booking: Booking): boolean => {
   return booking.hasVacation || false;
 };
 
-const hasMatchingHolidayIds = (booking: Booking): boolean => {
-  if (!booking.customerHolidays || booking.customerHolidays.length === 0) {
-    return false;
-  }
-  
-  return booking.customerHolidays.some(
-    (holiday) => holiday.engagementId === booking.id
-  );
-};
-
 const Booking: React.FC = () => {
-  // STATE VARIABLES (grouped by category)
+  // STATE VARIABLES
   const [currentBookings, setCurrentBookings] = useState<Booking[]>([]);
   const [pastBookings, setPastBookings] = useState<Booking[]>([]);
   const [futureBookings, setFutureBookings] = useState<Booking[]>([]);
@@ -286,7 +281,7 @@ const Booking: React.FC = () => {
   const [uniqueMissingSlots, setUniqueMissingSlots] = useState<string[]>([]);
   const [showAllHistory, setShowAllHistory] = useState(false);
 
-  // Add these state variables near your other dialog states
+  // Review dialog state
   const [reviewDialogVisible, setReviewDialogVisible] = useState(false);
   const [selectedReviewBooking, setSelectedReviewBooking] = useState<Booking | null>(null);
 
@@ -307,57 +302,76 @@ const Booking: React.FC = () => {
     severity: 'info'
   });
 
+  // Vacation dialog state
+  const [vacationDialogOpen, setVacationDialogOpen] = useState(false);
+  const [selectedBookingForVacation, setSelectedBookingForVacation] = useState<Booking | null>(null);
+
   // AUTH & INITIALIZATION
   const { user: auth0User } = useAuth0();
   const isAuthenticated = auth0User !== undefined && auth0User !== null;
+  const { appUser } = useAppUser();
 
-  useEffect(() => {
-    if (auth0User) {
-      setCustomerId(auth0User.customerid ? Number(auth0User.customerid) : null);
-    }
-  }, [auth0User]);
+  // Helper function to convert Booking for child components
+  const convertBookingForChildComponents = (booking: Booking | null): any => {
+    if (!booking) return null;
+    
+    return {
+      ...booking,
+      serviceType: booking.serviceType || booking.service_type,
+      vacationDetails: booking.vacationDetails ? {
+        ...booking.vacationDetails,
+        leave_start_date: booking.vacationDetails.leave_start_date || booking.vacationDetails.start_date,
+        leave_end_date: booking.vacationDetails.leave_end_date || booking.vacationDetails.end_date,
+      } : null
+    };
+  };
 
   // DATA FETCHING FUNCTIONS
   useEffect(() => {
-    setIsLoading(true);
-    
-    const fetchBookings = async () => {
-      try {
-        if (customerId !== null && customerId !== undefined) {
-          const response = await axios.get(
-            `https://payments-j5id.onrender.com/api/customers/${customerId}/engagements`
-          );
-          
-          const { past = [], ongoing = [], upcoming = [] } = response.data || {};
-          setPastBookings(mapBookingData(past));
-          setCurrentBookings(mapBookingData(ongoing));
-          setFutureBookings(mapBookingData(upcoming));
-        }
-      } catch (error) {
-        console.error("Error fetching booking details:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (customerId !== null && customerId !== undefined) {
-      fetchBookings();
-    } else if (isAuthenticated) {
-      // Customer ID will be set by the other useEffect, which will trigger this flow
+    if (isAuthenticated && appUser?.customerid) {
+      setIsLoading(true);
+      setCustomerId(appUser.customerid);
+      fetchBookings(appUser.customerid);
     } else {
       setIsLoading(false);
     }
-  }, [customerId, isAuthenticated]);
+  }, [appUser, isAuthenticated]);
 
-  // DATA MAPPING & UTILITY FUNCTIONS
-  // const mapBookingData = (data: any[]) => {
-  //   return Array.isArray(data)
-  //     ? data.map((item) => {
+  // Refresh function from React code
+  const refreshBookings = async (id?: string) => {
+    const effectiveId = id || customerId;
+    if (effectiveId !== null && effectiveId !== undefined) {
+      console.log("Fetching bookings for customerId:", effectiveId);
+
+      const response = await PaymentInstance.get(
+        `/api/customers/${effectiveId}/engagements`
+      );
+
+      const { past = [], ongoing = [], upcoming = [], cancelled = [] } = response.data || {};
+
+      setPastBookings(mapBookingData(past));
+      setCurrentBookings(mapBookingData(ongoing));
+      setFutureBookings(mapBookingData(upcoming));
+    }
+  };
+
+  const fetchBookings = async (id: string) => {
+    try {
+      await refreshBookings(id);
+    } catch (error) {
+      console.error("Error fetching booking details:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Improved mapBookingData function
   const mapBookingData = (data: any[]) => {
-  return Array.isArray(data)
-    ? data.map((item) => {
-        const hasVacation = Array.isArray(item.modifications) && 
-          item.modifications.some((mod: any) => mod.modified_type === "VACATION");
+    return Array.isArray(data)
+      ? data.map((item) => {
+          const hasVacation = item?.vacation?.leave_days > 0;
+          const serviceType = item.service_type?.toLowerCase() || item.serviceType?.toLowerCase() || 'other';
+          
           return {
             id: item.engagement_id,
             customerId: item.customerId,
@@ -376,7 +390,8 @@ const Booking: React.FC = () => {
             taskStatus: item.task_status,
             engagements: item.engagements,
             bookingDate: item.created_at,
-            serviceType: item.serviceType?.toLowerCase() || 'other',
+            service_type: serviceType,
+            serviceType: serviceType,
             childAge: item.childAge,
             experience: item.experience,
             noOfPersons: item.noOfPersons,
@@ -384,13 +399,16 @@ const Booking: React.FC = () => {
             modifiedDate: Array.isArray(item.modifications) && item.modifications.length > 0
               ? item.modifications[item.modifications.length - 1]?.created_at
               : item.created_at,
-            // responsibilities: item.responsibilities,
-            // customerHolidays: item.customerHolidays || [],
-             responsibilities: item.responsibilities,
-          customerHolidays: item.customerHolidays || [],
-          hasVacation: hasVacation,
-          vacationDetails: hasVacation ? 
-            item.modifications.find((mod: any) => mod.modified_type === "VACATION")?.modified_data : null
+            responsibilities: item.responsibilities,
+            customerHolidays: item.customerHolidays || [],
+            hasVacation: hasVacation,
+            vacationDetails: hasVacation && item.vacation?.leave_days > 0 
+              ? {
+                  ...item.vacation,
+                  leave_start_date: item.vacation.start_date || item.vacation.leave_start_date,
+                  leave_end_date: item.vacation.end_date || item.vacation.leave_end_date,
+                }
+              : null
           };
         })
       : [];
@@ -401,7 +419,7 @@ const Booking: React.FC = () => {
     if (!term) return bookings;
     
     return bookings.filter(booking => 
-      getServiceTitle(booking?.serviceType).toLowerCase().includes(term?.toLowerCase()) ||
+      getServiceTitle(booking?.service_type).toLowerCase().includes(term?.toLowerCase()) ||
       booking.serviceProviderName?.toLowerCase().includes(term?.toLowerCase()) ||
       booking.address?.toLowerCase().includes(term?.toLowerCase()) ||
       booking.bookingType?.toLowerCase().includes(term?.toLowerCase())
@@ -410,11 +428,10 @@ const Booking: React.FC = () => {
 
   const sortUpcomingBookings = (bookings: Booking[]): Booking[] => {
     const statusOrder: Record<string, number> = {
-      'ACTIVE': 1,
-      'IN_PROGRESS': 2,
-      'NOT_STARTED': 3,
-      'COMPLETED': 4,
-      'CANCELLED': 5
+      'NOT_STARTED': 2,
+      'IN_PROGRESS': 1,
+      'COMPLETED': 3,
+      'CANCELLED': 4
     };
 
     return [...bookings].sort((a, b) => {
@@ -424,20 +441,12 @@ const Booking: React.FC = () => {
     });
   };
 
- 
-
-  // Refresh function
+  // Improved refresh function
   const onRefresh = async () => {
     setIsRefreshing(true);
     try {
       if (customerId !== null) {
-        const response = await axios.get(
-          `https://payments-j5id.onrender.com/api/customers/${customerId}/engagements`
-        );
-        const { past = [], ongoing = [], upcoming = [] } = response.data || {};
-        setPastBookings(mapBookingData(past));
-        setCurrentBookings(mapBookingData(ongoing));
-        setFutureBookings(mapBookingData(upcoming));
+        await refreshBookings();
       }
     } catch (error) {
       console.error("Error refreshing bookings:", error);
@@ -498,7 +507,7 @@ const Booking: React.FC = () => {
       'cancel',
       booking,
       'Cancel Booking',
-      `Are you sure you want to cancel your ${getServiceTitle(booking.serviceType)} booking? This action cannot be undone.`,
+      `Are you sure you want to cancel your ${getServiceTitle(booking.service_type)} booking? This action cannot be undone.`,
       'warning'
     );
   };
@@ -529,116 +538,66 @@ const Booking: React.FC = () => {
     setModifyDialogOpen(true);
   };
 
-  // const handleVacationClick = (booking: Booking) => {
-  //   setSelectedBookingForLeave(booking);
-  //   setHolidayDialogOpen(true);
-  // };
+  const handleVacationClick = (booking: Booking) => {
+    setSelectedBookingForVacation(booking);
+    setVacationDialogOpen(true);
+  };
 
   const handleApplyLeaveClick = (booking: Booking) => {
     setSelectedBookingForLeave(booking);
     setHolidayDialogOpen(true);
   };
 
-  // ACTION HANDLERS - API CALLS
+  // Improved cancel booking with PaymentInstance
   const handleCancelBooking = async (booking: Booking) => {
-    const updatedStatus = "CANCELLED";
-    const serviceTypeUpperCase = booking.serviceType.toUpperCase();
-
-    let updatePayload: any = {
-      customerId: customerId,
-      taskStatus: updatedStatus,
-      modifiedBy: "CUSTOMER"
-    };
-
     try {
-      const response = await axiosInstance.put(
-        `/api/serviceproviders/update/engagement/${booking.id}`,
-        updatePayload
+      setActionLoading(true);
+      
+      const response = await PaymentInstance.put(
+        `/api/engagements/${booking.id}`,
+        {
+          task_status: "CANCELLED"
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
 
+      // Refresh bookings after cancellation
+      await refreshBookings();
+      setOpenSnackbar(true);
+      
+    } catch (error: any) {
+      console.error("Error cancelling engagement:", error);
+      // Fallback update local state
       setCurrentBookings((prev) =>
         prev.map((b) =>
-          b.id === booking.id ? { ...b, taskStatus: updatedStatus } : b
+          b.id === booking.id ? { ...b, taskStatus: "CANCELLED" } : b
         )
       );
       setFutureBookings((prev) =>
         prev.map((b) =>
-          b.id === booking.id ? { ...b, taskStatus: updatedStatus } : b
+          b.id === booking.id ? { ...b, taskStatus: "CANCELLED" } : b
         )
       );
-    } catch (error: any) {
-      console.error("Error updating task status:", error);
-      if (error.response) {
-        console.error("Full error response:", error.response.data);
-      } else if (error.message) {
-        console.error("Error message:", error.message);
-      } else {
-        console.error("Unknown error occurred");
-      }
+    } finally {
+      setActionLoading(false);
     }
-
-    setOpenSnackbar(true);
   };
 
+  // Improved modify booking handling
   const handleSaveModifiedBooking = async (updatedData: {
     startDate: string;
     endDate: string;
     timeSlot: string;
   }) => {
-    if (!selectedBooking) return;
-
-    try {
-      setIsRefreshing(true);
-      
-      // Update local state
-      setCurrentBookings((prev) =>
-        prev.map((b) =>
-          b.id === selectedBooking.id
-            ? { 
-                ...b, 
-                startDate: updatedData.startDate,
-                endDate: updatedData.endDate,
-                timeSlot: updatedData.timeSlot 
-              }
-            : b
-        )
-      );
-      setFutureBookings((prev) =>
-        prev.map((b) =>
-          b.id === selectedBooking.id
-            ? { 
-                ...b, 
-                startDate: updatedData.startDate,
-                endDate: updatedData.endDate,
-                timeSlot: updatedData.timeSlot 
-              }
-            : b
-        )
-      );
-      setModifiedBookings(prev => [...prev, selectedBooking.id]);
-      setModifyDialogOpen(false);
-      setOpenSnackbar(true);
-      
-      // Refresh data
-      if (customerId !== null) {
-        await axios
-          .get(`https://payments-j5id.onrender.com/api/customers/${customerId}/engagements`)
-          .then((response) => {
-            const { past = [], ongoing = [], upcoming = [] } = response.data || {};
-            setPastBookings(mapBookingData(past));
-            setCurrentBookings(mapBookingData(ongoing));
-            setFutureBookings(mapBookingData(upcoming));
-          });
-      }
-    } catch (error: any) {
-      console.error("Error updating booking:", error);
-      if (error.response) {
-        console.error("Full error response:", error.response.data);
-      }
-    }
+    setModifyDialogOpen(false);
   };
 
-  const handleLeaveSubmit = async (startDate: string, endDate: string, serviceType: string): Promise<void> => {
+  // Improved leave submit with PaymentInstance
+  const handleLeaveSubmit = async (startDate: string, endDate: string, service_type: string): Promise<void> => {
     if (!selectedBookingForLeave || !customerId) {
       throw new Error("Missing required information for leave application");
     }
@@ -646,29 +605,20 @@ const Booking: React.FC = () => {
     try {
       setIsRefreshing(true);
       
-      await axios.post(
-        `https://payments-j5id.onrender.com/api/customer/${customerId}/leaves`,
+      await PaymentInstance.put(
+        `api/engagements/${selectedBookingForLeave.id}`,
         {
-          engagement_id: selectedBookingForLeave.id,
-          leave_start_date: startDate,
-          leave_end_date: endDate,
-          leave_type: 'VACATION',
+          modified_by_role: appUser?.role || 'CUSTOMER',
+          vacation_start_date: startDate,
+          vacation_end_date: endDate,
+          modified_by_id: customerId,
         }
       );
 
       setBookingsWithVacation(prev => [...prev, selectedBookingForLeave.id]);
 
-      // Refresh data
-      if (customerId !== null) {
-        const response = await axios.get(
-          `https://payments-j5id.onrender.com/api/customers/${customerId}/engagements`
-        );
-        const { past = [], ongoing = [], upcoming = [] } = response.data || {};
-        setPastBookings(mapBookingData(past));
-        setCurrentBookings(mapBookingData(ongoing));
-        setFutureBookings(mapBookingData(upcoming));
-      }
-
+      // Refresh bookings after applying leave
+      await refreshBookings();
       setOpenSnackbar(true);
       setHolidayDialogOpen(false);
     } catch (error) {
@@ -677,6 +627,12 @@ const Booking: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  // Vacation success handler
+  const handleVacationSuccess = () => {
+    refreshBookings();
+    setOpenSnackbar(true);
   };
 
   // DATA PROCESSING
@@ -696,313 +652,247 @@ const Booking: React.FC = () => {
       day: 'numeric'
     });
   };
-   // Define status options for tabs
+
+  // Define status options for tabs - UPDATED to match React version
   const statusTabs = [
     { value: 'ALL', label: 'All', count: upcomingBookings.length },
     { value: 'NOT_STARTED', label: 'Not Started', count: upcomingBookings.filter(b => b.taskStatus === 'NOT_STARTED').length },
-    { value: 'ACTIVE', label: 'Active', count: upcomingBookings.filter(b => b.taskStatus === 'ACTIVE').length },
     { value: 'IN_PROGRESS', label: 'In Progress', count: upcomingBookings.filter(b => b.taskStatus === 'IN_PROGRESS').length },
     { value: 'COMPLETED', label: 'Completed', count: upcomingBookings.filter(b => b.taskStatus === 'COMPLETED').length },
     { value: 'CANCELLED', label: 'Cancelled', count: upcomingBookings.filter(b => b.taskStatus === 'CANCELLED').length },
   ];
 
-  const [vacationDialogOpen, setVacationDialogOpen] = useState(false);
-const [selectedBookingForVacation, setSelectedBookingForVacation] = useState<Booking | null>(null);
-
-  // Update the handleVacationClick method
-const handleVacationClick = (booking: Booking) => {
-  setSelectedBookingForVacation(booking);
-  setVacationDialogOpen(true);
-};
-
-// Add handleVacationSuccess method
-const handleVacationSuccess = () => {
-  // Refresh bookings data when vacation operation is successful
-  if (customerId !== null) {
-    axios.get(`https://payments-j5id.onrender.com/api/customers/${customerId}/engagements`)
-      .then((response) => {
-        const { past = [], ongoing = [], upcoming = [] } = response.data || {};
-        setPastBookings(mapBookingData(past));
-        setCurrentBookings(mapBookingData(ongoing));
-        setFutureBookings(mapBookingData(upcoming));
-      });
-  }
-  setOpenSnackbar(true);
-};
-
-  const renderBookingItem = ({ item }: { item: Booking }) => (
-    <Card style={styles.bookingCard}>
-      <View style={styles.cardHeader}>
-        <View style={styles.serviceInfo}>
-          <Icon 
-            name={getServiceIcon(item.serviceType)} 
-            size={24} 
-            color={
-              item.serviceType === 'maid' ? '#f97316' : 
-              item.serviceType === 'cleaning' ? '#ec4899' : 
-              item.serviceType === 'nanny' ? '#ef4444' : '#000'
-            } 
-          />
-          <View>
-            <Text style={styles.serviceTitle}>{getServiceTitle(item.serviceType)}</Text>
-            <Text style={styles.bookingId}>Booking #{item.id}</Text>
-          </View>
-        </View>
-        <View style={styles.badgeContainer}>
-          {getBookingTypeBadge(item.bookingType)}
-          {getStatusBadge(item.taskStatus)}
-        </View>
-      </View>
-
-      <View style={styles.cardContent}>
-        <View style={styles.bookingDetails}>
-          <View style={styles.detailRow}>
-            <Icon name="calendar" size={18} color="#6b7280" />
-            <Text style={styles.detailText}>{formatDate(item.date)}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Icon name="clock" size={18} color="#6b7280" />
-            <Text style={styles.detailText}>{item.timeSlot}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Icon name="map-marker" size={18} color="#6b7280" />
-            <Text style={styles.detailText}>{item.address}</Text>
-          </View>
-        </View>
-
-        <View style={styles.providerInfo}>
-          <View>
-            <Text style={styles.providerName}>{item.serviceProviderName}</Text>
-            <View style={styles.ratingContainer}>
-              <Icon name="star" size={16} color="#f59e0b" />
-              <Text style={styles.ratingText}>{4.5}</Text>
+  // Improved renderBookingItem with new action buttons logic
+  const renderBookingItem = ({ item }: { item: Booking }) => {
+    const serviceType = item.serviceType || item.service_type;
+    
+    return (
+      <Card style={styles.bookingCard}>
+        <View style={styles.cardHeader}>
+          <View style={styles.serviceInfo}>
+            <Icon 
+              name={getServiceIcon(serviceType)} 
+              size={24} 
+              color={
+                serviceType === 'maid' ? '#f97316' : 
+                serviceType === 'cleaning' ? '#ec4899' : 
+                serviceType === 'nanny' ? '#ef4444' : '#000'
+              } 
+            />
+            <View>
+              <Text style={styles.serviceTitle}>{getServiceTitle(serviceType)}</Text>
+              <Text style={styles.bookingId}>Booking #{item.id}</Text>
             </View>
           </View>
-          <Text style={styles.priceText}>₹{item.monthlyAmount}</Text>
+          <View style={styles.badgeContainer}>
+            {getBookingTypeBadge(item.bookingType)}
+            {getStatusBadge(item.taskStatus)}
+          </View>
         </View>
-        {item.responsibilities && (
-          <View style={styles.responsibilitiesContainer}>
-            <Text style={styles.responsibilitiesTitle}>Responsibilities:</Text>
-            <View style={styles.responsibilitiesList}>
-              {[
-                ...(item.responsibilities.tasks || []).map(task => ({ task, isAddon: false })),
-                ...(item.responsibilities.add_ons || []).map(task => ({ task, isAddon: true })),
-              ].map((item: any, index: number) => {
-                const { task, isAddon } = item;
 
-                const taskLabel =
-                  typeof task === "object" && task !== null
-                    ? Object.entries(task)
-                        .filter(([key]) => key !== "taskType")
-                        .map(([key, value]) => `${value} ${key}`)
-                        .join(", ")
-                    : "";
-
-                const taskName = typeof task === "object" ? task.taskType : task;
-
-                return (
-                  <View key={index} style={styles.responsibilityBadge}>
-                    <Text style={styles.responsibilityText}>
-                      {isAddon ? "Add-ons - " : ""}
-                      {taskName} {taskLabel && `- ${taskLabel}`}
-                    </Text>
-                  </View>
-                );
-              })}
+        <View style={styles.cardContent}>
+          <View style={styles.bookingDetails}>
+            <View style={styles.detailRow}>
+              <Icon name="calendar" size={18} color="#6b7280" />
+              <Text style={styles.detailText}>{formatDate(item.date)}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Icon name="clock" size={18} color="#6b7280" />
+              <Text style={styles.detailText}>{item.timeSlot}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Icon name="map-marker" size={18} color="#6b7280" />
+              <Text style={styles.detailText}>{item.address}</Text>
             </View>
           </View>
-        )}
-      </View>
 
-      <Separator style={styles.separator} />
+          <View style={styles.providerInfo}>
+            <View>
+              <Text style={styles.providerName}>{item.serviceProviderName}</Text>
+              <View style={styles.ratingContainer}>
+                <Icon name="star" size={16} color="#f59e0b" />
+                <Text style={styles.ratingText}>{4.5}</Text>
+              </View>
+            </View>
+            <Text style={styles.priceText}>₹{item.monthlyAmount}</Text>
+          </View>
+          {item.responsibilities && (
+            <View style={styles.responsibilitiesContainer}>
+              <Text style={styles.responsibilitiesTitle}>Responsibilities:</Text>
+              <View style={styles.responsibilitiesList}>
+                {[
+                  ...(item.responsibilities.tasks || []).map(task => ({ task, isAddon: false })),
+                  ...(item.responsibilities.add_ons || []).map(task => ({ task, isAddon: true })),
+                ].map((item: any, index: number) => {
+                  const { task, isAddon } = item;
 
-      <View style={styles.actionButtons}>
-        {/* ACTIVE Status */}
-        {item.taskStatus === "ACTIVE" && (
-          <>
-            {/* Call Provider Button - Show for all booking types */}
-            <Button style={styles.actionButton} onPress={() => {}}>
-              <Icon name="phone" size={16} color="#000" />
-              <Text>Call Provider</Text>
-            </Button>
+                  const taskLabel =
+                    typeof task === "object" && task !== null
+                      ? Object.entries(task)
+                          .filter(([key]) => key !== "taskType")
+                          .map(([key, value]) => `${value} ${key}`)
+                          .join(", ")
+                      : "";
 
-            {/* Message Button - Show for all booking types */}
-            <Button style={styles.actionButton} onPress={() => {}}>
-              <Icon name="message-text" size={16} color="#000" />
-              <Text>Message</Text>
-            </Button>
+                  const taskName = typeof task === "object" ? task.taskType : task;
 
-            {/* Cancel Booking Button - Show for all booking types */}
-            <Button 
-              style={[styles.actionButton, styles.cancelButton]}
-              onPress={() => handleCancelClick(item)}
-            >
-              <Icon name="close-circle" size={16} color="#fff" />
-              <Text style={styles.cancelButtonText}>Cancel Booking</Text>
-            </Button>
+                  return (
+                    <View key={index} style={styles.responsibilityBadge}>
+                      <Text style={styles.responsibilityText}>
+                        {isAddon ? "Add-ons - " : ""}
+                        {taskName} {taskLabel && `- ${taskLabel}`}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </View>
 
-            {/* Modify Booking Button - Show only for MONTHLY bookings */}
-            {item.bookingType === "MONTHLY" && (
-              <Button
-                style={styles.actionButton}
-                onPress={() => handleModifyClick(item)}
-              >
-                <Icon name="pencil" size={16} color="#000" />
-                <Text>Modify Booking</Text>
+        <Separator style={styles.separator} />
+
+        <View style={styles.actionButtons}>
+          {/* NOT_STARTED Status */}
+          {item.taskStatus === 'NOT_STARTED' && (
+            <>
+              <Button style={styles.actionButton} onPress={() => {}}>
+                <Icon name="phone" size={16} color="#000" />
+                <Text>Call Provider</Text>
               </Button>
-            )}
 
-            {/* Add Vacation Button - Show only for MONTHLY bookings */}
-            {item.bookingType === "MONTHLY" && (
-              <Button
-                style={styles.actionButton}
-                onPress={() => handleVacationClick(item)}
-                disabled={hasMatchingHolidayIds(item) || isRefreshing}
-              >
-                <Text>
-                  {hasMatchingHolidayIds(item)
-                    ? "Vacation Added"
-                    : "Add Vacation"}
-                </Text>
-              </Button>
-            )}
-          </>
-        )}
-
-        {/* IN_PROGRESS Status */}
-        {item.taskStatus === "IN_PROGRESS" && (
-          <>
-            {/* Call Provider Button - Show for all booking types */}
-            <Button style={styles.actionButton} onPress={() => {}}>
-              <Icon name="phone" size={16} color="#000" />
-              <Text>Call Provider</Text>
-            </Button>
-
-            {/* Message Button - Show for all booking types */}
-            <Button style={styles.actionButton} onPress={() => {}}>
-              <Icon name="message-text" size={16} color="#000" />
-              <Text>Message</Text>
-            </Button>
-
-            {/* Cancel Booking Button - Show for all booking types */}
-            <Button 
-              style={[styles.actionButton, styles.cancelButton]}
-              onPress={() => handleCancelClick(item)}
-            >
-              <Icon name="close-circle" size={16} color="#fff" />
-              <Text style={styles.cancelButtonText}>Cancel Booking</Text>
-            </Button>
-
-            {/* Add Vacation Button - Show only for MONTHLY bookings */}
-            {item.bookingType === "MONTHLY" && (
-              <Button
-                style={styles.actionButton}
-                onPress={() => handleVacationClick(item)}
-                disabled={hasMatchingHolidayIds(item) || isRefreshing}
-              >
-                <Text>
-                  {hasMatchingHolidayIds(item)
-                    ? "Vacation Added"
-                    : "Add Vacation"}
-                </Text>
-              </Button>
-            )}
-          </>
-        )}
-
-        {/* NOT_STARTED Status */}
-        {item.taskStatus === "NOT_STARTED" && (
-          <>
-            {/* Call Provider Button - Show for all booking types */}
-            <Button style={styles.actionButton} onPress={() => {}}>
-              <Icon name="phone" size={16} color="#000" />
-              <Text>Call Provider</Text>
-            </Button>
-
-            {/* Message Button - Show for all booking types */}
-            <Button style={styles.actionButton} onPress={() => {}}>
-              <Icon name="message-text" size={16} color="#000" />
-              <Text>Message</Text>
-            </Button>
-
-            {/* Cancel Booking Button - Show for all booking types */}
-            <Button 
-              style={[styles.actionButton, styles.cancelButton]}
-              onPress={() => handleCancelClick(item)}
-            >
-              <Icon name="close-circle" size={16} color="#fff" />
-              <Text style={styles.cancelButtonText}>Cancel Booking</Text>
-            </Button>
-
-            {/* Modify Booking Button - Show only for MONTHLY bookings */}
-            {item.bookingType === "MONTHLY" && (
-              <Button
-                style={styles.actionButton}
-                onPress={() => handleModifyClick(item)}
-              >
-                <Icon name="pencil" size={16} color="#000" />
-                <Text>Modify Booking</Text>
-              </Button>
-            )}
-
-            {/* Add Vacation Button - Show only for MONTHLY bookings */}
-            {item.bookingType === "MONTHLY" && (
-              <Button
-                style={styles.actionButton}
-                onPress={() => handleVacationClick(item)}
-                disabled={hasMatchingHolidayIds(item) || isRefreshing}
-              >
-                <Text>
-                  {hasMatchingHolidayIds(item)
-                    ? "Vacation Added"
-                    : "Add Vacation"}
-                </Text>
-              </Button>
-            )}
-          </>
-        )}
-
-        {/* COMPLETED Status */}
-        {item.taskStatus === "COMPLETED" && (
-          <>
-            {/* Leave Review Button - Show for all booking types */}
-            {hasReview(item) ? (
-              <Button
-                style={[styles.actionButton, styles.disabledButton]}
-                disabled={true}
-              >
-                <Icon name="check-circle" size={16} color="#000" />
-                <Text>Review Submitted</Text>
-              </Button>
-            ) : (
-              <Button
-                style={styles.actionButton}
-                onPress={() => handleLeaveReviewClick(item)}
-              >
+              <Button style={styles.actionButton} onPress={() => {}}>
                 <Icon name="message-text" size={16} color="#000" />
-                <Text>Leave Review</Text>
+                <Text>Message</Text>
               </Button>
-            )}
 
-            {/* Book Again Button - Show for all booking types */}
+              <Button 
+                style={[styles.actionButton, styles.cancelButton]}
+                onPress={() => handleCancelClick(item)}
+              >
+                <Icon name="close-circle" size={16} color="#fff" />
+                <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+              </Button>
+
+              {item.bookingType === "MONTHLY" && (
+                <Button
+                  style={styles.actionButton}
+                  onPress={() => handleModifyClick(item)}
+                >
+                  <Icon name="pencil" size={16} color="#000" />
+                  <Text>Modify Booking</Text>
+                </Button>
+              )}
+
+              {item.bookingType === "MONTHLY" && (
+                <Button
+                  style={styles.actionButton}
+                  onPress={() => handleVacationClick(item)}
+                  disabled={hasVacation(item) || isRefreshing}
+                >
+                  <Text>
+                    {hasVacation(item) ? "Vacation Added" : "Add Vacation"}
+                  </Text>
+                </Button>
+              )}
+            </>
+          )}
+
+          {/* IN_PROGRESS Status */}
+          {item.taskStatus === 'IN_PROGRESS' && (
+            <>
+              <Button style={styles.actionButton} onPress={() => {}}>
+                <Icon name="phone" size={16} color="#000" />
+                <Text>Call Provider</Text>
+              </Button>
+
+              <Button style={styles.actionButton} onPress={() => {}}>
+                <Icon name="message-text" size={16} color="#000" />
+                <Text>Message</Text>
+              </Button>
+
+              <Button 
+                style={[styles.actionButton, styles.cancelButton]}
+                onPress={() => handleCancelClick(item)}
+              >
+                <Icon name="close-circle" size={16} color="#fff" />
+                <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+              </Button>
+
+              {item.bookingType === "MONTHLY" && (
+                <Button
+                  style={styles.actionButton}
+                  onPress={() => handleVacationClick(item)}
+                  disabled={hasVacation(item) || isRefreshing}
+                >
+                  <Text>
+                    {hasVacation(item) ? "Vacation Added" : "Add Vacation"}
+                  </Text>
+                </Button>
+              )}
+            </>
+          )}
+
+          {/* COMPLETED Status */}
+          {item.taskStatus === 'COMPLETED' && (
+            <>
+              {hasReview(item) ? (
+                <Button
+                  style={[styles.actionButton, styles.disabledButton]}
+                  disabled={true}
+                >
+                  <Icon name="check-circle" size={16} color="#000" />
+                  <Text>Review Submitted</Text>
+                </Button>
+              ) : (
+                <Button
+                  style={styles.actionButton}
+                  onPress={() => handleLeaveReviewClick(item)}
+                >
+                  <Icon name="message-text" size={16} color="#000" />
+                  <Text>Leave Review</Text>
+                </Button>
+              )}
+
+              <Button style={styles.actionButton} onPress={() => {}}>
+                <Text>Book Again</Text>
+              </Button>
+            </>
+          )}
+
+          {/* CANCELLED Status */}
+          {item.taskStatus === 'CANCELLED' && (
             <Button style={styles.actionButton} onPress={() => {}}>
               <Text>Book Again</Text>
             </Button>
-          </>
-        )}
+          )}
 
-        {/* CANCELLED Status */}
-        {item.taskStatus === "CANCELLED" && (
-          <>
-            {/* Book Again Button - Show for all booking types */}
-            <Button style={styles.actionButton} onPress={() => {}}>
-              <Text>Book Again</Text>
-            </Button>
-          </>
-        )}
-      </View>
-    </Card>
-  );
+          {/* ACTIVE Status (fallback) */}
+          {item.taskStatus === 'ACTIVE' && (
+            <>
+              <Button style={styles.actionButton} onPress={() => {}}>
+                <Icon name="phone" size={16} color="#000" />
+                <Text>Call Provider</Text>
+              </Button>
+
+              <Button style={styles.actionButton} onPress={() => {}}>
+                <Icon name="message-text" size={16} color="#000" />
+                <Text>Message</Text>
+              </Button>
+
+              <Button 
+                style={[styles.actionButton, styles.cancelButton]}
+                onPress={() => handleCancelClick(item)}
+              >
+                <Icon name="close-circle" size={16} color="#fff" />
+                <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+              </Button>
+            </>
+          )}
+        </View>
+      </Card>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -1162,17 +1052,19 @@ const handleVacationSuccess = () => {
       <UserHoliday 
         open={holidayDialogOpen}
         onClose={() => setHolidayDialogOpen(false)}
-        booking={selectedBookingForLeave}
+        booking={convertBookingForChildComponents(selectedBookingForLeave)}
         onLeaveSubmit={handleLeaveSubmit}
       />
       
       <ModifyBookingDialog
         open={modifyDialogOpen}
         onClose={() => setModifyDialogOpen(false)}
-        booking={selectedBooking}
+        booking={convertBookingForChildComponents(selectedBooking)}
         timeSlots={timeSlots}
         onSave={handleSaveModifiedBooking}
         customerId={customerId}
+        // refreshBookings={refreshBookings}
+        // setOpenSnackbar={setOpenSnackbar}
       />
 
       <ConfirmationDialog
@@ -1186,19 +1078,18 @@ const handleVacationSuccess = () => {
         severity={confirmationDialog.severity}
       />
 
-<VacationManagement
-  open={vacationDialogOpen}
-  booking={selectedBookingForVacation || { id: 0 }}
-  customerId={customerId}
-  onClose={() => setVacationDialogOpen(false)}
-  onSuccess={handleVacationSuccess}
-/>
-
+      <VacationManagement
+        open={vacationDialogOpen}
+        booking={convertBookingForChildComponents(selectedBookingForVacation)}
+        customerId={customerId}
+        onClose={() => setVacationDialogOpen(false)}
+        onSuccess={handleVacationSuccess}
+      />
 
       <AddReviewDialog
         visible={reviewDialogVisible}
         onClose={closeReviewDialog}
-        booking={selectedReviewBooking}
+        booking={convertBookingForChildComponents(selectedReviewBooking)}
         onReviewSubmitted={handleReviewSubmitted}
       />
 
@@ -1220,8 +1111,8 @@ const handleVacationSuccess = () => {
   );
 };
 
+// Styles remain the same as in your original React Native code
 const styles = StyleSheet.create({
-  // Base components styles
   card: {
     backgroundColor: '#fff',
     borderRadius: 8,
@@ -1262,8 +1153,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
     marginVertical: 8,
   },
-
-  // Container styles
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
@@ -1277,8 +1166,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     color: '#4b5563',
   },
-
-  // Header styles
   header: {
     padding: 16,
     borderBottomWidth: 1,
@@ -1337,8 +1224,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
-
-  // Section styles
   section: {
     padding: 16,
   },
@@ -1386,8 +1271,6 @@ const styles = StyleSheet.create({
   pastBadgeText: {
     color: '#6b7280',
   },
-
-  // Status filter styles
   statusFilterContainer: {
     marginBottom: 16,
   },
@@ -1422,8 +1305,6 @@ const styles = StyleSheet.create({
     color: '#4b5563',
     fontWeight: '600',
   },
-
-  // Booking card styles
   bookingCard: {
     marginBottom: 16,
     borderRadius: 8,
@@ -1516,8 +1397,6 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#fff',
   },
-
-  // Empty state styles
   emptyStateCard: {
     alignItems: 'center',
     padding: 32,
@@ -1535,8 +1414,6 @@ const styles = StyleSheet.create({
   emptyStateButton: {
     marginTop: 16,
   },
-
-  // Badge styles
   activeBadge: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderColor: 'rgba(59, 130, 246, 0.2)',
@@ -1614,7 +1491,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 12,
   },
-    responsibilitiesContainer: {
+  responsibilitiesContainer: {
     marginTop: 12,
   },
   responsibilitiesTitle: {
@@ -1638,8 +1515,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4b5563',
   },
-
-  // Snackbar styles
   snackbar: {
     position: 'absolute',
     bottom: 0,

@@ -246,42 +246,59 @@ const HomePage: React.FC<ChildComponentProps> = ({
     setOpen(false);
   };
 
-  const handleSave = (bookingDetails: any) => {
-    const booking = {
-      startDate: bookingDetails.startDate,
-      endDate: bookingDetails.endDate,
-      timeRange: bookingDetails.startTime && bookingDetails.endTime 
-        ? `${bookingDetails.startTime.format("HH:mm")} - ${bookingDetails.endTime.format("HH:mm")}`
-        : bookingDetails.startTime?.format("HH:mm") || "",
-      bookingPreference: selectedRadioButtonValue,
-      housekeepingRole: selectedType,
-      startTime: bookingDetails.startTime?.format("HH:mm"),
-      endTime: bookingDetails.endTime?.format("HH:mm"),
-    };
-
-    console.log("Dispatching booking:", booking);
-
-    if (selectedRadioButtonValue === "Date") {
-      switch (selectedType) {
-        case "COOK":
-          setShowCookDialog(true);
-          break;
-        case "MAID":
-          setShowMaidServiceDialog(true);
-          break;
-        case "NANNY":
-          setShowNannyServicesDialog(true);
-          break;
-        default:
-          sendDataToParent(DETAILS);
-      }
-    } else {
-      sendDataToParent(DETAILS);
-    }
-
-    setOpen(false);
-    dispatch(add(booking));
+const handleSave = (bookingDetails: any) => {
+  const formatDate = (value: any) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return value; // already formatted string
+    return date.toISOString().split("T")[0]; // "YYYY-MM-DD"
   };
+
+  const formatTime = (value: any) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return value; // already formatted string
+    return date.toTimeString().slice(0, 5); // "HH:mm"
+  };
+
+  const booking = {
+    start_date: formatDate(bookingDetails.startDate),
+    start_time: formatTime(bookingDetails.startTime),
+    end_date: formatDate(bookingDetails.endDate || bookingDetails.startDate),
+    end_time: formatTime(bookingDetails.endTime),
+    timeRange:
+      bookingDetails.startTime && bookingDetails.endTime
+        ? `${formatTime(bookingDetails.startTime)} - ${formatTime(bookingDetails.endTime)}`
+        : formatTime(bookingDetails.startTime) || "",
+    bookingPreference: selectedRadioButtonValue,
+    housekeepingRole: selectedType,
+  };
+
+  console.log("Dispatching booking:", booking);
+
+  if (selectedRadioButtonValue === "Date") {
+    switch (selectedType) {
+      case "COOK":
+        setShowCookDialog(true);
+        break;
+      case "MAID":
+        setShowMaidServiceDialog(true);
+        break;
+      case "NANNY":
+        setShowNannyServicesDialog(true);
+        break;
+      default:
+        sendDataToParent(DETAILS);
+    }
+  } else {
+    sendDataToParent(DETAILS);
+  }
+
+  setOpen(false);
+  dispatch(add(booking));
+};
+
+
 
   const handleLearnMore = (service: string) => {
     switch (service) {
@@ -567,7 +584,7 @@ const HomePage: React.FC<ChildComponentProps> = ({
               bookingType={{
                 startDate: startDate,
                 endDate: endDate || startDate,
-                timeRange: startTime && endTime 
+                timeRange: startTime
                   ? `${startTime.format("HH:mm")} - ${endTime.format("HH:mm")}`
                   : startTime?.format("HH:mm") || "",
                 bookingPreference: selectedRadioButtonValue,
@@ -581,20 +598,30 @@ const HomePage: React.FC<ChildComponentProps> = ({
       {showNannyServicesDialog && (
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogBox}>
-            <NannyServicesDialog
-              open={showNannyServicesDialog}
-              handleClose={() => setShowNannyServicesDialog(false)}
-              sendDataToParent={sendDataToParent}
-              bookingType={{
-                startDate: startDate,
-                endDate: endDate || startDate,
-                timeRange: startTime && endTime 
-                  ? `${startTime.format("HH:mm")} - ${endTime.format("HH:mm")}`
-                  : startTime?.format("HH:mm") || "",
-                bookingPreference: selectedRadioButtonValue,
-                housekeepingRole: selectedType,
-              }}
-            />
+           <NannyServicesDialog
+  open={showNannyServicesDialog}
+  handleClose={() => setShowNannyServicesDialog(false)}
+  sendDataToParent={sendDataToParent}
+  bookingType={{
+    start_date: startDate ? new Date(startDate).toISOString().split("T")[0] : "",
+    start_time: startTime ? new Date(startTime).toTimeString().slice(0, 5) : "",
+    end_date: endDate
+      ? new Date(endDate).toISOString().split("T")[0]
+      : startDate
+      ? new Date(startDate).toISOString().split("T")[0]
+      : "",
+    end_time: endTime ? new Date(endTime).toTimeString().slice(0, 5) : "",
+    timeRange:
+      startTime
+        ? `${new Date(startTime).toTimeString().slice(0, 5)}`
+        : startTime
+        ? new Date(startTime).toTimeString().slice(0, 5)
+        : "",
+    bookingPreference: selectedRadioButtonValue,
+    housekeepingRole: selectedType,
+  }}
+/>
+
           </View>
         </View>
       )}
@@ -606,6 +633,24 @@ const HomePage: React.FC<ChildComponentProps> = ({
               open={showMaidServiceDialog}
               handleClose={() => setShowMaidServiceDialog(false)}
               sendDataToParent={sendDataToParent}
+               bookingType={{
+    start_date: startDate ? new Date(startDate).toISOString().split("T")[0] : "",
+    start_time: startTime ? new Date(startTime).toTimeString().slice(0, 5) : "",
+    end_date: endDate
+      ? new Date(endDate).toISOString().split("T")[0]
+      : startDate
+      ? new Date(startDate).toISOString().split("T")[0]
+      : "",
+    end_time: endTime ? new Date(endTime).toTimeString().slice(0, 5) : "",
+    timeRange:
+      startTime
+        ? `${new Date(startTime).toTimeString().slice(0, 5)}`
+        : startTime
+        ? new Date(startTime).toTimeString().slice(0, 5)
+        : "",
+    bookingPreference: selectedRadioButtonValue,
+    housekeepingRole: selectedType,
+  }}
             />
           </View>
         </View>

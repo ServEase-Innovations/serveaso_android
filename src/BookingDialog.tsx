@@ -35,14 +35,6 @@ interface BookingDialogProps {
   setEndTime: (val: Dayjs | null) => void;
 }
 
-const isBookingValid = (time: Dayjs | null) => {
-  if (!time) return false;
-  const now = dayjs();
-  if (time.isBefore(now.add(30, "minute").subtract(1, "second"))) return false;
-  const hour = time.hour();
-  return hour >= 5 && hour < 22; // 5 AM–10 PM
-};
-
 const BookingDialog: React.FC<BookingDialogProps> = ({
   open,
   onClose,
@@ -58,67 +50,311 @@ const BookingDialog: React.FC<BookingDialogProps> = ({
   setStartTime,
   setEndTime,
 }) => {
-  const [showPicker, setShowPicker] = useState<"start" | "end" | null>(null);
-  const [lastSelectedDate, setLastSelectedDate] = useState<Dayjs | null>(null);
-  const [pickerKey, setPickerKey] = useState(0); // Key to force re-render
+  const [showDatePicker, setShowDatePicker] = useState<"start" | "end" | null>(null);
+  const [showCustomTimePicker, setShowCustomTimePicker] = useState<"start" | "end" | null>(null);
+  const [tempDate, setTempDate] = useState<Date | null>(null);
+  const [customHours, setCustomHours] = useState<number>(12);
+  const [customMinutes, setCustomMinutes] = useState<number>(0);
+  const [customAmPm, setCustomAmPm] = useState<"AM" | "PM">("AM");
+  const [use24HourFormat, setUse24HourFormat] = useState<boolean>(false);
 
   const today = dayjs();
   const maxDate21Days = today.add(21, "day");
   const maxDate90Days = today.add(89, "day");
 
-  const updateStartDate = (newValue: Dayjs) => {
-    let adjustedTime = newValue;
-    if (newValue.isSame(today, "day")) {
-      const nowPlus30 = today.add(30, "minute");
-      if (newValue.isBefore(nowPlus30)) adjustedTime = nowPlus30;
-      if (adjustedTime.hour() < 5) adjustedTime = adjustedTime.hour(5).minute(0);
-      else if (adjustedTime.hour() >= 22)
-        adjustedTime = adjustedTime.hour(21).minute(55);
-    } else {
-      adjustedTime = adjustedTime.hour(5).minute(0);
+  // Reset picker state when modal closes
+  useEffect(() => {
+    if (!open) {
+      setShowDatePicker(null);
+      setShowCustomTimePicker(null);
+      setTempDate(null);
+    }
+  }, [open]);
+
+  // Initialize custom time picker with current time
+  useEffect(() => {
+    if (showCustomTimePicker) {
+      const currentTime = showCustomTimePicker === "start" ? startTime : endTime;
+      const now = dayjs();
+      let defaultTime = now.add(30, 'minute'); // Default to 30 minutes from now
+
+      if (currentTime) {
+        defaultTime = currentTime;
+      }
+
+      // Adjust to valid time range if needed
+      if (defaultTime.hour() < 5) {
+        defaultTime = defaultTime.hour(5).minute(0);
+      } else if (defaultTime.hour() >= 22) {
+        defaultTime = defaultTime.hour(21).minute(55);
+      }
+
+      const hours = defaultTime.hour();
+      const minutes = defaultTime.minute();
+      
+      if (use24HourFormat) {
+        // 24-hour format
+        setCustomHours(hours);
+      } else {
+        // 12-hour format
+        if (hours === 0) {
+          setCustomHours(12);
+          setCustomAmPm("AM");
+        } else if (hours < 12) {
+          setCustomHours(hours);
+          setCustomAmPm("AM");
+        } else if (hours === 12) {
+          setCustomHours(12);
+          setCustomAmPm("PM");
+        } else {
+          setCustomHours(hours - 12);
+          setCustomAmPm("PM");
+        }
+      }
+      setCustomMinutes(minutes);
+    }
+  }, [showCustomTimePicker, startTime, endTime, use24HourFormat]);
+
+  const handleDateSelect = (type: "start" | "end") => {
+    setShowDatePicker(type);
+    setShowCustomTimePicker(null);
+  };
+
+  const handleTimeSelect = (type: "start" | "end") => {
+    setShowCustomTimePicker(type);
+    setShowDatePicker(null);
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(null);
     }
 
-    setStartDate(adjustedTime.toISOString());
-    setStartTime(adjustedTime);
-    setLastSelectedDate(adjustedTime);
+    if (selectedDate && showDatePicker) {
+      setTempDate(selectedDate);
+      
+      // Auto-show time picker after date selection on Android
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          setShowCustomTimePicker(showDatePicker);
+        }, 100);
+      }
+    }
+  };
 
-    const defaultEnd = adjustedTime.add(1, "hour");
-    setEndDate(defaultEnd.toISOString());
-    setEndTime(defaultEnd);
+  const isTimeValid = (hours24: number, minutes: number, type: "start" | "end"): boolean => {
+    const now = dayjs();
+    const selectedDateTime = tempDate 
+      ? dayjs(tempDate).hour(hours24).minute(minutes)
+      : dayjs().hour(hours24).minute(minutes);
 
-    if (selectedOption === "Monthly") {
-      const endDateValue = adjustedTime.add(1, "month");
+    // For start time, check 30-minute minimum gap
+    if (type === "start") {
+      if (selectedDateTime.isSame(now, 'day') && selectedDateTime.isBefore(now.add(30, 'minute'))) {
+        return false;
+      }
+    }
+
+    // Check 5 AM - 10 PM range (5 to 21:59)
+    if (hours24 < 5 || hours24 >= 22) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const getValidTimeOptions = (type: "start" | "end") => {
+    const now = dayjs();
+    const isToday = tempDate ? dayjs(tempDate).isSame(now, 'day') : true;
+    
+    // For 24-hour format: 5 to 21 (5 AM to 9 PM)
+    const hours24 = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+    const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+    
+    const validHours = hours24.filter(hour24 => {
+      // For start times on today, check 30-minute minimum
+      if (type === "start" && isToday) {
+        const testTime = tempDate 
+          ? dayjs(tempDate).hour(hour24).minute(0)
+          : dayjs().hour(hour24).minute(0);
+        
+        if (testTime.isBefore(now.add(30, 'minute'))) {
+          return false;
+        }
+      }
+      
+      return hour24 >= 5 && hour24 < 22;
+    });
+
+    return { validHours, validMinutes: minutes };
+  };
+
+  const handleCustomTimeConfirm = () => {
+    if (showCustomTimePicker) {
+      // Convert to 24-hour format
+      let hours24 = customHours;
+      if (!use24HourFormat) {
+        // Convert from 12-hour to 24-hour format
+        if (customAmPm === "PM" && customHours !== 12) {
+          hours24 = customHours + 12;
+        } else if (customAmPm === "AM" && customHours === 12) {
+          hours24 = 0;
+        }
+      }
+
+      // Validate time
+      if (!isTimeValid(hours24, customMinutes, showCustomTimePicker)) {
+        const now = dayjs();
+        const selectedDateTime = tempDate 
+          ? dayjs(tempDate).hour(hours24).minute(customMinutes)
+          : dayjs().hour(hours24).minute(customMinutes);
+
+        if (selectedDateTime.isBefore(now.add(30, 'minute')) && showCustomTimePicker === "start") {
+          Alert.alert(
+            "Invalid Time",
+            "Please select a time at least 30 minutes from now"
+          );
+          return;
+        } else if (hours24 < 5 || hours24 >= 22) {
+          Alert.alert(
+            "Invalid Time",
+            "Please select a time between 5 AM (05:00) and 10 PM (22:00)"
+          );
+          return;
+        }
+      }
+
+      let selectedDateTime: Dayjs;
+
+      if (tempDate) {
+        selectedDateTime = dayjs(tempDate)
+          .hour(hours24)
+          .minute(customMinutes)
+          .second(0)
+          .millisecond(0);
+        setTempDate(null);
+      } else {
+        const currentDateTime = showCustomTimePicker === "start" ? startTime : endTime;
+        if (currentDateTime) {
+          selectedDateTime = currentDateTime
+            .hour(hours24)
+            .minute(customMinutes)
+            .second(0)
+            .millisecond(0);
+        } else {
+          selectedDateTime = dayjs()
+            .hour(hours24)
+            .minute(customMinutes)
+            .second(0)
+            .millisecond(0);
+        }
+      }
+
+      // Apply final validation and adjustments
+      if (showCustomTimePicker === "start") {
+        updateStartDateTime(selectedDateTime);
+      } else {
+        updateEndDateTime(selectedDateTime);
+      }
+    }
+
+    setShowCustomTimePicker(null);
+  };
+
+  const handleCustomTimeCancel = () => {
+    setShowCustomTimePicker(null);
+    setTempDate(null);
+  };
+
+  const updateStartDateTime = (newDateTime: Dayjs) => {
+    const now = dayjs();
+    let adjustedDateTime = newDateTime;
+
+    // Ensure start time is at least 30 minutes from now if it's today
+    if (newDateTime.isSame(now, 'day') && newDateTime.isBefore(now.add(30, 'minute'))) {
+      adjustedDateTime = now.add(30, 'minute');
+    }
+
+    // Ensure time is within 5 AM - 10 PM
+    const hour = adjustedDateTime.hour();
+    if (hour < 5) {
+      adjustedDateTime = adjustedDateTime.hour(5).minute(0);
+    } else if (hour >= 22) {
+      adjustedDateTime = adjustedDateTime.hour(21).minute(55);
+    }
+
+    setStartDate(adjustedDateTime.toISOString());
+    setStartTime(adjustedDateTime);
+
+    // Set default end time based on booking option
+    if (selectedOption === "Date") {
+      const defaultEnd = adjustedDateTime.add(1, "hour");
+      // Ensure end time doesn't go beyond 10 PM
+      let finalEnd = defaultEnd;
+      if (defaultEnd.hour() >= 22) {
+        finalEnd = adjustedDateTime.hour(21).minute(55);
+      }
+      setEndDate(finalEnd.toISOString());
+      setEndTime(finalEnd);
+    } else if (selectedOption === "Monthly") {
+      const endDateValue = adjustedDateTime.add(1, "month");
       setEndDate(endDateValue.toISOString());
       setEndTime(endDateValue);
     }
   };
 
-  const updateEndDate = (newValue: Dayjs) => {
-    setEndDate(newValue.toISOString());
-    setEndTime(newValue);
+  const updateEndDateTime = (newDateTime: Dayjs) => {
+    let adjustedDateTime = newDateTime;
+
+    // Ensure end time is after start time
+    if (startTime && newDateTime.isBefore(startTime)) {
+      adjustedDateTime = startTime.add(1, 'hour');
+    }
+
+    // Ensure time is within 5 AM - 10 PM
+    const hour = adjustedDateTime.hour();
+    if (hour < 5) {
+      adjustedDateTime = adjustedDateTime.hour(5).minute(0);
+    } else if (hour >= 22) {
+      adjustedDateTime = adjustedDateTime.hour(21).minute(55);
+    }
+
+    setEndDate(adjustedDateTime.toISOString());
+    setEndTime(adjustedDateTime);
   };
 
   const isConfirmDisabled = () => {
-    switch (selectedOption) {
-      case "Date":
-        return !startDate || !startTime;
-      case "Short term":
-        if (!startDate || !endDate || !startTime || !endTime) return true;
-        return dayjs(endDate).isBefore(dayjs(startDate));
-      case "Monthly":
-        return !startDate || !startTime;
-      default:
-        return true;
+    if (selectedOption === "Date") {
+      return !startDate || !startTime;
+    } else if (selectedOption === "Short term") {
+      if (!startDate || !endDate || !startTime || !endTime) return true;
+      return dayjs(endDate).isBefore(dayjs(startDate));
+    } else if (selectedOption === "Monthly") {
+      return !startDate || !startTime;
     }
+    return true;
   };
 
   const handleAccept = () => {
-    if (startTime && !isBookingValid(startTime)) {
-      Alert.alert(
-        "Invalid Time",
-        "Please select a time between 5 AM and 10 PM, at least 30 minutes from now"
-      );
-      return;
+    // Final validation before saving
+    if (startTime) {
+      const now = dayjs();
+      if (startTime.isSame(now, 'day') && startTime.isBefore(now.add(30, 'minute'))) {
+        Alert.alert(
+          "Invalid Time",
+          "Please select a start time at least 30 minutes from now"
+        );
+        return;
+      }
+
+      const hour = startTime.hour();
+      if (hour < 5 || hour >= 22) {
+        Alert.alert(
+          "Invalid Time",
+          "Please select a time between 5 AM (05:00) and 10 PM (22:00)"
+        );
+        return;
+      }
     }
 
     onSave({
@@ -132,106 +368,274 @@ const BookingDialog: React.FC<BookingDialogProps> = ({
 
   const getDuration = () => {
     if (!startTime || !endTime) return 1;
-    return endTime.diff(startTime, "hour");
-  };
-
-  const handleDateChange = (event: any, selectedDate: Date | undefined, type: "start" | "end") => {
-    // Always close the picker first to avoid the dismiss error
-    setShowPicker(null);
-    
-    // Add a small delay to ensure the picker is properly closed
-    setTimeout(() => {
-      // Check if date is undefined (cancelled)
-      if (!selectedDate) {
-        return;
-      }
-
-      const newValue = dayjs(selectedDate);
-      
-      if (type === "start") {
-        updateStartDate(newValue);
-      } else {
-        updateEndDate(newValue);
-      }
-
-      // Force re-render of picker for next use
-      setPickerKey(prev => prev + 1);
-    }, 100);
-  };
-
-  const openPicker = (type: "start" | "end") => {
-    // Force re-render of picker
-    setPickerKey(prev => prev + 1);
-    setShowPicker(type);
-  };
-
-  const renderDatePicker = (type: "start" | "end") => {
-    const currentDate = type === "start" ? startTime : endTime;
-    
-    if (Platform.OS === 'ios') {
-      return (
-        <View style={styles.pickerContainer}>
-          <DateTimePicker
-            key={`${type}-${pickerKey}`}
-            value={currentDate ? new Date(currentDate.toISOString()) : new Date()}
-            mode="datetime"
-            display="spinner"
-            minimumDate={
-              type === "start"
-                ? new Date()
-                : startDate
-                ? new Date(dayjs(startDate).add(1, "hour").toISOString())
-                : new Date()
-            }
-            maximumDate={
-              selectedOption === "Monthly"
-                ? new Date(maxDate90Days.toISOString())
-                : new Date(maxDate21Days.toISOString())
-            }
-            onChange={(event, date) => handleDateChange(event, date, type)}
-          />
-          
-          <View style={styles.iosButtonContainer}>
-            <TouchableOpacity 
-              style={styles.iosButton}
-              onPress={() => setShowPicker(null)}
-            >
-              <Text style={styles.iosButtonText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
-    }
-
-    // Android - render picker only when showPicker is true
-    if (showPicker === type) {
-      return (
-        <DateTimePicker
-          key={`${type}-${pickerKey}`}
-          value={currentDate ? new Date(currentDate.toISOString()) : new Date()}
-          mode="datetime"
-          display="default"
-          minimumDate={
-            type === "start"
-              ? new Date()
-              : startDate
-              ? new Date(dayjs(startDate).add(1, "hour").toISOString())
-              : new Date()
-          }
-          maximumDate={
-            selectedOption === "Monthly"
-              ? new Date(maxDate90Days.toISOString())
-              : new Date(maxDate21Days.toISOString())
-          }
-          onChange={(event, date) => handleDateChange(event, date, type)}
-        />
-      );
-    }
-
-    return null;
+    const durationHours = endTime.diff(startTime, "hour", true);
+    return Math.max(1, Math.round(durationHours));
   };
 
   const duration = getDuration();
+
+  // Helper function to get maximum date based on selected option
+  const getMaximumDate = () => {
+    if (selectedOption === "Monthly") {
+      return new Date(maxDate90Days.toISOString());
+    }
+    return new Date(maxDate21Days.toISOString());
+  };
+
+  // Custom Time Picker Component
+  const renderCustomTimePicker = () => {
+    const { validHours, validMinutes } = getValidTimeOptions(showCustomTimePicker!);
+    const now = dayjs();
+    const isToday = tempDate ? dayjs(tempDate).isSame(now, 'day') : true;
+
+    // Convert current selection to 24-hour format for validation
+    let currentHours24 = customHours;
+    if (!use24HourFormat) {
+      if (customAmPm === "PM" && customHours !== 12) {
+        currentHours24 = customHours + 12;
+      } else if (customAmPm === "AM" && customHours === 12) {
+        currentHours24 = 0;
+      }
+    }
+
+    const isCurrentTimeValid = isTimeValid(currentHours24, customMinutes, showCustomTimePicker!);
+
+    const getDisplayTime = () => {
+      if (use24HourFormat) {
+        return `${currentHours24.toString().padStart(2, '0')}:${customMinutes.toString().padStart(2, '0')}`;
+      } else {
+        return `${customHours}:${customMinutes.toString().padStart(2, '0')} ${customAmPm}`;
+      }
+    };
+
+    const get24HourDisplay = () => {
+      let hours24 = customHours;
+      if (!use24HourFormat) {
+        if (customAmPm === "PM" && customHours !== 12) {
+          hours24 = customHours + 12;
+        } else if (customAmPm === "AM" && customHours === 12) {
+          hours24 = 0;
+        }
+      }
+      return `${hours24.toString().padStart(2, '0')}:${customMinutes.toString().padStart(2, '0')}`;
+    };
+
+    return (
+      <View style={styles.customTimePickerContainer}>
+        <Text style={styles.customTimePickerTitle}>
+          Select {showCustomTimePicker === "start" ? "Start" : "End"} Time
+        </Text>
+        
+        <View style={styles.formatToggle}>
+          <TouchableOpacity
+            style={[
+              styles.formatButton,
+              !use24HourFormat && styles.formatButtonActive
+            ]}
+            onPress={() => setUse24HourFormat(false)}
+          >
+            <Text style={[
+              styles.formatButtonText,
+              !use24HourFormat && styles.formatButtonTextActive
+            ]}>
+              12H
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.formatButton,
+              use24HourFormat && styles.formatButtonActive
+            ]}
+            onPress={() => setUse24HourFormat(true)}
+          >
+            <Text style={[
+              styles.formatButtonText,
+              use24HourFormat && styles.formatButtonTextActive
+            ]}>
+              24H
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+        <Text style={styles.timeRangeInfo}>
+          Available: 5 AM - 10 PM (05:00 - 22:00 GMT){showCustomTimePicker === "start" && isToday ? " • Min. 30 mins from now" : ""}
+        </Text>
+        
+        <View style={styles.customTimePicker}>
+          {/* Hours Column */}
+          <ScrollView style={styles.timeColumn} showsVerticalScrollIndicator={false}>
+            {validHours.map((hour) => {
+              let displayHour, displayText;
+              
+              if (use24HourFormat) {
+                displayHour = hour;
+                displayText = hour.toString().padStart(2, '0');
+              } else {
+                // Convert to 12-hour format for display
+                if (hour === 0) {
+                  displayHour = 12;
+                  displayText = '12';
+                } else if (hour < 12) {
+                  displayHour = hour;
+                  displayText = hour.toString();
+                } else if (hour === 12) {
+                  displayHour = 12;
+                  displayText = '12';
+                } else {
+                  displayHour = hour - 12;
+                  displayText = (hour - 12).toString();
+                }
+              }
+
+              const isSelected = use24HourFormat 
+                ? customHours === hour
+                : customHours === displayHour && 
+                  ((hour < 12 && customAmPm === "AM") || 
+                   (hour >= 12 && customAmPm === "PM"));
+
+              return (
+                <TouchableOpacity
+                  key={hour}
+                  style={[
+                    styles.timeOption,
+                    isSelected && styles.timeOptionSelected,
+                  ]}
+                  onPress={() => {
+                    if (use24HourFormat) {
+                      setCustomHours(hour);
+                    } else {
+                      setCustomHours(displayHour);
+                      setCustomAmPm(hour < 12 ? "AM" : "PM");
+                    }
+                  }}
+                >
+                  <Text style={[
+                    styles.timeOptionText,
+                    isSelected && styles.timeOptionTextSelected,
+                  ]}>
+                    {displayText}
+                  </Text>
+                  {!use24HourFormat && (
+                    <Text style={[
+                      styles.timePeriodText,
+                      isSelected && styles.timePeriodTextSelected,
+                    ]}>
+                      {hour < 12 ? 'AM' : 'PM'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Minutes Column */}
+          <ScrollView style={styles.timeColumn} showsVerticalScrollIndicator={false}>
+            {validMinutes.map((minute) => (
+              <TouchableOpacity
+                key={minute}
+                style={[
+                  styles.timeOption,
+                  customMinutes === minute && styles.timeOptionSelected,
+                ]}
+                onPress={() => setCustomMinutes(minute)}
+              >
+                <Text style={[
+                  styles.timeOptionText,
+                  customMinutes === minute && styles.timeOptionTextSelected,
+                ]}>
+                  {minute.toString().padStart(2, '0')}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* AM/PM Column - Only show in 12-hour mode */}
+          {!use24HourFormat && (
+            <View style={styles.timeColumn}>
+              <TouchableOpacity
+                style={[
+                  styles.timeOption,
+                  customAmPm === "AM" && styles.timeOptionSelected,
+                ]}
+                onPress={() => setCustomAmPm("AM")}
+              >
+                <Text style={[
+                  styles.timeOptionText,
+                  customAmPm === "AM" && styles.timeOptionTextSelected,
+                ]}>
+                  AM
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.timeOption,
+                  customAmPm === "PM" && styles.timeOptionSelected,
+                ]}
+                onPress={() => setCustomAmPm("PM")}
+              >
+                <Text style={[
+                  styles.timeOptionText,
+                  customAmPm === "PM" && styles.timeOptionTextSelected,
+                ]}>
+                  PM
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={[
+          styles.selectedTimeDisplay,
+          !isCurrentTimeValid && styles.selectedTimeDisplayInvalid
+        ]}>
+          <Text style={[
+            styles.selectedTimeText,
+            !isCurrentTimeValid && styles.selectedTimeTextInvalid
+          ]}>
+            Selected: {getDisplayTime()}
+          </Text>
+          <Text style={styles.gmtTimeText}>
+            GMT: {get24HourDisplay()}
+          </Text>
+          {!isCurrentTimeValid && (
+            <Text style={styles.validationText}>
+              {showCustomTimePicker === "start" && isToday ? 
+                "Must be at least 30 minutes from now" : 
+                "Must be between 05:00 and 22:00 GMT"}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.customTimePickerActions}>
+          <TouchableOpacity 
+            style={styles.customTimePickerButton} 
+            onPress={handleCustomTimeCancel}
+          >
+            <Text style={styles.customTimePickerButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[
+              styles.customTimePickerButton, 
+              styles.customTimePickerButtonConfirm,
+              !isCurrentTimeValid && styles.disabledButton
+            ]} 
+            onPress={handleCustomTimeConfirm}
+            disabled={!isCurrentTimeValid}
+          >
+            <Text style={[
+              styles.customTimePickerButtonText, 
+              styles.customTimePickerButtonTextConfirm
+            ]}>
+              Confirm
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // Rest of the component remains the same as previous implementation
+  // ... (the modal structure with Date, Short term, and Monthly options)
 
   return (
     <Modal visible={open} transparent animationType="fade">
@@ -269,25 +673,50 @@ const BookingDialog: React.FC<BookingDialogProps> = ({
             {/* DATE Option */}
             {selectedOption === "Date" && (
               <>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => openPicker("start")}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {startDate
-                      ? `Start: ${dayjs(startDate).format("MMM D, YYYY h:mm A")}`
-                      : "Select Start Date"}
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.dateTimeContainer}>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => handleDateSelect("start")}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {startDate
+                        ? `Date: ${dayjs(startDate).format("MMM D, YYYY")}`
+                        : "Select Date"}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => handleTimeSelect("start")}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {startTime
+                        ? `Time: ${startTime.format("HH:mm")} GMT`
+                        : "Select Time"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-                {renderDatePicker("start")}
+                {/* Date Picker */}
+                {showDatePicker === "start" && (
+                  <DateTimePicker
+                    value={startTime ? new Date(startTime.toISOString()) : new Date()}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    minimumDate={new Date()}
+                    maximumDate={getMaximumDate()}
+                    onChange={handleDateChange}
+                  />
+                )}
+
+                {/* Custom Time Picker */}
+                {showCustomTimePicker === "start" && renderCustomTimePicker()}
 
                 {startDate && (
                   <View style={styles.confirmBox}>
                     <Text style={styles.sectionTitle}>Booking Details</Text>
                     <Text style={styles.sectionText}>
-                      Start Date:{" "}
-                      {dayjs(startDate).format("MMMM D, YYYY [at] h:mm A")}
+                      Start: {dayjs(startDate).format("MMMM D, YYYY [at] HH:mm")} GMT
                     </Text>
                     <Text style={styles.sectionText}>
                       Duration: {duration} hour{duration > 1 ? "s" : ""}
@@ -331,49 +760,139 @@ const BookingDialog: React.FC<BookingDialogProps> = ({
               </>
             )}
 
-            {/* SHORT TERM */}
+            {/* SHORT TERM Option */}
             {selectedOption === "Short term" && (
               <>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => openPicker("start")}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {startDate
-                      ? `Start: ${dayjs(startDate).format("MMM D, YYYY h:mm A")}`
-                      : "Select Start Date"}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => openPicker("end")}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {endDate
-                      ? `End: ${dayjs(endDate).format("MMM D, YYYY h:mm A")}`
-                      : "Select End Date"}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.subtitle}>Start Date & Time</Text>
+                <View style={styles.dateTimeContainer}>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => handleDateSelect("start")}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {startDate
+                        ? `Date: ${dayjs(startDate).format("MMM D, YYYY")}`
+                        : "Select Start Date"}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => handleTimeSelect("start")}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {startTime
+                        ? `Time: ${startTime.format("HH:mm")} GMT`
+                        : "Select Start Time"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-                {renderDatePicker("start")}
-                {renderDatePicker("end")}
+                <Text style={styles.subtitle}>End Date & Time</Text>
+                <View style={styles.dateTimeContainer}>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => handleDateSelect("end")}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {endDate
+                        ? `Date: ${dayjs(endDate).format("MMM D, YYYY")}`
+                        : "Select End Date"}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => handleTimeSelect("end")}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {endTime
+                        ? `Time: ${endTime.format("HH:mm")} GMT`
+                        : "Select End Time"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Date Pickers */}
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={
+                      showDatePicker === "start"
+                        ? (startTime ? new Date(startTime.toISOString()) : new Date())
+                        : (endTime ? new Date(endTime.toISOString()) : new Date())
+                    }
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    minimumDate={
+                      showDatePicker === "start"
+                        ? new Date()
+                        : startDate
+                        ? new Date(dayjs(startDate).toISOString())
+                        : new Date()
+                    }
+                    maximumDate={getMaximumDate()}
+                    onChange={handleDateChange}
+                  />
+                )}
+
+                {/* Custom Time Picker */}
+                {showCustomTimePicker && renderCustomTimePicker()}
               </>
             )}
 
-            {/* MONTHLY */}
+            {/* MONTHLY Option */}
             {selectedOption === "Monthly" && (
               <>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => openPicker("start")}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {startDate
-                      ? `Start: ${dayjs(startDate).format("MMM D, YYYY h:mm A")}`
-                      : "Select Start Date"}
-                  </Text>
-                </TouchableOpacity>
-                {renderDatePicker("start")}
+                <View style={styles.dateTimeContainer}>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => handleDateSelect("start")}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {startDate
+                        ? `Date: ${dayjs(startDate).format("MMM D, YYYY")}`
+                        : "Select Start Date"}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => handleTimeSelect("start")}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {startTime
+                        ? `Time: ${startTime.format("HH:mm")} GMT`
+                        : "Select Start Time"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Date Picker */}
+                {showDatePicker === "start" && (
+                  <DateTimePicker
+                    value={startTime ? new Date(startTime.toISOString()) : new Date()}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    minimumDate={new Date()}
+                    maximumDate={getMaximumDate()}
+                    onChange={handleDateChange}
+                  />
+                )}
+
+                {/* Custom Time Picker */}
+                {showCustomTimePicker === "start" && renderCustomTimePicker()}
+
+                {startDate && (
+                  <View style={styles.confirmBox}>
+                    <Text style={styles.sectionTitle}>Monthly Booking Details</Text>
+                    <Text style={styles.sectionText}>
+                      Start: {dayjs(startDate).format("MMMM D, YYYY [at] HH:mm")} GMT
+                    </Text>
+                    <Text style={styles.sectionText}>
+                      End: {dayjs(startDate).add(1, 'month').format("MMMM D, YYYY [at] HH:mm")} GMT
+                    </Text>
+                  </View>
+                )}
               </>
             )}
 
@@ -423,6 +942,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: "center",
   },
+  subtitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 10,
+    marginBottom: 5,
+    color: "#333",
+  },
   radioRow: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -447,7 +973,13 @@ const styles = StyleSheet.create({
     color: "#007AFF",
     fontWeight: "600",
   },
+  dateTimeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   dateButton: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 8,
@@ -455,8 +987,9 @@ const styles = StyleSheet.create({
     marginVertical: 6,
   },
   dateButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     color: "#333",
+    textAlign: "center",
   },
   confirmBox: {
     backgroundColor: "#f9f9f9",
@@ -484,6 +1017,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF20",
     padding: 10,
     borderRadius: 6,
+    minWidth: 40,
+    alignItems: "center",
   },
   adjustText: {
     fontSize: 20,
@@ -527,27 +1062,150 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: "#ccc",
   },
-  pickerContainer: {
-    marginVertical: 10,
+  // Custom Time Picker Styles
+  customTimePickerContainer: {
+    backgroundColor: "#f8f8f8",
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
   },
-  iosButtonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    backgroundColor: '#f9f9f9',
-  },
-  iosButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#007AFF',
-    borderRadius: 6,
-  },
-  iosButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+  customTimePickerTitle: {
     fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 8,
+    color: "#333",
+  },
+  formatToggle: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 4,
+  },
+  formatButton: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  formatButtonActive: {
+    backgroundColor: '#007AFF',
+  },
+  formatButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  formatButtonTextActive: {
+    color: '#fff',
+  },
+  timeRangeInfo: {
+    fontSize: 12,
+    textAlign: "center",
+    color: "#666",
+    marginBottom: 16,
+    fontStyle: 'italic',
+  },
+  customTimePicker: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    height: 200,
+  },
+  timeColumn: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  timeOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginVertical: 2,
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  timeOptionSelected: {
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
+  },
+  timeOptionText: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "500",
+  },
+  timeOptionTextSelected: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  timePeriodText: {
+    fontSize: 10,
+    color: "#666",
+    marginTop: 2,
+  },
+  timePeriodTextSelected: {
+    color: "#fff",
+  },
+  selectedTimeDisplay: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#007AFF",
+    alignItems: "center",
+  },
+  selectedTimeDisplayInvalid: {
+    borderColor: "#FF3B30",
+    backgroundColor: "#FF3B3010",
+  },
+  selectedTimeText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#007AFF",
+  },
+  selectedTimeTextInvalid: {
+    color: "#FF3B30",
+  },
+  gmtTimeText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+  },
+  validationText: {
+    fontSize: 12,
+    color: "#FF3B30",
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  customTimePickerActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+  },
+  customTimePickerButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#007AFF",
+    marginHorizontal: 4,
+    alignItems: "center",
+  },
+  customTimePickerButtonConfirm: {
+    backgroundColor: "#007AFF",
+  },
+  customTimePickerButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#007AFF",
+  },
+  customTimePickerButtonTextConfirm: {
+    color: "#fff",
   },
 });

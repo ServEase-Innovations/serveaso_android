@@ -1,5 +1,5 @@
 // ServiceProviderRegistration.tsx
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -28,7 +28,16 @@ import { PERMISSIONS, request, RESULTS } from "react-native-permissions";
 import { NativeModules } from "react-native";
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-// Define interfaces
+// Define interfaces matching React web version
+interface Address {
+  apartment: string;
+  street: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: string;
+}
+
 interface FormData {
   firstName: string;
   middleName: string;
@@ -39,18 +48,16 @@ interface FormData {
   confirmPassword: string;
   mobileNo: string;
   AlternateNumber: string;
-  address: string;
   buildingName: string;
   locality: string;
   street: string;
   currentLocation: string;
   nearbyLocation: string;
   pincode: string;
+  latitude: number;
+  longitude: number;
   AADHAR: string;
   pan: string;
-  terms: boolean;
-  privacy: boolean;
-  keyFacts: boolean;
   panImage: any;
   housekeepingRole: string;
   description: string;
@@ -66,12 +73,74 @@ interface FormData {
   profilePic: string;
   timeslot: string;
   referralCode: string;
-  latitude?: number;
-  longitude?: number;
+  agreeToTerms: boolean;
+  terms: boolean;
+  privacy: boolean;
+  keyFacts: boolean;
+  permanentAddress: Address;
+  correspondenceAddress: Address;
 }
 
 interface FormErrors {
-  [key: string]: string | undefined;
+  firstName?: string;
+  lastName?: string;
+  gender?: string;
+  emailId?: string;
+  password?: string;
+  confirmPassword?: string;
+  mobileNo?: string;
+  buildingName?: string;
+  locality?: string;
+  street?: string;
+  currentLocation?: string;
+  pincode?: string;
+  AADHAR?: string;
+  pan?: string;
+  agreeToTerms?: string;
+  terms?: string;
+  privacy?: string;
+  keyFacts?: string;
+  housekeepingRole?: string;
+  description?: string;
+  experience?: string;
+  kyc?: string;
+  documentImage?: string;
+  cookingSpeciality?: string;
+  diet?: string;
+  permanentAddress?: {
+    apartment?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    pincode?: string;
+  };
+  correspondenceAddress?: {
+    apartment?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    pincode?: string;
+  };
+}
+
+interface ValidationResults {
+  email: {
+    loading: boolean;
+    isAvailable: boolean | null;
+    error: string;
+  };
+  mobile: {
+    loading: boolean;
+    isAvailable: boolean | null;
+    error: string;
+  };
+  alternate: {
+    loading: boolean;
+    isAvailable: boolean | null;
+    error: string;
+  };
 }
 
 interface ServiceProviderRegistrationProps {
@@ -87,9 +156,226 @@ const steps = [
   "Confirmation",
 ];
 
-const ServiceProviderRegistration: React.FC<
-  ServiceProviderRegistrationProps
-> = ({ onBackToLogin, onRegistrationSuccess }) => {
+// Regex patterns
+const nameRegex = /^[A-Za-z]+(?:[ ][A-Za-z]+)*$/;
+const emailIdRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Z|a-z]{2,}$/;
+const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+const phoneRegex = /^[0-9]{10}$/;
+const pincodeRegex = /^[0-9]{6}$/;
+const aadhaarRegex = /^[0-9]{12}$/;
+const MAX_NAME_LENGTH = 30;
+
+// Custom hook for field validation (simplified version)
+const useFieldValidation = () => {
+  const [validationResults, setValidationResults] = useState<ValidationResults>({
+    email: { loading: false, isAvailable: null, error: "" },
+    mobile: { loading: false, isAvailable: null, error: "" },
+    alternate: { loading: false, isAvailable: null, error: "" },
+  });
+
+  const validateField = async (field: 'email' | 'mobile' | 'alternate', value: string) => {
+    if (!value) return;
+
+    setValidationResults(prev => ({
+      ...prev,
+      [field]: { ...prev[field], loading: true, error: "" }
+    }));
+
+    try {
+      // Simulate API call - replace with actual validation endpoint
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Mock validation - in real app, call your API
+      const isAvailable = Math.random() > 0.5; // Mock result
+      
+      setValidationResults(prev => ({
+        ...prev,
+        [field]: { 
+          loading: false, 
+          isAvailable,
+          error: isAvailable ? "" : `${field} is already registered`
+        }
+      }));
+    } catch (error) {
+      setValidationResults(prev => ({
+        ...prev,
+        [field]: { 
+          loading: false, 
+          isAvailable: null, 
+          error: "Validation failed" 
+        }
+      }));
+    }
+  };
+
+  const resetValidation = (field: 'email' | 'mobile' | 'alternate') => {
+    setValidationResults(prev => ({
+      ...prev,
+      [field]: { loading: false, isAvailable: null, error: "" }
+    }));
+  };
+
+  return { validationResults, validateField, resetValidation };
+};
+
+// Debounce utility
+const debounce = (func: Function, wait: number) => {
+  let timeout: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
+
+// Address Component
+const AddressComponent: React.FC<{
+  onAddressChange: (type: 'permanent' | 'correspondence', data: Address) => void;
+  permanentAddress: Address;
+  correspondenceAddress: Address;
+  errors: {
+    permanent?: any;
+    correspondence?: any;
+  };
+}> = ({ onAddressChange, permanentAddress, correspondenceAddress, errors }) => {
+  const [sameAsPermanent, setSameAsPermanent] = useState(true);
+
+  const handlePermanentAddressChange = (field: keyof Address, value: string) => {
+    const newAddress = { ...permanentAddress, [field]: value };
+    onAddressChange('permanent', newAddress);
+    
+    if (sameAsPermanent) {
+      onAddressChange('correspondence', newAddress);
+    }
+  };
+
+  const handleCorrespondenceAddressChange = (field: keyof Address, value: string) => {
+    const newAddress = { ...correspondenceAddress, [field]: value };
+    onAddressChange('correspondence', newAddress);
+  };
+
+  const toggleSameAddress = (checked: boolean) => {
+    setSameAsPermanent(checked);
+    if (checked) {
+      onAddressChange('correspondence', permanentAddress);
+    }
+  };
+
+  const renderAddressFields = (type: 'permanent' | 'correspondence', address: Address, errorObj: any) => (
+    <View style={styles.addressSection}>
+      <Text style={styles.addressTitle}>
+        {type === 'permanent' ? 'Permanent Address' : 'Correspondence Address'} *
+      </Text>
+      
+      <Text style={styles.inputLabel}>Apartment/Building *</Text>
+      <TextInput
+        style={[styles.input, errorObj?.apartment && styles.inputError]}
+        placeholder="Enter apartment/building name"
+        placeholderTextColor="#999"
+        value={address.apartment}
+        onChangeText={(text) => 
+          type === 'permanent' 
+            ? handlePermanentAddressChange('apartment', text)
+            : handleCorrespondenceAddressChange('apartment', text)
+        }
+      />
+      {errorObj?.apartment && <Text style={styles.errorText}>{errorObj.apartment}</Text>}
+
+      <Text style={styles.inputLabel}>Street *</Text>
+      <TextInput
+        style={[styles.input, errorObj?.street && styles.inputError]}
+        placeholder="Enter street name"
+        placeholderTextColor="#999"
+        value={address.street}
+        onChangeText={(text) => 
+          type === 'permanent' 
+            ? handlePermanentAddressChange('street', text)
+            : handleCorrespondenceAddressChange('street', text)
+        }
+      />
+      {errorObj?.street && <Text style={styles.errorText}>{errorObj.street}</Text>}
+
+      <Text style={styles.inputLabel}>City *</Text>
+      <TextInput
+        style={[styles.input, errorObj?.city && styles.inputError]}
+        placeholder="Enter city"
+        placeholderTextColor="#999"
+        value={address.city}
+        onChangeText={(text) => 
+          type === 'permanent' 
+            ? handlePermanentAddressChange('city', text)
+            : handleCorrespondenceAddressChange('city', text)
+        }
+      />
+      {errorObj?.city && <Text style={styles.errorText}>{errorObj.city}</Text>}
+
+      <Text style={styles.inputLabel}>State *</Text>
+      <TextInput
+        style={[styles.input, errorObj?.state && styles.inputError]}
+        placeholder="Enter state"
+        placeholderTextColor="#999"
+        value={address.state}
+        onChangeText={(text) => 
+          type === 'permanent' 
+            ? handlePermanentAddressChange('state', text)
+            : handleCorrespondenceAddressChange('state', text)
+        }
+      />
+      {errorObj?.state && <Text style={styles.errorText}>{errorObj.state}</Text>}
+
+      <Text style={styles.inputLabel}>Country *</Text>
+      <TextInput
+        style={[styles.input, errorObj?.country && styles.inputError]}
+        placeholder="Enter country"
+        placeholderTextColor="#999"
+        value={address.country}
+        onChangeText={(text) => 
+          type === 'permanent' 
+            ? handlePermanentAddressChange('country', text)
+            : handleCorrespondenceAddressChange('country', text)
+        }
+      />
+      {errorObj?.country && <Text style={styles.errorText}>{errorObj.country}</Text>}
+
+      <Text style={styles.inputLabel}>Pincode *</Text>
+      <TextInput
+        style={[styles.input, errorObj?.pincode && styles.inputError]}
+        placeholder="Enter 6-digit pincode"
+        placeholderTextColor="#999"
+        value={address.pincode}
+        onChangeText={(text) => {
+          const numericValue = text.replace(/\D/g, "").slice(0, 6);
+          type === 'permanent' 
+            ? handlePermanentAddressChange('pincode', numericValue)
+            : handleCorrespondenceAddressChange('pincode', numericValue);
+        }}
+        keyboardType="number-pad"
+        maxLength={6}
+      />
+      {errorObj?.pincode && <Text style={styles.errorText}>{errorObj.pincode}</Text>}
+    </View>
+  );
+
+  return (
+    <ScrollView>
+      {renderAddressFields('permanent', permanentAddress, errors.permanent)}
+      
+      <View style={styles.sameAddressContainer}>
+        <CheckBox
+          title="Correspondence address same as permanent address"
+          checked={sameAsPermanent}
+          onPress={() => toggleSameAddress(!sameAsPermanent)}
+        />
+      </View>
+
+      {!sameAsPermanent && renderAddressFields('correspondence', correspondenceAddress, errors.correspondence)}
+    </ScrollView>
+  );
+};
+
+const ServiceProviderRegistration: React.FC<ServiceProviderRegistrationProps> = ({ 
+  onBackToLogin, 
+  onRegistrationSuccess 
+}) => {
   const [activeStep, setActiveStep] = useState(0);
   const [isFieldsDisabled, setIsFieldsDisabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,6 +393,30 @@ const ServiceProviderRegistration: React.FC<
   const [showServicePicker, setShowServicePicker] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
 
+  const { validationResults, validateField, resetValidation } = useFieldValidation();
+
+  // Debounced validation functions
+  const debouncedEmailValidation = useCallback(
+    debounce((email: string) => {
+      validateField('email', email);
+    }, 500),
+    [validateField]
+  );
+
+  const debouncedMobileValidation = useCallback(
+    debounce((mobile: string) => {
+      validateField('mobile', mobile);
+    }, 500),
+    [validateField]
+  );
+
+  const debouncedAlternateValidation = useCallback(
+    debounce((alternate: string) => {
+      validateField('alternate', alternate);
+    }, 500),
+    [validateField]
+  );
+
   const [formData, setFormData] = useState<FormData>({
     firstName: "",
     middleName: "",
@@ -117,18 +427,16 @@ const ServiceProviderRegistration: React.FC<
     confirmPassword: "",
     mobileNo: "",
     AlternateNumber: "",
-    address: "",
     buildingName: "",
     locality: "",
     street: "",
     currentLocation: "",
     nearbyLocation: "",
     pincode: "",
+    latitude: 0,
+    longitude: 0,
     AADHAR: "",
     pan: "",
-    terms: false,
-    privacy: false,
-    keyFacts: false,
     panImage: null,
     housekeepingRole: "",
     description: "",
@@ -144,17 +452,29 @@ const ServiceProviderRegistration: React.FC<
     profilePic: "",
     timeslot: "06:00-20:00",
     referralCode: "",
+    agreeToTerms: false,
+    terms: false,
+    privacy: false,
+    keyFacts: false,
+    permanentAddress: {
+      apartment: "",
+      street: "",
+      city: "",
+      state: "",
+      country: "",
+      pincode: ""
+    },
+    correspondenceAddress: {
+      apartment: "",
+      street: "",
+      city: "",
+      state: "",
+      country: "",
+      pincode: ""
+    },
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
-
-  // Regex patterns
-  const nameRegex = /^[A-Za-z\s]+$/;
-  const emailIdRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Z|a-z]{2,}$/;
-  const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  const phoneRegex = /^[0-9]{10}$/;
-  const pincodeRegex = /^[0-9]{6}$/;
-  const aadhaarRegex = /^[0-9]{12}$/;
 
   const serviceTypes = [
     { label: 'Cook', value: 'COOK' },
@@ -162,7 +482,7 @@ const ServiceProviderRegistration: React.FC<
     { label: 'Maid', value: 'MAID' },
   ];
 
-  // Show alert function (equivalent to snackbar)
+  // Show alert function
   const showAlert = (message: string, type: "success" | "error" | "warning" = "success") => {
     setAlertMessage(message);
     setAlertType(type);
@@ -173,11 +493,29 @@ const ServiceProviderRegistration: React.FC<
     }, 6000);
   };
 
-  // Handle checkbox change for separate terms
+  // Handle address change
+  const handleAddressChange = (type: 'permanent' | 'correspondence', data: Address) => {
+    setFormData(prev => ({
+      ...prev,
+      [type === 'permanent' ? 'permanentAddress' : 'correspondenceAddress']: data
+    }));
+  };
+
+  // Handle checkbox change
   const handleChangeCheckbox = (name: keyof FormData, value: boolean) => {
     setFormData(prev => ({
       ...prev,
       [name]: value,
+    }));
+  };
+
+  // Handle terms change (all at once)
+  const handleTermsChange = (allAccepted: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      keyFacts: allAccepted,
+      terms: allAccepted,
+      privacy: allAccepted,
     }));
   };
 
@@ -210,22 +548,6 @@ const ServiceProviderRegistration: React.FC<
         return;
       }
 
-      const servicesEnabled = await checkLocationServices();
-      if (!servicesEnabled) {
-        Alert.alert(
-          "Location Services Disabled",
-          "Please enable location services to continue.",
-          [
-            {
-              text: "Enable",
-              onPress: () => NativeModules.LocationSettings?.showLocationSettingsDialog?.(),
-            },
-            { text: "Cancel", style: "cancel" },
-          ]
-        );
-        return;
-      }
-
       setLocationLoading(true);
       showAlert("Fetching your current location...", "success");
 
@@ -237,31 +559,44 @@ const ServiceProviderRegistration: React.FC<
             const res = await Geocoder.from(latitude, longitude);
             const address = res.results[0]?.formatted_address || "";
 
-            let street = "";
-            let locality = "";
-            let pincode = "";
+            let apartment = "", street = "", city = "", pincode = "", state = "", country = "";
 
             res.results[0]?.address_components?.forEach((component: any) => {
-              if (component.types.includes("route")) {
+              if (component.types.includes("street_number")) {
+                apartment = component.long_name;
+              } else if (component.types.includes("route")) {
                 street = component.long_name;
-              }
-              if (component.types.includes("locality")) {
-                locality = component.long_name;
-              }
-              if (component.types.includes("postal_code")) {
+              } else if (component.types.includes("locality") || component.types.includes("sublocality")) {
+                city = component.long_name;
+              } else if (component.types.includes("administrative_area_level_1")) {
+                state = component.long_name;
+              } else if (component.types.includes("country")) {
+                country = component.long_name;
+              } else if (component.types.includes("postal_code")) {
                 pincode = component.long_name;
               }
             });
 
-            setFormData((prev) => ({
+            const newAddress = {
+              apartment: apartment || "Not specified",
+              street: street || "Not specified",
+              city: city || "Not specified",
+              state: state || "Not specified",
+              country: country || "Not specified",
+              pincode: pincode || ""
+            };
+
+            setFormData(prev => ({
               ...prev,
-              address: address,
+              permanentAddress: newAddress,
+              correspondenceAddress: newAddress,
+              latitude,
+              longitude,
               currentLocation: address,
-              street: street || prev.street,
-              locality: locality || prev.locality,
-              pincode: pincode || prev.pincode,
-              latitude: latitude,
-              longitude: longitude,
+              locality: city || "",
+              street: street || "",
+              pincode: pincode || "",
+              buildingName: apartment || ""
             }));
 
             showAlert("Location fetched successfully!", "success");
@@ -301,16 +636,6 @@ const ServiceProviderRegistration: React.FC<
     }
   };
 
-  const checkLocationServices = async (): Promise<boolean> => {
-    try {
-      // Simplified service check
-      return true;
-    } catch (err) {
-      console.warn("Services check error:", err);
-      return false;
-    }
-  };
-
   const handleImageSelect = async () => {
     const options: ImagePicker.ImageLibraryOptions = {
       mediaType: "photo",
@@ -325,7 +650,7 @@ const ServiceProviderRegistration: React.FC<
       } else if (response.assets && response.assets[0].uri) {
         const source = { uri: response.assets[0].uri };
         setImage(source);
-        setFormData({ ...formData, profileImage: source });
+        setFormData(prev => ({ ...prev, profileImage: source }));
       }
     });
   };
@@ -344,13 +669,13 @@ const ServiceProviderRegistration: React.FC<
       } else if (response.assets && response.assets[0].uri) {
         const source = { uri: response.assets[0].uri };
         setDocumentImage(source);
-        setFormData({ ...formData, documentImage: source });
+        setFormData(prev => ({ ...prev, documentImage: source }));
       }
     });
   };
 
   const handleServiceTypeChange = (value: string) => {
-    setFormData({ ...formData, housekeepingRole: value });
+    setFormData(prev => ({ ...prev, housekeepingRole: value }));
     setIsCookSelected(value === "COOK");
     if (value !== "COOK") {
       setFormData(prev => ({
@@ -369,24 +694,26 @@ const ServiceProviderRegistration: React.FC<
     setFormData(prev => ({ ...prev, diet: value }));
   };
 
-  const handleChange = (name: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
   const handleRealTimeValidation = (name: string, value: string) => {
     let error = "";
 
     if (name === "firstName") {
-      if (!value.trim()) {
+      const trimmedValue = value.trim();
+      if (!trimmedValue) {
         error = "First Name is required.";
-      } else if (!nameRegex.test(value.trim())) {
+      } else if (!nameRegex.test(trimmedValue)) {
         error = "First Name should contain only alphabets.";
+      } else if (trimmedValue.length > MAX_NAME_LENGTH) {
+        error = `First Name should not exceed ${MAX_NAME_LENGTH} characters.`;
       }
     } else if (name === "lastName") {
-      if (!value.trim()) {
+      const trimmedValue = value.trim();
+      if (!trimmedValue) {
         error = "Last Name is required.";
-      } else if (!nameRegex.test(value.trim())) {
+      } else if (!nameRegex.test(trimmedValue)) {
         error = "Last Name should contain only alphabets.";
+      } else if (trimmedValue.length > MAX_NAME_LENGTH) {
+        error = `Last Name should not exceed ${MAX_NAME_LENGTH} characters.`;
       }
     } else if (name === "password") {
       if (value.length < 8) {
@@ -408,22 +735,29 @@ const ServiceProviderRegistration: React.FC<
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailPattern.test(value)) {
         error = "Please enter a valid email address.";
+        resetValidation('email');
+      } else {
+        debouncedEmailValidation(value);
       }
     } else if (name === "mobileNo") {
       const mobilePattern = /^[0-9]{10}$/;
       if (!mobilePattern.test(value)) {
         error = "Please enter a valid 10-digit mobile number.";
+        resetValidation('mobile');
+      } else {
+        debouncedMobileValidation(value);
+      }
+    } else if (name === "AlternateNumber" && value) {
+      const mobilePattern = /^[0-9]{10}$/;
+      if (!mobilePattern.test(value)) {
+        error = "Please enter a valid 10-digit mobile number.";
+        resetValidation('alternate');
+      } else {
+        debouncedAlternateValidation(value);
       }
     } else if (name === "AADHAR") {
-      const aadhaarPattern = /^[0-9]{12}$/;
-      if (!aadhaarPattern.test(value)) {
+      if (!aadhaarRegex.test(value)) {
         error = "AADHAR number must be exactly 12 digits.";
-      }
-    } else if (name === "pincode") {
-      const numericValue = value.replace(/\D/g, "");
-      const pincodePattern = /^[0-9]{6}$/;
-      if (!pincodePattern.test(numericValue)) {
-        error = "Pincode must be exactly 6 digits.";
       }
     }
 
@@ -433,19 +767,15 @@ const ServiceProviderRegistration: React.FC<
 
   const validateAge = (dob: string) => {
     if (!dob) return false;
-
     const birthDate = moment(dob, "YYYY-MM-DD");
     const today = moment();
     const age = today.diff(birthDate, "years");
-
     return age >= 18;
   };
 
   const handleDOBChange = (dob: string) => {
     setFormData(prev => ({ ...prev, dob }));
-
     const isValidAge = validateAge(dob);
-
     if (!isValidAge) {
       setIsFieldsDisabled(true);
       showAlert("You must be at least 18 years old to proceed.", "error");
@@ -462,49 +792,92 @@ const ServiceProviderRegistration: React.FC<
         tempErrors.firstName = "First Name is required.";
       } else if (!nameRegex.test(formData.firstName)) {
         tempErrors.firstName = "First Name should contain only alphabets.";
+      } else if (formData.firstName.length > MAX_NAME_LENGTH) {
+        tempErrors.firstName = `First Name should be under ${MAX_NAME_LENGTH} characters.`;
       }
 
       if (!formData.lastName) {
         tempErrors.lastName = "Last Name is required.";
       } else if (!nameRegex.test(formData.lastName)) {
         tempErrors.lastName = "Last Name should contain only alphabets.";
+      } else if (formData.lastName.length > MAX_NAME_LENGTH) {
+        tempErrors.lastName = `Last Name should be under ${MAX_NAME_LENGTH} characters.`;
       }
 
       if (!formData.gender) {
         tempErrors.gender = "Please select a gender.";
       }
-      if (!formData.emailId || !emailIdRegex.test(formData.emailId)) {
-        tempErrors.emailId = "Valid email is required.";
+      
+      if (validationResults.email.error) {
+        tempErrors.emailId = validationResults.email.error;
       }
+      
       if (!formData.password || !strongPasswordRegex.test(formData.password)) {
         tempErrors.password = "Password is required.";
       }
+      
       if (formData.password !== formData.confirmPassword) {
         tempErrors.confirmPassword = "Passwords do not match.";
       }
-      if (!formData.mobileNo || !phoneRegex.test(formData.mobileNo)) {
-        tempErrors.mobileNo = "Phone number is required.";
+      
+      if (validationResults.mobile.error) {
+        tempErrors.mobileNo = validationResults.mobile.error;
       }
     }
 
     if (activeStep === 1) {
-      if (!formData.address) {
-        tempErrors.address = "Address is required.";
+      // Validate permanent address
+      if (!formData.permanentAddress.apartment) {
+        tempErrors.permanentAddress = { ...tempErrors.permanentAddress, apartment: "Apartment is required." };
       }
-      if (!formData.buildingName) {
-        tempErrors.buildingName = "Building Name is required.";
+      if (!formData.permanentAddress.street) {
+        tempErrors.permanentAddress = { ...tempErrors.permanentAddress, street: "Street is required." };
       }
-      if (!formData.locality) {
-        tempErrors.locality = "Locality is required.";
+      if (!formData.permanentAddress.city) {
+        tempErrors.permanentAddress = { ...tempErrors.permanentAddress, city: "City is required." };
       }
-      if (!formData.street) {
-        tempErrors.street = "Street is required.";
+      if (!formData.permanentAddress.state) {
+        tempErrors.permanentAddress = { ...tempErrors.permanentAddress, state: "State is required." };
       }
-      if (!formData.currentLocation) {
-        tempErrors.currentLocation = "Current Location is required.";
+      if (!formData.permanentAddress.country) {
+        tempErrors.permanentAddress = { ...tempErrors.permanentAddress, country: "Country is required." };
       }
-      if (!formData.pincode || !pincodeRegex.test(formData.pincode)) {
-        tempErrors.pincode = "Pincode must be exactly 6 digits.";
+      if (!formData.permanentAddress.pincode) {
+        tempErrors.permanentAddress = { ...tempErrors.permanentAddress, pincode: "Pincode is required." };
+      } else if (formData.permanentAddress.pincode.length !== 6) {
+        tempErrors.permanentAddress = { ...tempErrors.permanentAddress, pincode: "Pincode must be exactly 6 digits." };
+      }
+
+      // Validate correspondence address only if it's different from permanent address
+      const isSameAddress = 
+        formData.permanentAddress.apartment === formData.correspondenceAddress.apartment &&
+        formData.permanentAddress.street === formData.correspondenceAddress.street &&
+        formData.permanentAddress.city === formData.correspondenceAddress.city &&
+        formData.permanentAddress.state === formData.correspondenceAddress.state &&
+        formData.permanentAddress.country === formData.correspondenceAddress.country &&
+        formData.permanentAddress.pincode === formData.correspondenceAddress.pincode;
+
+      if (!isSameAddress) {
+        if (!formData.correspondenceAddress.apartment) {
+          tempErrors.correspondenceAddress = { ...tempErrors.correspondenceAddress, apartment: "Apartment is required." };
+        }
+        if (!formData.correspondenceAddress.street) {
+          tempErrors.correspondenceAddress = { ...tempErrors.correspondenceAddress, street: "Street is required." };
+        }
+        if (!formData.correspondenceAddress.city) {
+          tempErrors.correspondenceAddress = { ...tempErrors.correspondenceAddress, city: "City is required." };
+        }
+        if (!formData.correspondenceAddress.state) {
+          tempErrors.correspondenceAddress = { ...tempErrors.correspondenceAddress, state: "State is required." };
+        }
+        if (!formData.correspondenceAddress.country) {
+          tempErrors.correspondenceAddress = { ...tempErrors.correspondenceAddress, country: "Country is required." };
+        }
+        if (!formData.correspondenceAddress.pincode) {
+          tempErrors.correspondenceAddress = { ...tempErrors.correspondenceAddress, pincode: "Pincode is required." };
+        } else if (formData.correspondenceAddress.pincode.length !== 6) {
+          tempErrors.correspondenceAddress = { ...tempErrors.correspondenceAddress, pincode: "Pincode must be exactly 6 digits." };
+        }
       }
     }
 
@@ -570,22 +943,18 @@ const ServiceProviderRegistration: React.FC<
     setIsLoading(true);
 
     try {
-      const filteredPayload = Object.fromEntries(
-        Object.entries(formData).filter(
-          ([_, value]) => value !== "" && value !== null && value !== undefined
-        )
-      );
-
       if (validateForm()) {
-        try {
-          if (image) {
-            const formDataToUpload = new FormData();
-            formDataToUpload.append("image", {
-              uri: image.uri,
-              type: "image/jpeg",
-              name: "profile.jpg",
-            } as any);
+        let profilePicUrl = "";
+        
+        if (image) {
+          const formDataToUpload = new FormData();
+          formDataToUpload.append("image", {
+            uri: image.uri,
+            type: "image/jpeg",
+            name: "profile.jpg",
+          } as any);
 
+          try {
             const imageResponse = await axios.post(
               "http://65.2.153.173:3000/upload",
               formDataToUpload,
@@ -597,51 +966,125 @@ const ServiceProviderRegistration: React.FC<
             );
 
             if (imageResponse.status === 200) {
-              filteredPayload.profilePic = imageResponse.data.imageUrl;
-            } else {
-              showAlert("Image upload failed. Proceeding without profile picture.", "warning");
+              profilePicUrl = imageResponse.data.imageUrl;
             }
+          } catch (uploadError) {
+            console.error("Image upload failed:", uploadError);
           }
-
-          const response = await axiosInstance.post(
-            "/api/serviceproviders/serviceprovider/add",
-            filteredPayload,
-            {
-              headers: {
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          showAlert("Service provider added successfully!", "success");
-
-          // Create Auth0 user
-          const authPayload = {
-            email: filteredPayload.emailId,
-            password: filteredPayload.password,
-            name: `${filteredPayload.firstName} ${filteredPayload.lastName}`,
-          };
-
-          axios.post('https://utils-ndt3.onrender.com/authO/create-autho-user', authPayload)
-            .then((authResponse) => {
-              console.log("Auth0 user created successfully:", authResponse.data);
-            }).catch((authError) => {
-              console.error("Error creating Auth0 user:", authError);
-            });
-
-          setTimeout(() => {
-            onRegistrationSuccess();
-          }, 3000);
-        } catch (error) {
-          showAlert("Failed to add service provider. Please try again.", "error");
-          console.error("Error submitting form:", error);
         }
+
+        // Prepare payload matching React web structure
+        const payload = {
+          firstName: formData.firstName,
+          middleName: formData.middleName,
+          lastName: formData.lastName,
+          mobileNo: parseInt(formData.mobileNo) || 0,
+          alternateNo: parseInt(formData.AlternateNumber) || 0,
+          emailId: formData.emailId,
+          gender: formData.gender,
+          buildingName: formData.buildingName,
+          locality: formData.locality,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          street: formData.street,
+          pincode: parseInt(formData.pincode) || 0,
+          currentLocation: formData.currentLocation,
+          nearbyLocation: formData.nearbyLocation,
+          location: formData.currentLocation,
+          housekeepingRole: formData.housekeepingRole,
+          diet: formData.diet,
+          cookingSpeciality: formData.cookingSpeciality,
+          timeslot: formData.timeslot,
+          expectedSalary: 0,
+          experience: parseInt(formData.experience) || 0,
+          username: formData.emailId,
+          password: formData.password,
+          privacy: formData.privacy,
+          keyFacts: formData.keyFacts,
+          permanentAddress: {
+            field1: formData.permanentAddress.apartment,
+            field2: formData.permanentAddress.street,
+            ctArea: formData.permanentAddress.city,
+            pinNo: formData.permanentAddress.pincode,
+            state: formData.permanentAddress.state,
+            country: formData.permanentAddress.country
+          },
+          correspondenceAddress: {
+            field1: formData.correspondenceAddress.apartment,
+            field2: formData.correspondenceAddress.street,
+            ctArea: formData.correspondenceAddress.city,
+            pinNo: formData.correspondenceAddress.pincode,
+            state: formData.correspondenceAddress.state,
+            country: formData.correspondenceAddress.country
+          },
+          active: true,
+          kyc: formData.kyc,
+          dob: formData.dob,
+          ...(profilePicUrl && { profilePic: profilePicUrl })
+        };
+
+        // Console log the payload
+        console.log("=== SUBMITTING PAYLOAD ===");
+        console.log("Payload:", JSON.stringify(payload, null, 2));
+        console.log("=== END PAYLOAD ===");
+
+        const response = await axiosInstance.post(
+          "/api/serviceproviders/serviceprovider/add",
+          payload,
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        // Console log the API response
+        console.log("=== API RESPONSE ===");
+        console.log("Response Status:", response.status);
+        console.log("Response Data:", JSON.stringify(response.data, null, 2));
+        console.log("=== END API RESPONSE ===");
+
+        showAlert("Service provider added successfully!", "success");
+
+        // Create Auth0 user
+        const authPayload = {
+          email: formData.emailId,
+          password: formData.password,
+          name: `${formData.firstName} ${formData.lastName}`,
+        };
+
+        // Console log Auth0 payload
+        console.log("=== AUTH0 PAYLOAD ===");
+        console.log("Auth0 Payload:", JSON.stringify(authPayload, null, 2));
+        console.log("=== END AUTH0 PAYLOAD ===");
+
+        axios.post('https://utils-ndt3.onrender.com/authO/create-autho-user', authPayload)
+          .then((authResponse) => {
+            console.log("=== AUTH0 RESPONSE ===");
+            console.log("Auth0 Response:", JSON.stringify(authResponse.data, null, 2));
+            console.log("=== END AUTH0 RESPONSE ===");
+          }).catch((authError) => {
+            console.error("=== AUTH0 ERROR ===");
+            console.error("Auth0 Error:", authError);
+            console.log("=== END AUTH0 ERROR ===");
+          });
+
+        setTimeout(() => {
+          onRegistrationSuccess();
+        }, 3000);
       } else {
         showAlert("Please fill out all required fields.", "warning");
       }
     } catch (error) {
-      showAlert("Failed to register. Please try again.", "error");
+      console.error("=== API ERROR ===");
       console.error("Error submitting form:", error);
+      if (axios.isAxiosError(error)) {
+        console.error("Error Response:", error.response?.data);
+        console.error("Error Status:", error.response?.status);
+      }
+      console.log("=== END API ERROR ===");
+      
+      showAlert("Failed to add service provider. Please try again.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -690,6 +1133,7 @@ const ServiceProviderRegistration: React.FC<
               value={formData.firstName}
               onChangeText={(text) => handleRealTimeValidation("firstName", text)}
               editable={!isFieldsDisabled}
+              maxLength={MAX_NAME_LENGTH}
             />
             {errors.firstName && <Text style={styles.errorText}>{errors.firstName}</Text>}
 
@@ -699,7 +1143,7 @@ const ServiceProviderRegistration: React.FC<
               placeholder="Enter your middle name"
               placeholderTextColor="#999"
               value={formData.middleName}
-              onChangeText={(text) => handleChange("middleName", text)}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, middleName: text }))}
               editable={!isFieldsDisabled}
             />
 
@@ -711,6 +1155,7 @@ const ServiceProviderRegistration: React.FC<
               value={formData.lastName}
               onChangeText={(text) => handleRealTimeValidation("lastName", text)}
               editable={!isFieldsDisabled}
+              maxLength={MAX_NAME_LENGTH}
             />
             {errors.lastName && <Text style={styles.errorText}>{errors.lastName}</Text>}
 
@@ -773,7 +1218,7 @@ const ServiceProviderRegistration: React.FC<
 
             <Text style={styles.label}>Gender *</Text>
             <RadioButton.Group
-              onValueChange={(value) => handleChange("gender", value)}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, gender: value }))}
               value={formData.gender}
             >
               <View style={styles.radioGroup}>
@@ -794,16 +1239,28 @@ const ServiceProviderRegistration: React.FC<
             {errors.gender && <Text style={styles.errorText}>{errors.gender}</Text>}
 
             <Text style={styles.inputLabel}>Email *</Text>
-            <TextInput
-              style={[styles.input, errors.emailId && styles.inputError]}
-              placeholder="Enter your email address"
-              placeholderTextColor="#999"
-              value={formData.emailId}
-              onChangeText={(text) => handleRealTimeValidation("emailId", text)}
-              keyboardType="email-address"
-              editable={!isFieldsDisabled}
-            />
+            <View style={styles.validationContainer}>
+              <TextInput
+                style={[styles.input, (errors.emailId || validationResults.email.isAvailable === false) && styles.inputError]}
+                placeholder="Enter your email address"
+                placeholderTextColor="#999"
+                value={formData.emailId}
+                onChangeText={(text) => handleRealTimeValidation("emailId", text)}
+                keyboardType="email-address"
+                editable={!isFieldsDisabled}
+              />
+              {validationResults.email.loading && (
+                <ActivityIndicator size="small" style={styles.validationIndicator} />
+              )}
+              {validationResults.email.isAvailable && (
+                <Icon name="check" size={20} color="green" style={styles.validationIndicator} />
+              )}
+              {validationResults.email.isAvailable === false && (
+                <Icon name="close" size={20} color="red" style={styles.validationIndicator} />
+              )}
+            </View>
             {errors.emailId && <Text style={styles.errorText}>{errors.emailId}</Text>}
+            {validationResults.email.error && <Text style={styles.errorText}>{validationResults.email.error}</Text>}
 
             <Text style={styles.inputLabel}>Password *</Text>
             <View style={styles.passwordContainer}>
@@ -846,118 +1303,83 @@ const ServiceProviderRegistration: React.FC<
             {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
 
             <Text style={styles.inputLabel}>Mobile Number *</Text>
-            <TextInput
-              style={[styles.input, errors.mobileNo && styles.inputError]}
-              placeholder="Enter your 10-digit mobile number"
-              placeholderTextColor="#999"
-              value={formData.mobileNo}
-              onChangeText={(text) => handleRealTimeValidation("mobileNo", text)}
-              keyboardType="phone-pad"
-              editable={!isFieldsDisabled}
-            />
+            <View style={styles.validationContainer}>
+              <TextInput
+                style={[styles.input, (errors.mobileNo || validationResults.mobile.isAvailable === false) && styles.inputError]}
+                placeholder="Enter your 10-digit mobile number"
+                placeholderTextColor="#999"
+                value={formData.mobileNo}
+                onChangeText={(text) => handleRealTimeValidation("mobileNo", text)}
+                keyboardType="phone-pad"
+                editable={!isFieldsDisabled}
+                maxLength={10}
+              />
+              {validationResults.mobile.loading && (
+                <ActivityIndicator size="small" style={styles.validationIndicator} />
+              )}
+              {validationResults.mobile.isAvailable && (
+                <Icon name="check" size={20} color="green" style={styles.validationIndicator} />
+              )}
+              {validationResults.mobile.isAvailable === false && (
+                <Icon name="close" size={20} color="red" style={styles.validationIndicator} />
+              )}
+            </View>
             {errors.mobileNo && <Text style={styles.errorText}>{errors.mobileNo}</Text>}
+            {validationResults.mobile.error && <Text style={styles.errorText}>{validationResults.mobile.error}</Text>}
 
             <Text style={styles.inputLabel}>Alternate Number</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter alternate contact number"
-              placeholderTextColor="#999"
-              value={formData.AlternateNumber}
-              onChangeText={(text) => handleChange("AlternateNumber", text)}
-              keyboardType="phone-pad"
-              editable={!isFieldsDisabled}
-            />
+            <View style={styles.validationContainer}>
+              <TextInput
+                style={[styles.input, validationResults.alternate.isAvailable === false && styles.inputError]}
+                placeholder="Enter alternate contact number"
+                placeholderTextColor="#999"
+                value={formData.AlternateNumber}
+                onChangeText={(text) => handleRealTimeValidation("AlternateNumber", text)}
+                keyboardType="phone-pad"
+                editable={!isFieldsDisabled}
+                maxLength={10}
+              />
+              {validationResults.alternate.loading && (
+                <ActivityIndicator size="small" style={styles.validationIndicator} />
+              )}
+              {validationResults.alternate.isAvailable && (
+                <Icon name="check" size={20} color="green" style={styles.validationIndicator} />
+              )}
+              {validationResults.alternate.isAvailable === false && (
+                <Icon name="close" size={20} color="red" style={styles.validationIndicator} />
+              )}
+            </View>
+            {validationResults.alternate.error && <Text style={styles.errorText}>{validationResults.alternate.error}</Text>}
           </ScrollView>
         );
 
       case 1:
-        return (
-          <ScrollView style={styles.stepContainer}>
-            <Text style={styles.inputLabel}>Address *</Text>
-            <TextInput
-              style={[styles.input, errors.address && styles.inputError]}
-              placeholder="Enter your complete address"
-              placeholderTextColor="#999"
-              value={formData.address}
-              onChangeText={(text) => handleChange("address", text)}
-              multiline
-            />
-            {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
+  return (
+    <View>
+      <AddressComponent
+        onAddressChange={handleAddressChange}
+        permanentAddress={formData.permanentAddress}
+        correspondenceAddress={formData.correspondenceAddress}
+        errors={{
+          permanent: errors.permanentAddress,
+          correspondence: errors.correspondenceAddress
+        }}
+      />
 
-            <Text style={styles.inputLabel}>Building Name *</Text>
-            <TextInput
-              style={[styles.input, errors.buildingName && styles.inputError]}
-              placeholder="Enter building name"
-              placeholderTextColor="#999"
-              value={formData.buildingName}
-              onChangeText={(text) => handleChange("buildingName", text)}
-            />
-            {errors.buildingName && <Text style={styles.errorText}>{errors.buildingName}</Text>}
-
-            <Text style={styles.inputLabel}>Locality *</Text>
-            <TextInput
-              style={[styles.input, errors.locality && styles.inputError]}
-              placeholder="Enter your locality"
-              placeholderTextColor="#999"
-              value={formData.locality}
-              onChangeText={(text) => handleChange("locality", text)}
-            />
-            {errors.locality && <Text style={styles.errorText}>{errors.locality}</Text>}
-
-            <Text style={styles.inputLabel}>Street *</Text>
-            <TextInput
-              style={[styles.input, errors.street && styles.inputError]}
-              placeholder="Enter street name"
-              placeholderTextColor="#999"
-              value={formData.street}
-              onChangeText={(text) => handleChange("street", text)}
-            />
-            {errors.street && <Text style={styles.errorText}>{errors.street}</Text>}
-
-            <Text style={styles.inputLabel}>Pincode *</Text>
-            <TextInput
-              style={[styles.input, errors.pincode && styles.inputError]}
-              placeholder="Enter 6-digit pincode"
-              placeholderTextColor="#999"
-              value={formData.pincode}
-              onChangeText={(text) => handleRealTimeValidation("pincode", text)}
-              keyboardType="number-pad"
-              maxLength={6}
-            />
-            {errors.pincode && <Text style={styles.errorText}>{errors.pincode}</Text>}
-
-            <Text style={styles.inputLabel}>Current Location *</Text>
-            <TextInput
-              style={[styles.input, errors.currentLocation && styles.inputError]}
-              placeholder="Enter your current location"
-              placeholderTextColor="#999"
-              value={formData.currentLocation}
-              onChangeText={(text) => handleChange("currentLocation", text)}
-            />
-            {errors.currentLocation && <Text style={styles.errorText}>{errors.currentLocation}</Text>}
-
-            <Text style={styles.inputLabel}>Nearby Location</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter nearby landmark"
-              placeholderTextColor="#999"
-              value={formData.nearbyLocation}
-              onChangeText={(text) => handleChange("nearbyLocation", text)}
-            />
-
-            <TouchableOpacity
-              style={styles.button}
-              onPress={fetchLocationData}
-              disabled={locationLoading}
-            >
-              {locationLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Fetch Location</Text>
-              )}
-            </TouchableOpacity>
-          </ScrollView>
-        );
+      {/* Fetch Location Button Below */}
+      <TouchableOpacity
+        style={styles.button}
+        onPress={fetchLocationData}
+        disabled={locationLoading}
+      >
+        {locationLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Fetch My Location</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
 
       case 2:
         return (
@@ -1047,11 +1469,11 @@ const ServiceProviderRegistration: React.FC<
 
             <Text style={styles.inputLabel}>Description</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, styles.textArea]}
               placeholder="Describe your services and experience"
               placeholderTextColor="#999"
               value={formData.description}
-              onChangeText={(text) => handleChange("description", text)}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
               multiline
               numberOfLines={4}
             />
@@ -1062,7 +1484,7 @@ const ServiceProviderRegistration: React.FC<
               placeholder="Enter your years of experience"
               placeholderTextColor="#999"
               value={formData.experience}
-              onChangeText={(text) => handleChange("experience", text)}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, experience: text }))}
               keyboardType="numeric"
             />
             {errors.experience && <Text style={styles.errorText}>{errors.experience}</Text>}
@@ -1073,7 +1495,7 @@ const ServiceProviderRegistration: React.FC<
               placeholder="Enter referral code if any"
               placeholderTextColor="#999"
               value={formData.referralCode}
-              onChangeText={(text) => handleChange("referralCode", text)}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, referralCode: text }))}
             />
 
             <Text style={styles.label}>Select Time Slot</Text>
@@ -1169,65 +1591,27 @@ const ServiceProviderRegistration: React.FC<
             </Text>
 
             <View style={styles.termsContainer}>
-              <View style={styles.checkboxContainer}>
-                <CheckBox
-                  checked={formData.keyFacts}
-                  onPress={() => handleChangeCheckbox("keyFacts", !formData.keyFacts)}
-                />
-                <TouchableOpacity 
-                  style={styles.termsTextContainer}
-                  onPress={() => openExternalLink('/KeyFactsStatement')}
-                >
-                  <Text style={styles.termsText}>
-                    I agree to the ServEaso{" "}
-                    <Text style={styles.linkText}>
-                      Key Facts Statement
-                      <Icon name="open-in-new" size={14} color="#3182ce" />
-                    </Text>
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {errors.keyFacts && <Text style={styles.errorText}>{errors.keyFacts}</Text>}
+              <CheckBox
+                title="I agree to all terms and conditions"
+                checked={formData.terms && formData.privacy && formData.keyFacts}
+                onPress={() => handleTermsChange(!(formData.terms && formData.privacy && formData.keyFacts))}
+              />
 
-              <View style={styles.checkboxContainer}>
-                <CheckBox
-                  checked={formData.terms}
-                  onPress={() => handleChangeCheckbox("terms", !formData.terms)}
-                />
-                <TouchableOpacity 
-                  style={styles.termsTextContainer}
-                  onPress={() => openExternalLink('/TnC')}
-                >
-                  <Text style={styles.termsText}>
-                    I agree to the ServEaso{" "}
-                    <Text style={styles.linkText}>
-                      Terms and Conditions
-                      <Icon name="open-in-new" size={14} color="#3182ce" />
-                    </Text>
-                  </Text>
+              <View style={styles.termsLinks}>
+                <TouchableOpacity onPress={() => openExternalLink('/KeyFactsStatement')}>
+                  <Text style={styles.linkText}>Key Facts Statement</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => openExternalLink('/TnC')}>
+                  <Text style={styles.linkText}>Terms and Conditions</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => openExternalLink('/Privacy')}>
+                  <Text style={styles.linkText}>Privacy Statement</Text>
                 </TouchableOpacity>
               </View>
-              {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
 
-              <View style={styles.checkboxContainer}>
-                <CheckBox
-                  checked={formData.privacy}
-                  onPress={() => handleChangeCheckbox("privacy", !formData.privacy)}
-                />
-                <TouchableOpacity 
-                  style={styles.termsTextContainer}
-                  onPress={() => openExternalLink('/Privacy')}
-                >
-                  <Text style={styles.termsText}>
-                    I agree to the ServEaso{" "}
-                    <Text style={styles.linkText}>
-                      Privacy Statement
-                      <Icon name="open-in-new" size={14} color="#3182ce" />
-                    </Text>
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {errors.privacy && <Text style={styles.errorText}>{errors.privacy}</Text>}
+              {(errors.keyFacts || errors.terms || errors.privacy) && (
+                <Text style={styles.errorText}>You must agree to all terms and conditions</Text>
+              )}
             </View>
           </ScrollView>
         );
@@ -1382,6 +1766,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff", 
     color: "#000" 
   },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
   inputError: { borderColor: "red" },
   errorText: { 
     color: "red", 
@@ -1405,6 +1793,14 @@ const styles = StyleSheet.create({
   showPasswordButton: { 
     position: "absolute", 
     right: 10 
+  },
+  validationContainer: {
+    position: 'relative',
+  },
+  validationIndicator: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
   },
   button: { 
     backgroundColor: "#2771c1ff", 
@@ -1438,6 +1834,24 @@ const styles = StyleSheet.create({
     borderRadius: 5, 
     alignItems: "center", 
     flex: 1 
+  },
+  dateInputContainer: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    marginBottom: 10 
+  },
+  dateInputPart: { 
+    flex: 1, 
+    height: 40, 
+    borderColor: "#ddd", 
+    borderWidth: 1, 
+    borderRadius: 5, 
+    paddingHorizontal: 10, 
+    textAlign: "center" 
+  },
+  dateSeparator: { 
+    paddingHorizontal: 5, 
+    fontSize: 16 
   },
   disabledButton: { 
     backgroundColor: "#cccccc" 
@@ -1485,24 +1899,6 @@ const styles = StyleSheet.create({
     marginTop: 5, 
     color: "#666" 
   },
-  dateInputContainer: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    marginBottom: 10 
-  },
-  dateInputPart: { 
-    flex: 1, 
-    height: 40, 
-    borderColor: "#ddd", 
-    borderWidth: 1, 
-    borderRadius: 5, 
-    paddingHorizontal: 10, 
-    textAlign: "center" 
-  },
-  dateSeparator: { 
-    paddingHorizontal: 5, 
-    fontSize: 16 
-  },
   modalPickerContainer: { 
     flex: 1, 
     justifyContent: 'center', 
@@ -1543,19 +1939,10 @@ const styles = StyleSheet.create({
   termsContainer: { 
     marginBottom: 20 
   },
-  checkboxContainer: { 
-    flexDirection: "row", 
-    alignItems: "flex-start", 
-    marginBottom: 15 
-  },
-  termsTextContainer: { 
-    flex: 1, 
-    marginLeft: 10 
-  },
-  termsText: { 
-    fontSize: 14, 
-    color: "#4a5568", 
-    lineHeight: 20 
+  termsLinks: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 10,
   },
   linkText: { 
     color: "#3182ce", 
@@ -1594,6 +1981,22 @@ const styles = StyleSheet.create({
     color: "#fff", 
     flex: 1, 
     marginRight: 10 
+  },
+  // Address Component Styles
+  addressSection: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+  },
+  addressTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  sameAddressContainer: {
+    marginBottom: 20,
   },
 });
 
