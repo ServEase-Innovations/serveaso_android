@@ -714,7 +714,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         Geolocation.clearWatch(locationWatchId);
       }
     };
-  }, [locationWatchId]);
+  }, []);
 
   // Update suggestions when userPreference changes
   useEffect(() => {
