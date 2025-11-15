@@ -54,6 +54,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   setUserPreference,
   onLocationChange,
 }) => {
+  console.log("User Preference in LocationSelector:", userPreference);
   const dispatch = useDispatch();
   const locationDispatch = useDispatch();
   const { appUser } = useAppUser(); // Using AppUser context
@@ -283,6 +284,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         dispatch(addLocation(position.coords));
         setLatitude(latitude);
         setLongitude(longitude);
+        
 
         try {
           const res = await axios.get(
@@ -505,6 +507,9 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   const handleChange = (newValue: any) => {
     if (newValue === "Add Address") {
+      setLoading(false);
+      setIsCheckingLocation(false);
+      setShowGPSButton(false);
       // Check authentication before opening address modal
       if (!isAuthenticated) {
         Alert.alert(
@@ -716,21 +721,35 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     };
   }, []);
 
-  // Update suggestions when userPreference changes
-  useEffect(() => {
+   const updatePreferences = () => {
     const baseSuggestions = [
       { name: "Detect Location", index: 1 },
       { name: "Add Address", index: 2 },
     ];
+
+    console.log("Updating suggestions based on userPreference:", JSON.stringify(userPreference));
     
-    const savedLocationSuggestions = Array.isArray(userPreference?.savedLocations) 
-      ? userPreference.savedLocations.map((loc: any, i: number) => ({
+    const savedLocationSuggestions = Array.isArray(userPreference?.[0]?.savedLocations) 
+      ? userPreference?.[0]?.savedLocations.map((loc: any, i: number) => ({
           name: loc.name,
           index: i + 3,
         }))
       : [];
 
-    setSuggestions([...baseSuggestions, ...savedLocationSuggestions]);
+      console.log(userPreference?.[0]?.savedLocations)
+
+      console.log("Saved location suggestions:", savedLocationSuggestions);
+
+      const finalList = [...baseSuggestions, ...savedLocationSuggestions];
+
+    setSuggestions(finalList);
+
+    console.log("Updated suggestions based on userPreference:", suggestions);
+  } 
+
+  // Update suggestions when userPreference changes
+  useEffect(() => {
+    updatePreferences();
   }, [userPreference]);
 
   const renderLocationModalContent = () => {
@@ -948,7 +967,11 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     <View style={styles.locationSection}>
       <TouchableOpacity
         style={styles.locationContainer}
-        onPress={() => setShowDropdown(!showDropdown)}
+        onPress={() =>{ 
+          setShowDropdown(!showDropdown)
+          updatePreferences()
+        }
+        }
       >
         <MaterialIcon
           name="location-on"

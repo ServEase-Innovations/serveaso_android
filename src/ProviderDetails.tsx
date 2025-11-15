@@ -426,16 +426,14 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
               <TouchableOpacity 
                 style={[
                   styles.bookNowButton,
-                  isSmallScreen && styles.bookNowButtonSmall,
-                  !isBookNowEnabled && styles.bookNowButtonDisabled
+                  isSmallScreen && styles.bookNowButtonSmall
                 ]}
                 onPress={handleBookNow}
                 disabled={!isBookNowEnabled}
               >
                 <Text style={[
                   styles.bookNowText,
-                  isSmallScreen && styles.bookNowTextSmall,
-                  !isBookNowEnabled && styles.bookNowTextDisabled
+                  isSmallScreen && styles.bookNowTextSmall
                 ]}>
                   Book Now
                 </Text>
