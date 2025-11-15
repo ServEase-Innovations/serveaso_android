@@ -25,6 +25,7 @@ import { NativeModules } from "react-native";
 import Geolocation from "@react-native-community/geolocation";
 import { useDispatch, useSelector } from "react-redux";
 import { add } from "./features/userSlice";
+import { addLocation } from "./features/geoLocationSlice";
 import { useAppUser } from "./context/AppUserContext";
 
 Geocoder.init(keys.api_key);
@@ -54,6 +55,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   onLocationChange,
 }) => {
   const dispatch = useDispatch();
+  const locationDispatch = useDispatch();
   const { appUser } = useAppUser(); // Using AppUser context
   
   const [location, setLocation] = useState("");
@@ -278,6 +280,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         }
 
         const { latitude, longitude } = position.coords;
+        dispatch(addLocation(position.coords));
         setLatitude(latitude);
         setLongitude(longitude);
 

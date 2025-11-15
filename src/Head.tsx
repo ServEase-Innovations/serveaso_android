@@ -32,6 +32,7 @@ import axios from "axios";
 import Snackbar from "react-native-snackbar";
 import { useAppUser } from "./context/AppUserContext";
 import NotificationsDialog from "./Notifications/NotificationsPage";
+import { addLocation } from "./features/geoLocationSlice";
 
 interface ChildComponentProps {
   sendDataToParent: (data: string) => void;
@@ -115,6 +116,7 @@ const Head: React.FC<ChildComponentProps> = ({ sendDataToParent }) => {
   const handleLocationChange = (location: string, locationData?: LocationData) => {
     console.log("Location changed to:", location);
     console.log("Location data:", locationData);
+    dispatch(addLocation(locationData))
     
     if (locationData) {
       setCurrentLocation(locationData);

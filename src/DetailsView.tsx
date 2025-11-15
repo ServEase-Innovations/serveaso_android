@@ -45,6 +45,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   const dispatch = useDispatch();
 
   const location = useSelector((state: any) => {
+    console.log('🌍 Retrieving geolocation from Redux state:', state);
     return state?.geoLocation?.value;
   });
 
@@ -58,7 +59,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
 
   useEffect(() => {
     performSearch();
-  }, [selectedProviderType, location]);
+  }, [selectedProviderType]);
 
   const handleBackClick = () => {
     sendDataToParent('');
@@ -135,7 +136,6 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       console.log('📍 Latitude:', latitude.toString());
       console.log('📍 Longitude:', longitude.toString());
       console.log('🌐 Full Query String:', queryParams.toString());
-      console.log('🔗 Complete URL:', `/api/serviceproviders/search?${queryParams.toString()}`);
 
       const response = await axiosInstance.get(
         `/api/serviceproviders/search?${queryParams.toString()}`
