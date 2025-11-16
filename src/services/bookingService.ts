@@ -7,8 +7,8 @@ import RazorpayCheckout from "react-native-razorpay";
 export interface BookingPayload {
   customerid: number;
   serviceproviderid: number | null;
-  start_date: string;
-  end_date: string;
+  start_date?: string;
+  end_date?: string;
   responsibilities: any;
   booking_type: string;
   service_type: string;
@@ -48,6 +48,8 @@ export const BookingService = {
    * Create a new engagement
    */
   createEngagement: async (payload: BookingPayload) => {
+
+    console.log("Creating engagement with payload:", payload);
     try {
       const res = await PaymentInstance.post(`/api/engagements`, payload, {
         headers: { "Content-Type": "application/json" },

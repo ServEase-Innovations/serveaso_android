@@ -79,6 +79,7 @@ const DemoCook = ({
   providerDetails,
   bookingType,
 }: any) => {
+  
   const dispatch = useDispatch();
   const cart = useSelector((state: any) => state.addToCart?.items || []);
   const { getFilteredPricing, getBookingType } = usePricingFilterService();
@@ -222,10 +223,10 @@ const DemoCook = ({
     errors.push("Invalid base amount");
   }
 
-  if (errors.length > 0) {
-    console.error("🚨 Payload validation errors:", errors);
-    return false;
-  }
+  // if (errors.length > 0) {
+  //   console.error("🚨 Payload validation errors:", errors);
+  //   return false;
+  // }
 
   return true;
 };
@@ -439,11 +440,15 @@ const handleCheckout = async () => {
       serviceproviderid = Number(providerDetails.serviceproviderId);
     }
 
+    console.log("Determined serviceproviderid:", bookingType);
+
+    const demoForStartTime = bookingType?.timeRange.split("-");
+    console.log("Demo for start time :", demoForStartTime + ":00")
     // Prepare payload matching BookingPayload interface
     const payload: BookingPayload = {
       customerid: customerId,
       serviceproviderid: serviceproviderid, // Now properly typed as number | null
-      start_date: bookingType?.start_Date || new Date().toISOString().split("T")[0],
+      start_date: bookingType?.demoForStartTime || new Date().toISOString().split("T")[0],
       end_date: bookingType?.end_Date || new Date().toISOString().split("T")[0],
       responsibilities: responsibilities,
       booking_type: currentBookingType,
@@ -451,11 +456,11 @@ const handleCheckout = async () => {
       service_type: "COOK",
       base_amount: baseTotal,
       payment_mode: "razorpay",
-      start_time: bookingType?.start_Time,
-      ...(currentBookingType === "ON_DEMAND" && {
-        end_time: bookingType?.end_Time || formatTimeForBackend('06:00 PM'),
-      }),
+      start_time: demoForStartTime[0].trim()
     };
+
+    console.log("Prepared booking payload:", payload);
+
 
     console.log("📦 Booking payload:", JSON.stringify(payload, null, 2));
     console.log(`🔍 Booking Type: ${currentBookingType}, Service Provider ID: ${serviceproviderid}`);

@@ -208,6 +208,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   };
 
   const handleBookNow = () => {
+    Alert.alert("Booking", "Proceeding to book the service provider.");
     let booking: BookingType;
 
     if (props.housekeepingRole !== "NANNY") {
@@ -237,7 +238,9 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
       selectedMorningTime: morningSelection,
       selectedEveningTime: eveningSelection
     };
-    props.selectedProvider(providerDetails);
+
+    // console.log("Props ==> , ",providerDetails)
+    // props.selectedProvider(providerDetails);
     
     // CRITICAL FIX: Set open to true to show the dialog
     setOpen(true);
@@ -429,7 +432,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
                   isSmallScreen && styles.bookNowButtonSmall
                 ]}
                 onPress={handleBookNow}
-                disabled={!isBookNowEnabled}
+                // disabled={!isBookNowEnabled}
               >
                 <Text style={[
                   styles.bookNowText,
