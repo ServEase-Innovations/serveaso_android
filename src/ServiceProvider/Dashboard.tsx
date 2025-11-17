@@ -20,7 +20,7 @@ import { PaymentHistory } from './PaymentHistory';
 import { useAuth0 } from 'react-native-auth0';
 import { AllBookingsDialog } from './AllBookingsDialog';
 import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from '../common/BookingUtils';
-import axiosInstance from '../axiosInstance';
+import axiosInstance from '../services/axiosInstance';
 import LinearGradient from 'react-native-linear-gradient';
 import { ReviewsDialog } from './ReviewDialog';
 import axios, { AxiosResponse } from 'axios';

@@ -20,7 +20,7 @@ import CustomFileInput from "./CustomFileInput";
 import AddressComponent from "./AddressComponent";
 import { TermsCheckboxes } from "../common/TermsCheckboxes";
 import Button from "../common/Button";
-import axiosInstance from "../axiosInstance";
+import axiosInstance from "../services/axiosInstance";
 
 // Define proper file interface for React Native
 interface RNFile {

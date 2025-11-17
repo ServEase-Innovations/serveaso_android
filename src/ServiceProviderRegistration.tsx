@@ -21,7 +21,7 @@ import { RadioButton } from "react-native-paper";
 import Slider from "@react-native-community/slider";
 import * as ImagePicker from "react-native-image-picker";
 import axios from "axios";
-import axiosInstance from "./axiosInstance";
+import axiosInstance from "./services/axiosInstance";
 import Geolocation from "@react-native-community/geolocation";
 import Geocoder from "react-native-geocoding";
 import { PERMISSIONS, request, RESULTS } from "react-native-permissions";

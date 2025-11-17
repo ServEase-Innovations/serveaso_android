@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import axiosInstance from '../axiosInstance';
+import axiosInstance from '../services/axiosInstance';
 
 interface ValidationState {
   loading: boolean;

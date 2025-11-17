@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Star, User, Calendar, MessageSquare, X } from 'lucide-react-native';
 import { useToast } from '../hooks/useToast';
-import axiosInstance from '../axiosInstance';
+import axiosInstance from '../services/axiosInstance';
 
 interface Review {
   id: number;

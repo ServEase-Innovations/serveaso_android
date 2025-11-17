@@ -17,17 +17,17 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Auth0Provider } from "react-native-auth0";
 import config from "./auth0-configuration";
-import Head from "./src/Head";
-import HomePage from "./src/HomePage";
-import DetailsView from "./src/DetailsView";
-import Footer from "./src/Footer";
-import Chatbot from "./src/Chatbot";
-import Booking from "./src/Bookings";
+import Head from "./src/Header/Header";
+import HomePage from "./src/HomePage/HomePage";
+import DetailsView from "./src/DetailsView/DetailsView";
+import Footer from "./src/Footer/Footer";
+import Chatbot from "./src/Chatbot/Chatbot";
+import Booking from "./src/UserProfile/Bookings";
 import Dashboard from "./src/ServiceProvider/Dashboard";
-import ProfileScreen from "./src/ProfileScreen";
+import ProfileScreen from "./src/UserProfile/ProfileScreen";
 import { BOOKINGS, DASHBOARD, PROFILE } from "./src/Constants/pagesConstants";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import NotificationButton from "./src/NotificationButton";
+import NotificationButton from "./src/Notifications/NotificationButton";
 import NotificationClient from "./src/NotificationClient/NotificationClient";
 import BookingRequestToast from "./src/Notifications/BookingRequestToast";
 import io, { Socket } from "socket.io-client";
@@ -35,8 +35,8 @@ import { AppUserProvider, useAppUser } from "./src/context/AppUserContext";
 import axios from "axios";
 import { useDispatch } from "react-redux";
 import { add } from "./src/features/pricingSlice";
-import MobileNumberDialog from "./src/MobileNumberDialog";
-import axiosInstance from "./src/axiosInstance";
+import MobileNumberDialog from "./src/UserProfile/MobileNumberDialog";
+import axiosInstance from "./src/services/axiosInstance";
 
 interface Engagement {
   engagement_id: number;
@@ -342,11 +342,11 @@ const MainApp = () => {
         return (
           <View style={styles.homeContainer}>
             <HomePage sendDataToParent={handleViewChange} bookingType={() => {}} />
-            {__DEV__ && appUser?.role?.toUpperCase() === "CUSTOMER" && (
+            {/* {__DEV__ && appUser?.role?.toUpperCase() === "CUSTOMER" && (
               <TouchableOpacity style={styles.testButton} onPress={forceShowMobileDialog}>
                 <Text style={styles.testButtonText}>Test Mobile Dialog</Text>
               </TouchableOpacity>
-            )}
+            )} */}
           </View>
         );
       case BOOKINGS:
@@ -539,16 +539,16 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  testButton: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    backgroundColor: "#ff6b6b",
-    padding: 10,
-    borderRadius: 8,
-    zIndex: 1000,
-  },
-  testButtonText: { color: "white", fontSize: 12, fontWeight: "bold" },
+  // testButton: {
+  //   position: "absolute",
+  //   bottom: 20,
+  //   left: 20,
+  //   backgroundColor: "#ff6b6b",
+  //   padding: 10,
+  //   borderRadius: 8,
+  //   zIndex: 1000,
+  // },
+  // testButtonText: { color: "white", fontSize: 12, fontWeight: "bold" },
 });
 
 export default App;
