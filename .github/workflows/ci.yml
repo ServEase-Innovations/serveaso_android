@@ -5,15 +5,43 @@ on:
     branches:
       - "**"
 
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Select the branch to build"
+        required: true
+        default: "main"
+        type: choice
+        options:
+          - main
+          - develop
+          - staging
+          - production
+
 jobs:
   ci-build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout correct branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.inputs.branch || github.ref_name }}
+
+      - name: Decode Android Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+
+      - name: Create gradle.properties for signing
+        run: |
+          cat <<EOF > android/gradle.properties
+          MYAPP_UPLOAD_STORE_FILE=release.keystore
+          MYAPP_UPLOAD_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}
+          MYAPP_UPLOAD_STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}
+          FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+          EOF
 
       - name: Set up Java 17
         uses: actions/setup-java@v3
@@ -46,8 +74,7 @@ jobs:
       - name: Build Release APK
         run: |
           cd android
-          ./gradlew assembleRelease \
-            -PFIREBASE_APP_ID="${{ secrets.FIREBASE_APP_ID }}"
+          ./gradlew assembleRelease
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
