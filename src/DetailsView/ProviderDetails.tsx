@@ -208,7 +208,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   };
 
   const handleBookNow = () => {
-    Alert.alert("Booking", "Proceeding to book the service provider.");
+    // Alert.alert("Booking", "Proceeding to book the service provider.");
     let booking: BookingType;
 
     if (props.housekeepingRole !== "NANNY") {

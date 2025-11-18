@@ -13,8 +13,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import axios from 'axios';
 import axiosInstance from '../services/axiosInstance';
 import ProviderDetails from './ProviderDetails';
-// import HeaderSearch from '../HeaderSearch/HeaderSearch';
-// import PreferenceSelection from '../PreferenceSelection/PreferenceSelection';
 import { add } from '../features/detailsDataSlice';
 import { CONFIRMATION } from '../Constants/pagesConstants';
 import { usePricingFilterService } from '../utils/PricingFilter';
@@ -57,9 +55,43 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     }
   };
 
+  // Updated useEffect to include location dependency like React version
   useEffect(() => {
     performSearch();
-  }, [selectedProviderType]);
+  }, [selectedProviderType, location]); // Added location dependency
+
+  // Added useEffect to handle selected prop changes like React version
+  useEffect(() => {
+    console.log('Selected ...', selected);
+    setSelectedProviderType(selected || '');
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        let response;
+        if (selected) {
+          response = await axiosInstance.get(
+            'api/serviceproviders/role?role=' + selected.toUpperCase()
+          );
+        } else {
+          response = await axiosInstance.get(
+            'api/serviceproviders/serviceproviders/all'
+          );
+        }
+        setServiceProvidersData(response?.data);
+        dispatch(add(response?.data));
+      } catch (err) {
+        console.error('There was a problem with the fetch operation:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Only fetch if we have a selected provider type
+    if (selected) {
+      fetchData();
+    }
+  }, [selected]);
 
   const handleBackClick = () => {
     sendDataToParent('');
@@ -90,7 +122,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     try {
       setLoading(true);
 
-      console.log('Booking Type in performSearch:', location);
+      console.log('Booking Type in performSearch:', bookingType);
       console.log('Location object:', location?.geometry?.location);
 
       let latitude = 0;
@@ -104,19 +136,17 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
         longitude = location?.lng;
       }
 
+      // Updated date formatting to match React version
       const formatDateOnly = (dateString?: string) => {
         if (!dateString) return '';
         return dateString.split('T')[0];
       };
 
-      // const startDate = formatDateOnly(bookingType?.start_Date) || '2025-04-01';
-      // const endDate = formatDateOnly(bookingType?.end_Date) || '2025-04-30';
-      // const timeslot = bookingType?.timeRange || '16:37-16:37';
-      // const housekeepingRole = bookingType?.housekeepingRole || 'COOK';
-  const startDate = bookingType?.start_date || "";
-      const endDate = bookingType?.end_date || "";
-      const timeslot = bookingType?.timeRange ;
-      const housekeepingRole = bookingType?.housekeepingRole || selected?.toUpperCase() || "COOK";
+      // Updated to use bookingType structure from React version
+      const startDate = formatDateOnly(bookingType?.startDate) || '2025-04-01';
+      const endDate = formatDateOnly(bookingType?.endDate) || '2025-04-30';
+      const timeslot = bookingType?.timeRange || '16:37-16:37';
+      const housekeepingRole = bookingType?.housekeepingRole || 'COOK';
 
       const queryParams = new URLSearchParams({
         startDate: startDate,
@@ -127,7 +157,6 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
         longitude: longitude.toString(),
       });
 
-      // Console queryParams in detail
       console.log('🔍 QUERY PARAMS DETAILS:');
       console.log('📅 Start Date:', startDate);
       console.log('📅 End Date:', endDate);
@@ -167,24 +196,28 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
 
   const renderContent = () => {
     console.log('🎨 Rendering content...');
-    console.log('📊 Service provider data length:', serviceProviderData.length);
+    console.log('📊 Service provider data length:', serviceProviderData?.length || 0);
     console.log('⏳ Loading state:', loading);
 
     if (Array.isArray(serviceProviderData) && serviceProviderData.length > 0) {
       console.log('✅ Rendering providers list');
       return serviceProviderData.map((provider, index) => (
         <View key={index} style={styles.providerContainer}>
-          <ProviderDetails {...provider} />
+          <ProviderDetails 
+            {...provider} 
+            onCheckout={handleCheckoutData}
+            onSelectProvider={handleSelectedProvider}
+          />
         </View>
       ));
     } else if (loading) {
       console.log('🔄 Rendering loading state');
       return (
         <View style={styles.centeredContainer}>
-            <Image 
-              source={require('../../assets/images/search.gif')} 
-              style={styles.loadingImage}
-            />
+          <Image 
+            source={require('../../assets/images/search.gif')} 
+            style={styles.loadingImage}
+          />
           <Text style={styles.loadingText}>Searching providers near you...</Text>
         </View>
       );
@@ -192,11 +225,17 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       console.log('❌ Rendering no data state');
       return (
         <View style={styles.centeredContainer}>
-          {/* <Image 
-            source={require('../../assets/no-data.png')} 
-            style={styles.noDataImage}
-          /> */}
-          <Text style={styles.noDataText}>No providers found near you</Text>
+          <Text style={styles.noDataTitle}>Service Not Available in Your Area</Text>
+          <Text style={styles.noDataText}>
+            Currently, we are unable to provide services in your location. 
+            We hope to be available in your area soon.
+          </Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => sendDataToParent('')}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -207,6 +246,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
       >
         {renderContent()}
       </ScrollView>
@@ -218,34 +258,28 @@ const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
     backgroundColor: '#fff',
+    paddingTop: 16,
   },
   scrollView: {
     flex: 1,
   },
   scrollViewContent: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
   providerContainer: {
     paddingTop: 10,
     paddingHorizontal: 16,
+    marginBottom: 10,
   },
   centeredContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    paddingHorizontal: 24,
     backgroundColor: '#fff',
   },
   loadingImage: {
-    width: 100,
-    height: 100,
-    marginBottom: 16,
-  },
-  noDataImage: {
     width: 100,
     height: 100,
     marginBottom: 16,
@@ -254,10 +288,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+    marginTop: 8,
+  },
+  noDataTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   noDataText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  backButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#007bff',
+    borderRadius: 8,
+    minWidth: 120,
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'white',
     textAlign: 'center',
   },
 });
