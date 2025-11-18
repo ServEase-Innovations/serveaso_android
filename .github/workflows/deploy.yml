@@ -1,0 +1,50 @@
+name: Manual Deploy to Firebase
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Select branch to deploy from"
+        required: true
+        type: choice
+        options:
+          - main
+          - development
+          - release
+
+      release_notes:
+        description: "Custom release notes (optional)"
+        required: false
+        default: ""
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Download APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release-apk
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Deploy APK to Firebase App Distribution
+        run: |
+          NOTES="${{ github.event.inputs.release_notes }}"
+          if [ -z "$NOTES" ]; then
+            NOTES=$(cat CHANGELOG.md)
+          fi
+
+          firebase appdistribution:distribute app-release.apk \
+            --app "${{ secrets.FIREBASE_APP_ID }}" \
+            --groups testers \
+            --release-notes "$NOTES"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

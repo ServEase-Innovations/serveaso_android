@@ -5,17 +5,45 @@ on:
     branches:
       - "**"
 
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Select the branch to build"
+        required: true
+        default: "main"
+        type: choice
+        options:
+          - main
+          - develop
+          - staging
+          - production
+
 jobs:
   ci-build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout correct branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # important for versioning & changelog
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.branch || github.ref_name }}
 
-      - name: Set up JDK 17
+      - name: Decode Android Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+
+      - name: Create gradle.properties for signing
+        run: |
+          cat <<EOF > android/gradle.properties
+          MYAPP_UPLOAD_STORE_FILE=release.keystore
+          MYAPP_UPLOAD_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}
+          MYAPP_UPLOAD_STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}
+          FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+          EOF
+
+      - name: Set up Java 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
@@ -25,35 +53,31 @@ jobs:
         id: version
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 || echo "v0.0.0")
-          echo "LAST_TAG=$LAST_TAG"
-
           VERSION_CODE=$(git rev-list --count HEAD)
           VERSION_NAME="$LAST_TAG+build.$VERSION_CODE"
-
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
 
-          echo "versionName = $VERSION_NAME"
-          echo "versionCode = $VERSION_CODE"
-
-      - name: Update app/build.gradle version
+      - name: Update version in app/build.gradle
         run: |
-          sed -i "s/versionCode .*/versionCode $VERSION_CODE/" app/build.gradle
-          sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" app/build.gradle
+          sed -i "s/versionCode .*/versionCode $VERSION_CODE/" android/app/build.gradle
+          sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" android/app/build.gradle
 
-      - name: Generate Changelog
-        id: changelog
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Build Release APK
         run: |
-          git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:'- %s' > CHANGELOG.md
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat CHANGELOG.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          cd android
+          ./gradlew assembleRelease
 
-      - name: Build APK
-        run: ./gradlew assembleRelease
-
-      - name: Upload Artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-release
-          path: app/build/outputs/apk/release/app-release.apk
+          name: android-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
