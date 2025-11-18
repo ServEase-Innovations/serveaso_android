@@ -38,14 +38,14 @@ jobs:
       # ------------------------------------------------------
       - name: Configure Global Gradle Memory
         run: |
-          mkdir -p ~/.gradle
-          cat <<EOF > ~/.gradle/gradle.properties
-          org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dkotlin.daemon.jvm.options=-Xmx2048m
-          org.gradle.daemon=true
-          org.gradle.parallel=true
-          org.gradle.workers.max=4
-          android.enableDexingArtifactTransform=false
-          EOF
+           mkdir -p ~/.gradle
+           cat <<EOF > ~/.gradle/gradle.properties
+           org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dkotlin.daemon.jvm.options=-Xmx2048m
+           org.gradle.daemon=true
+           org.gradle.parallel=true
+           org.gradle.workers.max=4
+           android.useFullClasspathForDexingTransform=true
+           EOF
 
       # ------------------------------------------------------
       # DECODE KEYSTORE FROM GITHUB SECRET
