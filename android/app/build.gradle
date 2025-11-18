@@ -73,6 +73,15 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+project.ext.react = [
+    enableHermes: true
+]
+
+// Required for CI – prevents "unknown property hermesEnabled" error
+def enableHermes = project.ext.react.get("enableHermes", false)
+def hermesEnabled = enableHermes
+
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
