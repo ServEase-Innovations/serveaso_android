@@ -32,6 +32,11 @@ jobs:
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
 
+      - name: Update version in app/build.gradle
+        run: |
+          sed -i "s/versionCode .*/versionCode $VERSION_CODE/" app/build.gradle
+          sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" app/build.gradle
+
       - name: Generate Changelog
         id: changelog
         run: |
