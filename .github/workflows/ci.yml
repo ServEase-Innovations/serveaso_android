@@ -25,32 +25,32 @@ jobs:
         id: version
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 || echo "v0.0.0")
-
           VERSION_CODE=$(git rev-list --count HEAD)
           VERSION_NAME="$LAST_TAG+build.$VERSION_CODE"
-
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
 
       - name: Update version in app/build.gradle
         run: |
-          ls -ltr
           sed -i "s/versionCode .*/versionCode $VERSION_CODE/" android/app/build.gradle
           sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" android/app/build.gradle
 
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:'- %s' > CHANGELOG.md
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat CHANGELOG.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Node dependencies
+        run: npm install
 
       - name: Build Release APK
-        run: cd android && ./gradlew assembleRelease
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -PFIREBASE_APP_ID="${{ secrets.FIREBASE_APP_ID }}"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
