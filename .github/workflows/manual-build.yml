@@ -145,6 +145,7 @@ jobs:
           firebase appdistribution:distribute "android/app/build/outputs/apk/release/app-release.apk" \
             --app "${{ secrets.FIREBASE_APP_ID }}" \
             --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
+            --groups: ${{ secrets.FIREBASE_GROUPS }} \
             --testers "${{ secrets.FIREBASE_TESTERS }}" \
             --token "${{ env.FIREBASE_TOKEN }}" \
             --release-notes "Build ${{ env.VERSION_NAME }}"
