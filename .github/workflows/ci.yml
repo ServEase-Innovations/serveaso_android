@@ -1,14 +1,10 @@
-name: Android CI
+name: Android Manual Build & Firebase Distribution
 
 on:
-  push:
-    branches:
-      - "**"
-
   workflow_dispatch:
     inputs:
       branch:
-        description: "Select branch"
+        description: "Select the branch to build"
         required: true
         default: "main"
         type: choice
@@ -19,19 +15,18 @@ on:
           - production
 
 jobs:
-  ci-build:
+  build-android:
     runs-on: ubuntu-latest
 
     steps:
-
       # ------------------------------------------------------
-      # CHECKOUT BRANCH
+      # CHECKOUT SELECTED BRANCH
       # ------------------------------------------------------
-      - name: Checkout
+      - name: Checkout selected branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.inputs.branch || github.ref_name }}
+          ref: ${{ github.event.inputs.branch }}
 
       # ------------------------------------------------------
       # GLOBAL GRADLE MEMORY FIX
@@ -110,7 +105,7 @@ jobs:
           ./gradlew assembleRelease --stacktrace
 
       # ------------------------------------------------------
-      # UPLOAD ARTIFACT FOR DOWNLOAD
+      # UPLOAD ARTIFACT
       # ------------------------------------------------------
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -119,34 +114,26 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
 
       # ------------------------------------------------------
-      # FIREBASE AUTHENTICATION (CORRECT METHOD)
-      # ------------------------------------------------------
-      - name: Authenticate with Google Cloud
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-      - name: Install Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
-          install_components: app-engine-java
-
-      - name: Generate Firebase Token
-        run: |
-          echo "FIREBASE_TOKEN=$(gcloud auth print-access-token)" >> $GITHUB_ENV
-
-      # ------------------------------------------------------
-      # FIREBASE APP DISTRIBUTION
+      # FIREBASE DISTRIBUTION
       # ------------------------------------------------------
       - name: Distribute to Firebase App Distribution
         run: |
+          # Write service account JSON file
+          printf '%s' "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > service-account.json
+
+          # Authenticate using GOOGLE_APPLICATION_CREDENTIALS
+          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service-account.json"
+
           npm install -g firebase-tools
 
+          # Validate auth
+          firebase apps:list --project "${{ secrets.FIREBASE_PROJECT_ID }}"
+
+          # Distribute to testers OR groups
           firebase appdistribution:distribute "android/app/build/outputs/apk/release/app-release.apk" \
             --app "${{ secrets.FIREBASE_APP_ID }}" \
             --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
-            --groups "testers" \
+            --groups "${{ secrets.FIREBASE_GROUP }}" \
             --testers "${{ secrets.FIREBASE_TESTERS }}" \
-            --token "${{ env.FIREBASE_TOKEN }}" \
-            --release-notes "Build ${{ env.VERSION_NAME }}"
+            --release-notes "Build ${{ env.VERSION_NAME }}" \
+            --notify
