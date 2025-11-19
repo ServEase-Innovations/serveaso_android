@@ -25,7 +25,7 @@ jobs:
     steps:
 
       # ------------------------------------------------------
-      # CHECKOUT
+      # CHECKOUT BRANCH
       # ------------------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
@@ -110,7 +110,7 @@ jobs:
           ./gradlew assembleRelease --stacktrace
 
       # ------------------------------------------------------
-      # UPLOAD APK
+      # UPLOAD ARTIFACT FOR DOWNLOAD
       # ------------------------------------------------------
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -119,13 +119,18 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
 
       # ------------------------------------------------------
-      # INSTALL GCLOUD & GENERATE FIREBASE TOKEN
+      # FIREBASE AUTHENTICATION (CORRECT METHOD)
       # ------------------------------------------------------
-      - name: Install Google Cloud CLI
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Install Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
         with:
-          service_account_key: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+          install_components: app-engine-java
 
       - name: Generate Firebase Token
         run: |
