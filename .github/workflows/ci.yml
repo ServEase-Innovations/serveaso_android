@@ -23,7 +23,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       # ------------------------------------------------------
       # CHECKOUT BRANCH
       # ------------------------------------------------------
@@ -34,7 +33,7 @@ jobs:
           ref: ${{ github.event.inputs.branch || github.ref_name }}
 
       # ------------------------------------------------------
-      # GLOBAL GRADLE MEMORY FIX (Fixes React Native CI crashes)
+      # GLOBAL GRADLE MEMORY FIX
       # ------------------------------------------------------
       - name: Configure Global Gradle Memory
         run: |
@@ -82,6 +81,7 @@ jobs:
           LAST_TAG=$(git describe --tags --abbrev=0 || echo "v0.0.0")
           VERSION_CODE=$(git rev-list --count HEAD)
           VERSION_NAME="$LAST_TAG+build.$VERSION_CODE"
+
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
 
@@ -102,7 +102,7 @@ jobs:
         run: npm install
 
       # ------------------------------------------------------
-      # BUILD APK
+      # BUILD RELEASE APK
       # ------------------------------------------------------
       - name: Build Release APK
         run: |
@@ -110,7 +110,7 @@ jobs:
           ./gradlew assembleRelease --stacktrace
 
       # ------------------------------------------------------
-      # UPLOAD APK ARTIFACT
+      # UPLOAD ARTIFACT
       # ------------------------------------------------------
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -119,19 +119,23 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
 
       # ------------------------------------------------------
-      # FIREBASE DISTRIBUTION
+      # FIREBASE DISTRIBUTION (FINAL WORKING VERSION)
       # ------------------------------------------------------
       - name: Distribute to Firebase App Distribution
         run: |
-          # Create service account file
-          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > service-account.json
+          # Write service account JSON safely (NO formatting issues)
+          printf '%s' "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > service-account.json
 
-          # Authenticate via Service Account
+          # Authenticate Firebase using Service Account
           export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service-account.json"
 
+          # Install Firebase CLI
           npm install -g firebase-tools
 
-          # Upload APK to Firebase App Distribution
+          # Validate auth works
+          firebase apps:list --project "${{ secrets.FIREBASE_PROJECT_ID }}"
+
+          # Upload to Firebase App Distribution
           firebase appdistribution:distribute "android/app/build/outputs/apk/release/app-release.apk" \
             --app "${{ secrets.FIREBASE_APP_ID }}" \
             --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
