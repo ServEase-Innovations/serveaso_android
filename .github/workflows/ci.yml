@@ -24,12 +24,18 @@ jobs:
 
     steps:
 
+      # ------------------------------------------------------
+      # CHECKOUT BRANCH
+      # ------------------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.inputs.branch || github.ref_name }}
 
+      # ------------------------------------------------------
+      # GLOBAL GRADLE MEMORY FIX (Fixes React Native CI crashes)
+      # ------------------------------------------------------
       - name: Configure Global Gradle Memory
         run: |
           mkdir -p ~/.gradle
@@ -41,11 +47,14 @@ jobs:
           android.useFullClasspathForDexingTransform=true
           EOF
 
+      # ------------------------------------------------------
+      # KEYSTORE SETUP
+      # ------------------------------------------------------
       - name: Decode Android Keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
 
-      - name: Create gradle.properties for signing
+      - name: Add signing properties
         run: |
           cat <<EOF >> android/gradle.properties
           MYAPP_UPLOAD_STORE_FILE=release.keystore
@@ -55,12 +64,18 @@ jobs:
           FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
           EOF
 
+      # ------------------------------------------------------
+      # JAVA SETUP
+      # ------------------------------------------------------
       - name: Set up Java 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
 
+      # ------------------------------------------------------
+      # AUTO VERSIONING
+      # ------------------------------------------------------
       - name: Auto Versioning
         id: version
         run: |
@@ -70,48 +85,55 @@ jobs:
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
 
-      - name: Update version in build.gradle
+      - name: Apply version to build.gradle
         run: |
           sed -i "s/versionCode .*/versionCode $VERSION_CODE/" android/app/build.gradle
           sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" android/app/build.gradle
 
+      # ------------------------------------------------------
+      # NODE SETUP
+      # ------------------------------------------------------
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Install Node dependencies
+      - name: Install dependencies
         run: npm install
 
+      # ------------------------------------------------------
+      # BUILD APK
+      # ------------------------------------------------------
       - name: Build Release APK
         run: |
           cd android
           ./gradlew assembleRelease --stacktrace
 
-      # ---------------------------------------------------------
-      # UPLOAD APK AS ARTIFACT
-      # ---------------------------------------------------------
+      # ------------------------------------------------------
+      # UPLOAD APK ARTIFACT
+      # ------------------------------------------------------
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
 
-      # ---------------------------------------------------------
+      # ------------------------------------------------------
       # FIREBASE DISTRIBUTION
-      # ---------------------------------------------------------
+      # ------------------------------------------------------
       - name: Distribute to Firebase App Distribution
         run: |
+          # Create service account file
           echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > service-account.json
 
-          # Authenticate using service account
-          export GOOGLE_APPLICATION_CREDENTIALS="service-account.json"
+          # Authenticate via Service Account
+          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service-account.json"
 
-          # Install firebase tools
           npm install -g firebase-tools
 
-          # Distribute APK
+          # Upload APK to Firebase App Distribution
           firebase appdistribution:distribute "android/app/build/outputs/apk/release/app-release.apk" \
             --app "${{ secrets.FIREBASE_APP_ID }}" \
+            --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
             --testers "${{ secrets.FIREBASE_TESTERS }}" \
             --release-notes "Build ${{ env.VERSION_NAME }}"
