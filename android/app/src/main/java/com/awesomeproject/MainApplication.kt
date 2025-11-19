@@ -1,4 +1,4 @@
-package com.awesomeproject
+package com.serveaso
 
 import android.app.Application
 import com.facebook.react.PackageList
@@ -11,7 +11,7 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
-import com.awesomeproject.LocationSettingsPackage // Add this import
+import com.serveaso.LocationSettingsPackage // Add this import
 
 class MainApplication : Application(), ReactApplication {
 

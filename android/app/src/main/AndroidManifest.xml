@@ -5,15 +5,20 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" 
         android:usesPermissionFlags="neverForLocation" 
         tools:targetApi="s" />
-        
+    <!-- Add these permissions if using image picker -->
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
     <application
         android:name=".MainApplication"
         android:label="@string/app_name"
-        android:icon="@mipmap/logo"
-        android:roundIcon="@mipmap/logo"
+        android:icon="@mipmap/serveasonew"
+        android:roundIcon="@mipmap/serveasonew"
         android:allowBackup="false"
         android:theme="@style/AppTheme"
         android:supportsRtl="true"
@@ -34,8 +39,32 @@
             </intent-filter>
         </activity>
 
+        <!-- Add this Auth0 Activity -->
+        <activity
+            android:name="com.auth0.android.provider.AuthenticationActivity"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="true"
+            tools:replace="android:exported">
+            <intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data
+        android:scheme="com.serveaso"
+        android:host="dev-plavkbiy7v55pbg4.us.auth0.com"
+        android:pathPrefix="/android/com.serveaso/callback" />
+</intent-filter>
+<intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data
+        android:scheme="com.serveaso"
+        android:host="logout" />
+</intent-filter>
+        </activity>
         <uses-library android:name="org.apache.http.legacy" android:required="false" />
-
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyBWoIIAX-gE7fvfAkiquz70WFgDaL7YXSk" />

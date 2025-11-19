@@ -13,21 +13,20 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
-  Button,
+  Linking,
 } from "react-native";
 import moment from "moment";
-import { Picker } from "@react-native-picker/picker";
 import { CheckBox } from "react-native-elements";
 import { RadioButton } from "react-native-paper";
 import Slider from "@react-native-community/slider";
 import * as ImagePicker from "react-native-image-picker";
 import axios from "axios";
-import axiosInstance from "./axiosInstance";
+import axiosInstance from "./services/axiosInstance";
 import Geolocation from "@react-native-community/geolocation";
 import Geocoder from "react-native-geocoding";
 import { PERMISSIONS, request, RESULTS } from "react-native-permissions";
-import { NativeModules, Linking } from "react-native";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import { NativeModules } from "react-native";
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // Define interfaces
 interface FormData {
@@ -49,7 +48,9 @@ interface FormData {
   pincode: string;
   AADHAR: string;
   pan: string;
-  agreeToTerms: boolean;
+  terms: boolean;
+  privacy: boolean;
+  keyFacts: boolean;
   panImage: any;
   housekeepingRole: string;
   description: string;
@@ -65,6 +66,8 @@ interface FormData {
   profilePic: string;
   timeslot: string;
   referralCode: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface FormErrors {
@@ -75,31 +78,6 @@ interface ServiceProviderRegistrationProps {
   onBackToLogin: () => void;
   onRegistrationSuccess: () => void;
 }
-
-const availableLanguages = [
-  "Assamese",
-  "Bengali",
-  "Gujarati",
-  "Hindi",
-  "Kannada",
-  "Kashmiri",
-  "Marathi",
-  "Malayalam",
-  "Oriya",
-  "Punjabi",
-  "Sanskrit",
-  "Tamil",
-  "Telugu",
-  "Urdu",
-  "Sindhi",
-  "Konkani",
-  "Nepali",
-  "Manipuri",
-  "Bodo",
-  "Dogri",
-  "Maithili",
-  "Santhali",
-];
 
 const steps = [
   "Basic Information",
@@ -121,9 +99,13 @@ const ServiceProviderRegistration: React.FC<
   const [sliderDisabled, setSliderDisabled] = useState(true);
   const [sliderValueMorning, setSliderValueMorning] = useState([6, 12]);
   const [sliderValueEvening, setSliderValueEvening] = useState([12, 20]);
-  const [selectedChips, setSelectedChips] = useState<string[]>([]);
   const [image, setImage] = useState<any>(null);
   const [documentImage, setDocumentImage] = useState<any>(null);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertType, setAlertType] = useState<"success" | "error" | "warning">("success");
+  const [showServicePicker, setShowServicePicker] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     firstName: "",
@@ -144,7 +126,9 @@ const ServiceProviderRegistration: React.FC<
     pincode: "",
     AADHAR: "",
     pan: "",
-    agreeToTerms: false,
+    terms: false,
+    privacy: false,
+    keyFacts: false,
     panImage: null,
     housekeepingRole: "",
     description: "",
@@ -167,24 +151,49 @@ const ServiceProviderRegistration: React.FC<
   // Regex patterns
   const nameRegex = /^[A-Za-z\s]+$/;
   const emailIdRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Z|a-z]{2,}$/;
-  const strongPasswordRegex =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
   const phoneRegex = /^[0-9]{10}$/;
   const pincodeRegex = /^[0-9]{6}$/;
   const aadhaarRegex = /^[0-9]{12}$/;
 
-  const [locationModalVisible, setLocationModalVisible] = useState(false);
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [address, setAddress] = useState("");
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [showGPSButton, setShowGPSButton] = useState(false);
+  const serviceTypes = [
+    { label: 'Cook', value: 'COOK' },
+    { label: 'Nanny', value: 'NANNY' },
+    { label: 'Maid', value: 'MAID' },
+  ];
 
-  // Initialize Geocoder with your API key (put this right after imports)
+  // Show alert function (equivalent to snackbar)
+  const showAlert = (message: string, type: "success" | "error" | "warning" = "success") => {
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+    
+    setTimeout(() => {
+      setAlertVisible(false);
+    }, 6000);
+  };
+
+  // Handle checkbox change for separate terms
+  const handleChangeCheckbox = (name: keyof FormData, value: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Open external links
+  const openExternalLink = (url: string) => {
+    Linking.openURL(url).catch(err => {
+      showAlert('Failed to open link', 'error');
+      console.error('Error opening link:', err);
+    });
+  };
+
+  // Initialize Geocoder
   Geocoder.init("AIzaSyBWoIIAX-gE7fvfAkiquz70WFgDaL7YXSk");
+
   const fetchLocationData = async () => {
     try {
-      // 1. Check and request location permission
       const hasPermission = await requestLocationPermission();
       if (!hasPermission) {
         Alert.alert(
@@ -201,7 +210,6 @@ const ServiceProviderRegistration: React.FC<
         return;
       }
 
-      // 2. Check location services are enabled
       const servicesEnabled = await checkLocationServices();
       if (!servicesEnabled) {
         Alert.alert(
@@ -210,8 +218,7 @@ const ServiceProviderRegistration: React.FC<
           [
             {
               text: "Enable",
-              onPress: () =>
-                NativeModules.LocationSettings.showLocationSettingsDialog(),
+              onPress: () => NativeModules.LocationSettings?.showLocationSettingsDialog?.(),
             },
             { text: "Cancel", style: "cancel" },
           ]
@@ -219,25 +226,22 @@ const ServiceProviderRegistration: React.FC<
         return;
       }
 
-      // 3. Show loading indicator
-      Alert.alert("Fetching Location", "Getting your current location...");
+      setLocationLoading(true);
+      showAlert("Fetching your current location...", "success");
 
-      // 4. Get current position
       Geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
 
-          // 5. Reverse geocode to get address
           try {
             const res = await Geocoder.from(latitude, longitude);
             const address = res.results[0]?.formatted_address || "";
 
-            // Extract address components
             let street = "";
             let locality = "";
             let pincode = "";
 
-            res.results[0]?.address_components?.forEach((component) => {
+            res.results[0]?.address_components?.forEach((component: any) => {
               if (component.types.includes("route")) {
                 street = component.long_name;
               }
@@ -249,7 +253,6 @@ const ServiceProviderRegistration: React.FC<
               }
             });
 
-            // 6. Update form fields
             setFormData((prev) => ({
               ...prev,
               address: address,
@@ -261,35 +264,33 @@ const ServiceProviderRegistration: React.FC<
               longitude: longitude,
             }));
 
-            Alert.alert("Success", "Location fetched successfully!");
+            showAlert("Location fetched successfully!", "success");
           } catch (error) {
             console.error("Geocoding error:", error);
-            Alert.alert("Error", "Could not determine address from location");
+            showAlert("Could not determine address from location", "error");
+          } finally {
+            setLocationLoading(false);
           }
         },
         (error) => {
           console.error("Location error:", error);
-          Alert.alert("Error", "Failed to get location. Please try again.");
+          showAlert("Failed to get location. Please try again.", "error");
+          setLocationLoading(false);
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
       );
     } catch (error) {
       console.error("Location fetch error:", error);
-      Alert.alert("Error", "Failed to fetch location. Please try again.");
+      showAlert("Failed to fetch location. Please try again.", "error");
+      setLocationLoading(false);
     }
   };
 
-  // Helper functions
   const requestLocationPermission = async (): Promise<boolean> => {
     try {
       if (Platform.OS === "android") {
-        const [fineStatus, coarseStatus] = await Promise.all([
-          request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION),
-          request(PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION),
-        ]);
-        return (
-          fineStatus === RESULTS.GRANTED || coarseStatus === RESULTS.GRANTED
-        );
+        const fineStatus = await request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
+        return fineStatus === RESULTS.GRANTED;
       } else {
         const iosStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
         return iosStatus === RESULTS.GRANTED;
@@ -302,175 +303,12 @@ const ServiceProviderRegistration: React.FC<
 
   const checkLocationServices = async (): Promise<boolean> => {
     try {
-      if (Platform.OS === "android") {
-        return await NativeModules.LocationSettings.checkLocationServices();
-      }
+      // Simplified service check
       return true;
     } catch (err) {
       console.warn("Services check error:", err);
       return false;
     }
-  };
-
-  const checkLocationAccuracy = async (): Promise<void> => {
-    if (Platform.OS === "android") {
-      try {
-        const locationMode =
-          await NativeModules.LocationSettings.getLocationMode();
-
-        if (locationMode !== "high_accuracy") {
-          Alert.alert(
-            "High Accuracy Recommended",
-            "For best results, please enable high accuracy location mode in your device settings.",
-            [
-              {
-                text: "Open Settings",
-                onPress: () =>
-                  NativeModules.LocationSettings.openLocationSettings(),
-              },
-              { text: "Continue Anyway", onPress: () => {} },
-            ]
-          );
-        }
-      } catch (err) {
-        console.warn("Error checking location accuracy:", err);
-      }
-    }
-  };
-
-  // const checkLocationServices = async (): Promise<boolean> => {
-  //   try {
-  //     if (Platform.OS === 'android') {
-  //       return await NativeModules.LocationSettings.checkLocationServices();
-  //     }
-  //     return true;
-  //   } catch (err) {
-  //     console.warn('Error checking location services:', err);
-  //     return false;
-  //   }
-  // };
-
-  const getAddressFromCoords = async (lat: number, lon: number) => {
-    try {
-      const res = await Geocoder.from(lat, lon);
-      const addressComponent = res.results?.[0]?.formatted_address;
-      const addressParts = res.results?.[0]?.address_components || [];
-
-      if (addressComponent) {
-        setAddress(addressComponent);
-
-        // Extract address components
-        let street = "";
-        let locality = "";
-        let pincode = "";
-
-        addressParts.forEach((component) => {
-          if (component.types.includes("route")) {
-            street = component.long_name;
-          }
-          if (component.types.includes("locality")) {
-            locality = component.long_name;
-          }
-          if (component.types.includes("postal_code")) {
-            pincode = component.long_name;
-          }
-        });
-
-        // Update form data with extracted components
-        setFormData((prev) => ({
-          ...prev,
-          address: addressComponent,
-          street: street || prev.street,
-          locality: locality || prev.locality,
-          pincode: pincode || prev.pincode,
-          currentLocation: addressComponent,
-          latitude: lat,
-          longitude: lon,
-        }));
-      }
-    } catch (error) {
-      console.warn("Geocoder error:", error);
-    }
-  };
-
-  const fetchLocation = () => {
-    setLocationLoading(true);
-    setShowGPSButton(false);
-
-    Geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setLatitude(latitude);
-        setLongitude(longitude);
-        getAddressFromCoords(latitude, longitude);
-        setLocationLoading(false);
-      },
-      (error) => {
-        console.warn("Location fetch error:", error);
-        setLocationLoading(false);
-        setShowGPSButton(true);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
-  };
-
-  const fetchLocationWithChecks = async () => {
-    setLocationLoading(true);
-    setLocationModalVisible(true);
-
-    try {
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        Alert.alert(
-          "Permission Required",
-          "Location access is required for this feature. Please enable it in settings.",
-          [
-            {
-              text: "Open Settings",
-              onPress: () =>
-                NativeModules.LocationSettings.openLocationSettings(),
-            },
-            { text: "Cancel", style: "cancel" },
-          ]
-        );
-        return;
-      }
-
-      const servicesEnabled = await checkLocationServices();
-      if (!servicesEnabled) {
-        Alert.alert(
-          "Location Services Disabled",
-          "Please enable location services to continue.",
-          [
-            {
-              text: "Enable",
-              onPress: () =>
-                NativeModules.LocationSettings.showLocationSettingsDialog(),
-            },
-            { text: "Cancel", style: "cancel" },
-          ]
-        );
-        setShowGPSButton(true);
-        return;
-      }
-
-      await checkLocationAccuracy();
-      fetchLocation();
-    } catch (error) {
-      console.warn("Location fetch error:", error);
-      setShowGPSButton(true);
-    } finally {
-      setLocationLoading(false);
-    }
-  };
-
-  const handleOpenSettings = async () => {
-    await Linking.openSettings();
-    fetchLocationWithChecks();
-  };
-
-  const handleBackLogin = () => {
-    onBackToLogin();
   };
 
   const handleImageSelect = async () => {
@@ -511,43 +349,46 @@ const ServiceProviderRegistration: React.FC<
     });
   };
 
-  // const fetchLocationData = async () => {
-  //    fetchLocationWithChecks();
-  //   Alert.alert(
-  //     'Location',
-  //     'Fetching location is not implemented in this example. You would use react-native-geolocation-service in a real app.',
-  //     [{ text: 'OK' }]
-  //   );
-  // };
-
   const handleServiceTypeChange = (value: string) => {
     setFormData({ ...formData, housekeepingRole: value });
     setIsCookSelected(value === "COOK");
     if (value !== "COOK") {
-      setFormData({
-        ...formData,
+      setFormData(prev => ({
+        ...prev,
         housekeepingRole: value,
         cookingSpeciality: "",
-      });
+      }));
     }
   };
 
   const handleCookingSpecialityChange = (value: string) => {
-    setFormData({ ...formData, cookingSpeciality: value });
+    setFormData(prev => ({ ...prev, cookingSpeciality: value }));
   };
 
   const handledietChange = (value: string) => {
-    setFormData({ ...formData, diet: value });
+    setFormData(prev => ({ ...prev, diet: value }));
   };
 
   const handleChange = (name: string, value: string | boolean) => {
-    setFormData({ ...formData, [name]: value });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleRealTimeValidation = (name: string, value: string) => {
     let error = "";
 
-    if (name === "password") {
+    if (name === "firstName") {
+      if (!value.trim()) {
+        error = "First Name is required.";
+      } else if (!nameRegex.test(value.trim())) {
+        error = "First Name should contain only alphabets.";
+      }
+    } else if (name === "lastName") {
+      if (!value.trim()) {
+        error = "Last Name is required.";
+      } else if (!nameRegex.test(value.trim())) {
+        error = "Last Name should contain only alphabets.";
+      }
+    } else if (name === "password") {
       if (value.length < 8) {
         error = "Password must be at least 8 characters long.";
       } else if (!/[A-Z]/.test(value)) {
@@ -579,14 +420,15 @@ const ServiceProviderRegistration: React.FC<
         error = "AADHAR number must be exactly 12 digits.";
       }
     } else if (name === "pincode") {
+      const numericValue = value.replace(/\D/g, "");
       const pincodePattern = /^[0-9]{6}$/;
-      if (!pincodePattern.test(value)) {
+      if (!pincodePattern.test(numericValue)) {
         error = "Pincode must be exactly 6 digits.";
       }
     }
 
-    setErrors({ ...errors, [name]: error });
-    setFormData({ ...formData, [name]: value });
+    setErrors(prev => ({ ...prev, [name]: error }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const validateAge = (dob: string) => {
@@ -596,19 +438,17 @@ const ServiceProviderRegistration: React.FC<
     const today = moment();
     const age = today.diff(birthDate, "years");
 
-    console.log("Entered DOB:", dob);
-    console.log("Calculated Age:", age);
-
     return age >= 18;
   };
 
   const handleDOBChange = (dob: string) => {
-    setFormData({ ...formData, dob });
+    setFormData(prev => ({ ...prev, dob }));
 
     const isValidAge = validateAge(dob);
 
     if (!isValidAge) {
       setIsFieldsDisabled(true);
+      showAlert("You must be at least 18 years old to proceed.", "error");
     } else {
       setIsFieldsDisabled(false);
     }
@@ -618,14 +458,18 @@ const ServiceProviderRegistration: React.FC<
     let tempErrors: FormErrors = {};
 
     if (activeStep === 0) {
-      if (!formData.firstName || !nameRegex.test(formData.firstName)) {
-        tempErrors.firstName =
-          "First Name is required and should contain only alphabets.";
+      if (!formData.firstName) {
+        tempErrors.firstName = "First Name is required.";
+      } else if (!nameRegex.test(formData.firstName)) {
+        tempErrors.firstName = "First Name should contain only alphabets.";
       }
-      if (!formData.lastName || !nameRegex.test(formData.lastName)) {
-        tempErrors.lastName =
-          "Last Name is required and should contain only alphabets.";
+
+      if (!formData.lastName) {
+        tempErrors.lastName = "Last Name is required.";
+      } else if (!nameRegex.test(formData.lastName)) {
+        tempErrors.lastName = "Last Name should contain only alphabets.";
       }
+
       if (!formData.gender) {
         tempErrors.gender = "Please select a gender.";
       }
@@ -660,45 +504,40 @@ const ServiceProviderRegistration: React.FC<
         tempErrors.currentLocation = "Current Location is required.";
       }
       if (!formData.pincode || !pincodeRegex.test(formData.pincode)) {
-        tempErrors.pincode = "Pin Code is required";
+        tempErrors.pincode = "Pincode must be exactly 6 digits.";
       }
     }
 
     if (activeStep === 2) {
-      if (!formData.agreeToTerms) {
-        tempErrors.agreeToTerms =
-          "You must agree to the Terms of Service and Privacy Policy.";
-      }
       if (!formData.housekeepingRole) {
         tempErrors.housekeepingRole = "Please select a service type.";
       }
       if (formData.housekeepingRole === "COOK" && !formData.cookingSpeciality) {
-        tempErrors.cookingSpeciality =
-          "Please select a speciality for the cook service.";
+        tempErrors.cookingSpeciality = "Please select a speciality for the cook service.";
       }
       if (!formData.diet) {
-        tempErrors.diet = "Please select diet";
+        tempErrors.diet = "Please select diet.";
       }
-
       if (!formData.experience) {
-        tempErrors.experience = "Please select experience";
-      } else {
-        const experienceRegex = /^[0-9]+$/;
-        if (!experienceRegex.test(formData.experience)) {
-          tempErrors.experience = "Experience only accepts numbers.";
-        } else {
-          const experienceRangeRegex = /^([0-9]|[1-4][0-9]|50)$/;
-          if (!experienceRangeRegex.test(formData.experience)) {
-            tempErrors.experience =
-              "Experience must be between 0 and 50 years.";
-          }
-        }
+        tempErrors.experience = "Please select experience.";
       }
     }
 
     if (activeStep === 3) {
       if (!formData.AADHAR || !aadhaarRegex.test(formData.AADHAR)) {
-        tempErrors.kyc = "Aadhaar number must be exactly 12 digits.";
+        tempErrors.AADHAR = "Aadhaar number must be exactly 12 digits.";
+      }
+    }
+
+    if (activeStep === 4) {
+      if (!formData.keyFacts) {
+        tempErrors.keyFacts = "You must agree to the Key Facts Document";
+      }
+      if (!formData.terms) {
+        tempErrors.terms = "You must agree to the Terms and Conditions";
+      }
+      if (!formData.privacy) {
+        tempErrors.privacy = "You must agree to the Privacy Policy";
       }
     }
 
@@ -707,30 +546,30 @@ const ServiceProviderRegistration: React.FC<
   };
 
   const handleNext = () => {
-    if (!validateForm()) {
-      return;
-    }
-
-    if (activeStep === 0) {
-      const isValidAge = validateAge(formData.dob);
-      if (!isValidAge) {
-        Alert.alert("Error", "You must be at least 18 years old to proceed");
-        return;
+    if (validateForm()) {
+      if (activeStep === 0) {
+        const isValidAge = validateAge(formData.dob);
+        if (!isValidAge) {
+          showAlert("You must be at least 18 years old to proceed", "error");
+          return;
+        }
       }
+      setActiveStep(prevStep => Math.min(prevStep + 1, steps.length - 1));
     }
-
-    setActiveStep(Math.min(activeStep + 1, steps.length - 1));
   };
 
   const handleBack = () => {
-    setActiveStep(Math.max(activeStep - 1, 0));
+    if (activeStep === 0) {
+      onBackToLogin();
+    } else {
+      setActiveStep(prevActiveStep => prevActiveStep - 1);
+    }
   };
 
   const handleSubmit = async () => {
     setIsLoading(true);
 
     try {
-      // Filter out empty values
       const filteredPayload = Object.fromEntries(
         Object.entries(formData).filter(
           ([_, value]) => value !== "" && value !== null && value !== undefined
@@ -739,17 +578,16 @@ const ServiceProviderRegistration: React.FC<
 
       if (validateForm()) {
         try {
-          // Upload profile image if selected
           if (image) {
             const formDataToUpload = new FormData();
             formDataToUpload.append("image", {
               uri: image.uri,
               type: "image/jpeg",
               name: "profile.jpg",
-            });
+            } as any);
 
             const imageResponse = await axios.post(
-              "http://your-api-endpoint/upload",
+              "http://65.2.153.173:3000/upload",
               formDataToUpload,
               {
                 headers: {
@@ -761,43 +599,10 @@ const ServiceProviderRegistration: React.FC<
             if (imageResponse.status === 200) {
               filteredPayload.profilePic = imageResponse.data.imageUrl;
             } else {
-              Alert.alert(
-                "Warning",
-                "Image upload failed. Proceeding without profile picture."
-              );
+              showAlert("Image upload failed. Proceeding without profile picture.", "warning");
             }
           }
 
-          // Upload document image if selected
-          if (documentImage) {
-            const docFormData = new FormData();
-            docFormData.append("document", {
-              uri: documentImage.uri,
-              type: "image/jpeg",
-              name: "document.jpg",
-            });
-
-            const docResponse = await axios.post(
-              "http://your-api-endpoint/upload-document",
-              docFormData,
-              {
-                headers: {
-                  "Content-Type": "multipart/form-data",
-                },
-              }
-            );
-
-            if (docResponse.status === 200) {
-              filteredPayload.documentImageUrl = docResponse.data.documentUrl;
-            } else {
-              Alert.alert(
-                "Warning",
-                "Document upload failed. Proceeding without document."
-              );
-            }
-          }
-
-          // Submit the form data
           const response = await axiosInstance.post(
             "/api/serviceproviders/serviceprovider/add",
             filteredPayload,
@@ -808,41 +613,48 @@ const ServiceProviderRegistration: React.FC<
             }
           );
 
-          Alert.alert("Success", "Service provider added successfully!");
-          console.log("Success:", response.data);
+          showAlert("Service provider added successfully!", "success");
+
+          // Create Auth0 user
+          const authPayload = {
+            email: filteredPayload.emailId,
+            password: filteredPayload.password,
+            name: `${filteredPayload.firstName} ${filteredPayload.lastName}`,
+          };
+
+          axios.post('https://utils-ndt3.onrender.com/authO/create-autho-user', authPayload)
+            .then((authResponse) => {
+              console.log("Auth0 user created successfully:", authResponse.data);
+            }).catch((authError) => {
+              console.error("Error creating Auth0 user:", authError);
+            });
 
           setTimeout(() => {
             onRegistrationSuccess();
           }, 3000);
         } catch (error) {
-          Alert.alert(
-            "Error",
-            "Failed to add service provider. Please try again."
-          );
+          showAlert("Failed to add service provider. Please try again.", "error");
           console.error("Error submitting form:", error);
         }
       } else {
-        Alert.alert("Warning", "Please fill out all required fields.");
+        showAlert("Please fill out all required fields.", "warning");
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to register. Please try again.");
+      showAlert("Failed to register. Please try again.", "error");
       console.error("Error submitting form:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateFormTimeSlot = (
-    morningRange: number[],
-    eveningRange: number[]
-  ) => {
+  const updateFormTimeSlot = (morningRange: number[], eveningRange: number[]) => {
     const startMorning = formatDisplayTime(morningRange[0]);
     const endMorning = formatDisplayTime(morningRange[1]);
     const startEvening = formatDisplayTime(eveningRange[0]);
     const endEvening = formatDisplayTime(eveningRange[1]);
 
     const formattedTimeSlot = `${startMorning}-${endMorning}, ${startEvening}-${endEvening}`;
-    setFormData({ ...formData, timeslot: formattedTimeSlot });
+    setFormData(prev => ({ ...prev, timeslot: formattedTimeSlot }));
   };
 
   const formatDisplayTime = (value: number) => {
@@ -857,7 +669,6 @@ const ServiceProviderRegistration: React.FC<
       case 0:
         return (
           <ScrollView style={styles.stepContainer}>
-            {/* Profile Image Upload */}
             <View style={styles.profileImageContainer}>
               <TouchableOpacity
                 onPress={handleImageSelect}
@@ -866,9 +677,7 @@ const ServiceProviderRegistration: React.FC<
                 {image ? (
                   <Image source={image} style={styles.profileImage} />
                 ) : (
-                  <Text style={styles.imageUploadText}>
-                    Upload Profile Image
-                  </Text>
+                  <Text style={styles.imageUploadText}>Upload Profile Image</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -879,14 +688,10 @@ const ServiceProviderRegistration: React.FC<
               placeholder="Enter your first name"
               placeholderTextColor="#999"
               value={formData.firstName}
-              onChangeText={(text) =>
-                handleRealTimeValidation("firstName", text)
-              }
+              onChangeText={(text) => handleRealTimeValidation("firstName", text)}
               editable={!isFieldsDisabled}
             />
-            {errors.firstName && (
-              <Text style={styles.errorText}>{errors.firstName}</Text>
-            )}
+            {errors.firstName && <Text style={styles.errorText}>{errors.firstName}</Text>}
 
             <Text style={styles.inputLabel}>Middle Name</Text>
             <TextInput
@@ -904,23 +709,10 @@ const ServiceProviderRegistration: React.FC<
               placeholder="Enter your last name"
               placeholderTextColor="#999"
               value={formData.lastName}
-              onChangeText={(text) =>
-                handleRealTimeValidation("lastName", text)
-              }
+              onChangeText={(text) => handleRealTimeValidation("lastName", text)}
               editable={!isFieldsDisabled}
             />
-            {errors.lastName && (
-              <Text style={styles.errorText}>{errors.lastName}</Text>
-            )}
-
-            {/* <Text style={styles.inputLabel}>Date of Birth *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#999"
-              value={formData.dob}
-              onChangeText={(text) => handleDOBChange(text)}
-            /> */}
+            {errors.lastName && <Text style={styles.errorText}>{errors.lastName}</Text>}
 
             <Text style={styles.inputLabel}>Date of Birth *</Text>
             <View style={styles.dateInputContainer}>
@@ -976,9 +768,7 @@ const ServiceProviderRegistration: React.FC<
               />
             </View>
             {formData.dob && !validateAge(formData.dob) && (
-              <Text style={styles.errorText}>
-                You must be at least 18 years old to register.
-              </Text>
+              <Text style={styles.errorText}>You must be at least 18 years old to register.</Text>
             )}
 
             <Text style={styles.label}>Gender *</Text>
@@ -1001,9 +791,7 @@ const ServiceProviderRegistration: React.FC<
                 </View>
               </View>
             </RadioButton.Group>
-            {errors.gender && (
-              <Text style={styles.errorText}>{errors.gender}</Text>
-            )}
+            {errors.gender && <Text style={styles.errorText}>{errors.gender}</Text>}
 
             <Text style={styles.inputLabel}>Email *</Text>
             <TextInput
@@ -1015,9 +803,7 @@ const ServiceProviderRegistration: React.FC<
               keyboardType="email-address"
               editable={!isFieldsDisabled}
             />
-            {errors.emailId && (
-              <Text style={styles.errorText}>{errors.emailId}</Text>
-            )}
+            {errors.emailId && <Text style={styles.errorText}>{errors.emailId}</Text>}
 
             <Text style={styles.inputLabel}>Password *</Text>
             <View style={styles.passwordContainer}>
@@ -1027,9 +813,7 @@ const ServiceProviderRegistration: React.FC<
                 placeholderTextColor="#999"
                 secureTextEntry={!showPassword}
                 value={formData.password}
-                onChangeText={(text) =>
-                  handleRealTimeValidation("password", text)
-                }
+                onChangeText={(text) => handleRealTimeValidation("password", text)}
                 editable={!isFieldsDisabled}
               />
               <TouchableOpacity
@@ -1039,24 +823,17 @@ const ServiceProviderRegistration: React.FC<
                 <Text>{showPassword ? "Hide" : "Show"}</Text>
               </TouchableOpacity>
             </View>
-            {errors.password && (
-              <Text style={styles.errorText}>{errors.password}</Text>
-            )}
+            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
             <Text style={styles.inputLabel}>Confirm Password *</Text>
             <View style={styles.passwordContainer}>
               <TextInput
-                style={[
-                  styles.input,
-                  errors.confirmPassword && styles.inputError,
-                ]}
+                style={[styles.input, errors.confirmPassword && styles.inputError]}
                 placeholder="Confirm your password"
                 placeholderTextColor="#999"
                 secureTextEntry={!showConfirmPassword}
                 value={formData.confirmPassword}
-                onChangeText={(text) =>
-                  handleRealTimeValidation("confirmPassword", text)
-                }
+                onChangeText={(text) => handleRealTimeValidation("confirmPassword", text)}
                 editable={!isFieldsDisabled}
               />
               <TouchableOpacity
@@ -1066,9 +843,7 @@ const ServiceProviderRegistration: React.FC<
                 <Text>{showConfirmPassword ? "Hide" : "Show"}</Text>
               </TouchableOpacity>
             </View>
-            {errors.confirmPassword && (
-              <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-            )}
+            {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
 
             <Text style={styles.inputLabel}>Mobile Number *</Text>
             <TextInput
@@ -1076,15 +851,11 @@ const ServiceProviderRegistration: React.FC<
               placeholder="Enter your 10-digit mobile number"
               placeholderTextColor="#999"
               value={formData.mobileNo}
-              onChangeText={(text) =>
-                handleRealTimeValidation("mobileNo", text)
-              }
+              onChangeText={(text) => handleRealTimeValidation("mobileNo", text)}
               keyboardType="phone-pad"
               editable={!isFieldsDisabled}
             />
-            {errors.mobileNo && (
-              <Text style={styles.errorText}>{errors.mobileNo}</Text>
-            )}
+            {errors.mobileNo && <Text style={styles.errorText}>{errors.mobileNo}</Text>}
 
             <Text style={styles.inputLabel}>Alternate Number</Text>
             <TextInput
@@ -1111,9 +882,7 @@ const ServiceProviderRegistration: React.FC<
               onChangeText={(text) => handleChange("address", text)}
               multiline
             />
-            {errors.address && (
-              <Text style={styles.errorText}>{errors.address}</Text>
-            )}
+            {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
 
             <Text style={styles.inputLabel}>Building Name *</Text>
             <TextInput
@@ -1123,9 +892,7 @@ const ServiceProviderRegistration: React.FC<
               value={formData.buildingName}
               onChangeText={(text) => handleChange("buildingName", text)}
             />
-            {errors.buildingName && (
-              <Text style={styles.errorText}>{errors.buildingName}</Text>
-            )}
+            {errors.buildingName && <Text style={styles.errorText}>{errors.buildingName}</Text>}
 
             <Text style={styles.inputLabel}>Locality *</Text>
             <TextInput
@@ -1135,9 +902,7 @@ const ServiceProviderRegistration: React.FC<
               value={formData.locality}
               onChangeText={(text) => handleChange("locality", text)}
             />
-            {errors.locality && (
-              <Text style={styles.errorText}>{errors.locality}</Text>
-            )}
+            {errors.locality && <Text style={styles.errorText}>{errors.locality}</Text>}
 
             <Text style={styles.inputLabel}>Street *</Text>
             <TextInput
@@ -1147,9 +912,7 @@ const ServiceProviderRegistration: React.FC<
               value={formData.street}
               onChangeText={(text) => handleChange("street", text)}
             />
-            {errors.street && (
-              <Text style={styles.errorText}>{errors.street}</Text>
-            )}
+            {errors.street && <Text style={styles.errorText}>{errors.street}</Text>}
 
             <Text style={styles.inputLabel}>Pincode *</Text>
             <TextInput
@@ -1159,25 +922,19 @@ const ServiceProviderRegistration: React.FC<
               value={formData.pincode}
               onChangeText={(text) => handleRealTimeValidation("pincode", text)}
               keyboardType="number-pad"
+              maxLength={6}
             />
-            {errors.pincode && (
-              <Text style={styles.errorText}>{errors.pincode}</Text>
-            )}
+            {errors.pincode && <Text style={styles.errorText}>{errors.pincode}</Text>}
 
             <Text style={styles.inputLabel}>Current Location *</Text>
             <TextInput
-              style={[
-                styles.input,
-                errors.currentLocation && styles.inputError,
-              ]}
+              style={[styles.input, errors.currentLocation && styles.inputError]}
               placeholder="Enter your current location"
               placeholderTextColor="#999"
               value={formData.currentLocation}
               onChangeText={(text) => handleChange("currentLocation", text)}
             />
-            {errors.currentLocation && (
-              <Text style={styles.errorText}>{errors.currentLocation}</Text>
-            )}
+            {errors.currentLocation && <Text style={styles.errorText}>{errors.currentLocation}</Text>}
 
             <Text style={styles.inputLabel}>Nearby Location</Text>
             <TextInput
@@ -1206,19 +963,42 @@ const ServiceProviderRegistration: React.FC<
         return (
           <ScrollView style={styles.stepContainer}>
             <Text style={styles.label}>Select Service Type *</Text>
-            <Picker
-              selectedValue={formData.housekeepingRole}
-              onValueChange={handleServiceTypeChange}
-              style={styles.picker}
+            <TouchableOpacity 
+              style={[styles.input, errors.housekeepingRole && styles.inputError]}
+              onPress={() => setShowServicePicker(true)}
             >
-              <Picker.Item label="Select Service Type" value="" />
-              <Picker.Item label="Cook" value="COOK" />
-              <Picker.Item label="Nanny" value="NANNY" />
-              <Picker.Item label="Maid" value="MAID" />
-            </Picker>
-            {errors.housekeepingRole && (
-              <Text style={styles.errorText}>{errors.housekeepingRole}</Text>
-            )}
+              <Text style={{ color: formData.housekeepingRole ? '#000' : '#999' }}>
+                {formData.housekeepingRole ? 
+                  serviceTypes.find(s => s.value === formData.housekeepingRole)?.label : 
+                  'Select Service Type'}
+              </Text>
+            </TouchableOpacity>
+
+            <Modal visible={showServicePicker} transparent={true} animationType="slide">
+              <View style={styles.modalPickerContainer}>
+                <View style={styles.modalPickerContent}>
+                  {serviceTypes.map((service) => (
+                    <TouchableOpacity
+                      key={service.value}
+                      style={styles.serviceOption}
+                      onPress={() => {
+                        handleServiceTypeChange(service.value);
+                        setShowServicePicker(false);
+                      }}
+                    >
+                      <Text style={styles.serviceOptionText}>{service.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => setShowServicePicker(false)}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+            {errors.housekeepingRole && <Text style={styles.errorText}>{errors.housekeepingRole}</Text>}
 
             {isCookSelected && (
               <>
@@ -1230,23 +1010,11 @@ const ServiceProviderRegistration: React.FC<
                   <View style={styles.radioGroup}>
                     <View style={styles.radioOption}>
                       <RadioButton value="VEG" />
-                      <View style={styles.radioLabel}>
-                        <Image
-                          source={require("../assets/images/veg.png")}
-                          style={styles.icon}
-                        />
-                        <Text>Veg</Text>
-                      </View>
+                      <Text>Veg</Text>
                     </View>
                     <View style={styles.radioOption}>
                       <RadioButton value="NONVEG" />
-                      <View style={styles.radioLabel}>
-                        <Image
-                          source={require("../assets/images/nonveg.png")}
-                          style={styles.icon}
-                        />
-                        <Text>Non-Veg</Text>
-                      </View>
+                      <Text>Non-Veg</Text>
                     </View>
                     <View style={styles.radioOption}>
                       <RadioButton value="BOTH" />
@@ -1254,39 +1022,20 @@ const ServiceProviderRegistration: React.FC<
                     </View>
                   </View>
                 </RadioButton.Group>
-                {errors.cookingSpeciality && (
-                  <Text style={styles.errorText}>
-                    {errors.cookingSpeciality}
-                  </Text>
-                )}
+                {errors.cookingSpeciality && <Text style={styles.errorText}>{errors.cookingSpeciality}</Text>}
               </>
             )}
 
             <Text style={styles.label}>Diet *</Text>
-            <RadioButton.Group
-              onValueChange={handledietChange}
-              value={formData.diet}
-            >
+            <RadioButton.Group onValueChange={handledietChange} value={formData.diet}>
               <View style={styles.radioGroup}>
                 <View style={styles.radioOption}>
                   <RadioButton value="VEG" />
-                  <View style={styles.radioLabel}>
-                    <Image
-                      source={require("../assets/images/veg.png")}
-                      style={styles.icon}
-                    />
-                    <Text>Veg</Text>
-                  </View>
+                  <Text>Veg</Text>
                 </View>
                 <View style={styles.radioOption}>
                   <RadioButton value="NONVEG" />
-                  <View style={styles.radioLabel}>
-                    <Image
-                      source={require("../assets/images/nonveg.png")}
-                      style={styles.icon}
-                    />
-                    <Text>Non-Veg</Text>
-                  </View>
+                  <Text>Non-Veg</Text>
                 </View>
                 <View style={styles.radioOption}>
                   <RadioButton value="BOTH" />
@@ -1295,11 +1044,6 @@ const ServiceProviderRegistration: React.FC<
               </View>
             </RadioButton.Group>
             {errors.diet && <Text style={styles.errorText}>{errors.diet}</Text>}
-
-            <Text style={styles.label}>Languages</Text>
-            <Text style={styles.note}>
-              Note: Languages selection UI would be implemented here
-            </Text>
 
             <Text style={styles.inputLabel}>Description</Text>
             <TextInput
@@ -1321,9 +1065,7 @@ const ServiceProviderRegistration: React.FC<
               onChangeText={(text) => handleChange("experience", text)}
               keyboardType="numeric"
             />
-            {errors.experience && (
-              <Text style={styles.errorText}>{errors.experience}</Text>
-            )}
+            {errors.experience && <Text style={styles.errorText}>{errors.experience}</Text>}
 
             <Text style={styles.inputLabel}>Referral Code (Optional)</Text>
             <TextInput
@@ -1340,10 +1082,10 @@ const ServiceProviderRegistration: React.FC<
               checked={formData.timeslot === "06:00-20:00"}
               onPress={() => {
                 if (formData.timeslot === "06:00-20:00") {
-                  setFormData({ ...formData, timeslot: "" });
+                  setFormData(prev => ({ ...prev, timeslot: "" }));
                   setSliderDisabled(false);
                 } else {
-                  setFormData({ ...formData, timeslot: "06:00-20:00" });
+                  setFormData(prev => ({ ...prev, timeslot: "06:00-20:00" }));
                   setSliderDisabled(true);
                 }
               }}
@@ -1359,15 +1101,14 @@ const ServiceProviderRegistration: React.FC<
               thumbTintColor={sliderDisabled ? "#cccccc" : "#1fb28a"}
               disabled={sliderDisabled}
               value={sliderValueMorning[0]}
-              onValueChange={(value: any) => {
+              onValueChange={(value) => {
                 const newRange = [value, sliderValueMorning[1]];
                 setSliderValueMorning(newRange);
                 updateFormTimeSlot(newRange, sliderValueEvening);
               }}
             />
             <Text style={styles.sliderValue}>
-              {formatDisplayTime(sliderValueMorning[0])} -{" "}
-              {formatDisplayTime(sliderValueMorning[1])}
+              {formatDisplayTime(sliderValueMorning[0])} - {formatDisplayTime(sliderValueMorning[1])}
             </Text>
 
             <Text style={styles.sliderLabel}>Evening (12:00 PM - 8:00 PM)</Text>
@@ -1380,27 +1121,15 @@ const ServiceProviderRegistration: React.FC<
               thumbTintColor={sliderDisabled ? "#cccccc" : "#1fb28a"}
               disabled={sliderDisabled}
               value={sliderValueEvening[0]}
-              onValueChange={(value: any) => {
+              onValueChange={(value) => {
                 const newRange = [value, sliderValueEvening[1]];
                 setSliderValueEvening(newRange);
                 updateFormTimeSlot(sliderValueMorning, newRange);
               }}
             />
             <Text style={styles.sliderValue}>
-              {formatDisplayTime(sliderValueEvening[0])} -{" "}
-              {formatDisplayTime(sliderValueEvening[1])}
+              {formatDisplayTime(sliderValueEvening[0])} - {formatDisplayTime(sliderValueEvening[1])}
             </Text>
-
-            <CheckBox
-              title="I agree to the Terms of Service and Privacy Policy *"
-              checked={formData.agreeToTerms}
-              onPress={() =>
-                handleChange("agreeToTerms", !formData.agreeToTerms)
-              }
-            />
-            {errors.agreeToTerms && (
-              <Text style={styles.errorText}>{errors.agreeToTerms}</Text>
-            )}
           </ScrollView>
         );
 
@@ -1409,20 +1138,18 @@ const ServiceProviderRegistration: React.FC<
           <ScrollView style={styles.stepContainer}>
             <Text style={styles.inputLabel}>Aadhaar Number *</Text>
             <TextInput
-              style={[styles.input, errors.kyc && styles.inputError]}
+              style={[styles.input, errors.AADHAR && styles.inputError]}
               placeholder="Enter 12-digit Aadhaar number"
               placeholderTextColor="#999"
               value={formData.AADHAR}
               onChangeText={(text) => handleRealTimeValidation("AADHAR", text)}
               keyboardType="numeric"
+              maxLength={12}
             />
-            {errors.kyc && <Text style={styles.errorText}>{errors.kyc}</Text>}
+            {errors.AADHAR && <Text style={styles.errorText}>{errors.AADHAR}</Text>}
 
-            <Text style={styles.label}>Upload Document Image *</Text>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleDocumentImageSelect}
-            >
+            <Text style={styles.label}>Upload Aadhaar Document *</Text>
+            <TouchableOpacity style={styles.button} onPress={handleDocumentImageSelect}>
               <Text style={styles.buttonText}>Select Document Image</Text>
             </TouchableOpacity>
             {documentImage && (
@@ -1436,11 +1163,73 @@ const ServiceProviderRegistration: React.FC<
 
       case 4:
         return (
-          <View style={styles.confirmationContainer}>
-            <Text style={styles.confirmationText}>
-              All steps completed - You're ready to submit your information!
+          <ScrollView style={styles.stepContainer}>
+            <Text style={styles.confirmationTitle}>
+              Please agree to the following before proceeding with your Registration:
             </Text>
-          </View>
+
+            <View style={styles.termsContainer}>
+              <View style={styles.checkboxContainer}>
+                <CheckBox
+                  checked={formData.keyFacts}
+                  onPress={() => handleChangeCheckbox("keyFacts", !formData.keyFacts)}
+                />
+                <TouchableOpacity 
+                  style={styles.termsTextContainer}
+                  onPress={() => openExternalLink('/KeyFactsStatement')}
+                >
+                  <Text style={styles.termsText}>
+                    I agree to the ServEaso{" "}
+                    <Text style={styles.linkText}>
+                      Key Facts Statement
+                      <Icon name="open-in-new" size={14} color="#3182ce" />
+                    </Text>
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {errors.keyFacts && <Text style={styles.errorText}>{errors.keyFacts}</Text>}
+
+              <View style={styles.checkboxContainer}>
+                <CheckBox
+                  checked={formData.terms}
+                  onPress={() => handleChangeCheckbox("terms", !formData.terms)}
+                />
+                <TouchableOpacity 
+                  style={styles.termsTextContainer}
+                  onPress={() => openExternalLink('/TnC')}
+                >
+                  <Text style={styles.termsText}>
+                    I agree to the ServEaso{" "}
+                    <Text style={styles.linkText}>
+                      Terms and Conditions
+                      <Icon name="open-in-new" size={14} color="#3182ce" />
+                    </Text>
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
+
+              <View style={styles.checkboxContainer}>
+                <CheckBox
+                  checked={formData.privacy}
+                  onPress={() => handleChangeCheckbox("privacy", !formData.privacy)}
+                />
+                <TouchableOpacity 
+                  style={styles.termsTextContainer}
+                  onPress={() => openExternalLink('/Privacy')}
+                >
+                  <Text style={styles.termsText}>
+                    I agree to the ServEaso{" "}
+                    <Text style={styles.linkText}>
+                      Privacy Statement
+                      <Icon name="open-in-new" size={14} color="#3182ce" />
+                    </Text>
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {errors.privacy && <Text style={styles.errorText}>{errors.privacy}</Text>}
+            </View>
+          </ScrollView>
         );
 
       default:
@@ -1454,377 +1243,357 @@ const ServiceProviderRegistration: React.FC<
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-      >
-        //{" "}
-        <View style={styles.container}>
-          <Text style={styles.title}>Service Provider Registration</Text>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={onBackToLogin}>
+          <Icon name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Service Provider Registration</Text>
+      </View>
 
-          {/* Stepper */}
-          <View style={styles.stepperContainer}>
-            {steps.map((label, index) => (
-              <View key={index} style={styles.stepIndicatorContainer}>
-                <View
-                  style={[
-                    styles.stepIndicator,
-                    index <= activeStep
-                      ? styles.activeStep
-                      : styles.inactiveStep,
-                  ]}
-                >
-                  <Text style={styles.stepNumber}>{index + 1}</Text>
-                </View>
-                <Text style={styles.stepLabel}>{label}</Text>
+      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+        <View style={styles.stepperContainer}>
+          {steps.map((label, index) => (
+            <View key={index} style={styles.stepIndicatorContainer}>
+              <View style={[
+                styles.stepIndicator,
+                index <= activeStep ? styles.activeStep : styles.inactiveStep
+              ]}>
+                <Text style={styles.stepNumber}>{index + 1}</Text>
               </View>
-            ))}
-          </View>
+              <Text style={styles.stepLabel}>{label}</Text>
+            </View>
+          ))}
+        </View>
 
-          {/* Form Content */}
-          {renderStepContent(activeStep)}
+        {renderStepContent(activeStep)}
 
-          {/* Navigation Buttons */}
-          <View style={styles.navigationButtons}>
-            {activeStep > 0 && (
-              <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                <Text style={styles.buttonText}>Back</Text>
-              </TouchableOpacity>
-            )}
+        <View style={styles.navigationButtons}>
+          <TouchableOpacity style={styles.backButtons} onPress={handleBack}>
+            <Text style={styles.buttonText}>{activeStep === 0 ? "Back to Login" : "Back"}</Text>
+          </TouchableOpacity>
 
-            {activeStep < steps.length - 1 ? (
-              <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-                <Text style={styles.buttonText}>Next</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleSubmit}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Submit</Text>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.loginLinkContainer}>
-            <Text style={styles.loginText}>Already have an account? </Text>
+          {activeStep < steps.length - 1 ? (
+            <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+              <Text style={styles.buttonText}>Next</Text>
+            </TouchableOpacity>
+          ) : (
             <TouchableOpacity
-              onPress={() => {
-                console.log("Sign in button pressed");
-                if (onBackToLogin) {
-                  onBackToLogin();
-                } else {
-                  console.error("onBackToLogin function not provided");
-                }
-              }}
+              style={[
+                styles.submitButton,
+                (!formData.terms || !formData.privacy || !formData.keyFacts) && styles.disabledButton
+              ]}
+              onPress={handleSubmit}
+              disabled={!formData.terms || !formData.privacy || !formData.keyFacts || isLoading}
             >
-              <Text style={styles.loginLink}>Sign in</Text>
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Submit</Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {alertVisible && (
+          <View style={[styles.alertContainer, styles[`alert${alertType}`]]}>
+            <Text style={styles.alertText}>{alertMessage}</Text>
+            <TouchableOpacity onPress={() => setAlertVisible(false)}>
+              <Icon name="close" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
-        </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: "#fff",
+  container: { flex: 1, backgroundColor: "#fff" },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 15, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#eee' 
   },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingBottom: 20, // Add some padding at the bottom
+  backButton: { marginRight: 15 },
+  headerTitle: { 
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    color: '#333' 
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 20,
-    color: "#333",
+  scrollContainer: { 
+    flexGrow: 1, 
+    padding: 20, 
+    paddingBottom: 40 
   },
-  stepperContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 20,
+  stepperContainer: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    marginBottom: 20 
   },
-  stepIndicatorContainer: {
-    alignItems: "center",
-    flex: 1,
+  stepIndicatorContainer: { 
+    alignItems: "center", 
+    flex: 1 
   },
-  stepIndicator: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 5,
+  stepIndicator: { 
+    width: 30, 
+    height: 30, 
+    borderRadius: 15, 
+    justifyContent: "center", 
+    alignItems: "center", 
+    marginBottom: 5 
   },
-  activeStep: {
-    backgroundColor: "#1fb28a",
+  activeStep: { backgroundColor: "#1fb28a" },
+  inactiveStep: { backgroundColor: "#cccccc" },
+  stepNumber: { 
+    color: "#fff", 
+    fontWeight: "bold" 
   },
-  inactiveStep: {
-    backgroundColor: "#cccccc",
+  stepLabel: { 
+    fontSize: 10, 
+    textAlign: "center", 
+    color: "#666" 
   },
-  stepNumber: {
-    color: "#fff",
-    fontWeight: "bold",
+  stepContainer: { 
+    flex: 1, 
+    marginBottom: 20 
   },
-  stepLabel: {
-    fontSize: 10,
-    textAlign: "center",
-    color: "#666",
+  inputLabel: { 
+    fontSize: 14, 
+    marginBottom: 5, 
+    color: "#333", 
+    fontWeight: "500" 
   },
-  stepContainer: {
-    flex: 1,
-    marginBottom: 20,
+  label: { 
+    fontSize: 14, 
+    marginBottom: 5, 
+    marginTop: 10, 
+    color: "#333", 
+    fontWeight: "500" 
   },
-  inputLabel: {
-    fontSize: 14,
-    marginBottom: 5,
-    color: "#333",
-    fontWeight: "500",
+  input: { 
+    height: 40, 
+    borderColor: "#ddd", 
+    borderWidth: 1, 
+    borderRadius: 5, 
+    paddingHorizontal: 10, 
+    marginBottom: 10, 
+    backgroundColor: "#fff", 
+    color: "#000" 
   },
-  label: {
-    fontSize: 14,
-    marginBottom: 5,
-    marginTop: 10,
-    color: "#333",
-    fontWeight: "500",
+  inputError: { borderColor: "red" },
+  errorText: { 
+    color: "red", 
+    fontSize: 12, 
+    marginBottom: 10 
   },
-  input: {
-    height: 40,
-    borderColor: "#ddd",
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-    backgroundColor: "#fff",
-    color: "#000",
+  radioGroup: { 
+    flexDirection: "row", 
+    justifyContent: "space-around", 
+    marginBottom: 10 
   },
-  inputError: {
-    borderColor: "red",
+  radioOption: { 
+    flexDirection: "row", 
+    alignItems: "center" 
   },
-  errorText: {
-    color: "red",
-    fontSize: 12,
-    marginBottom: 10,
+  passwordContainer: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    position: "relative" 
   },
-  radioGroup: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 10,
+  showPasswordButton: { 
+    position: "absolute", 
+    right: 10 
   },
-  radioOption: {
-    flexDirection: "row",
-    alignItems: "center",
+  button: { 
+    backgroundColor: "#2771c1ff", 
+    padding: 12, 
+    borderRadius: 5, 
+    alignItems: "center", 
+    marginVertical: 10 
   },
-  radioLabel: {
-    flexDirection: "row",
-    alignItems: "center",
+  buttonText: { 
+    color: "#fff", 
+    fontWeight: "bold" 
   },
-  icon: {
-    width: 20,
-    height: 20,
-    marginRight: 5,
+  backButtons: { 
+    backgroundColor: "#666", 
+    padding: 12, 
+    borderRadius: 5, 
+    alignItems: "center", 
+    flex: 1, 
+    marginRight: 10 
   },
-  picker: {
-    height: 50,
-    width: "100%",
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 5,
+  nextButton: { 
+    backgroundColor: "#2771c1ff", 
+    padding: 12, 
+    borderRadius: 5, 
+    alignItems: "center", 
+    flex: 1 
   },
-  passwordContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    position: "relative",
+  submitButton: { 
+    backgroundColor: "#2771c1ff", 
+    padding: 12, 
+    borderRadius: 5, 
+    alignItems: "center", 
+    flex: 1 
   },
-  showPasswordButton: {
+  disabledButton: { 
+    backgroundColor: "#cccccc" 
+  },
+  navigationButtons: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    marginBottom: 20 
+  },
+  profileImageContainer: { 
+    alignItems: "center", 
+    marginBottom: 20 
+  },
+  imageUploadButton: { 
+    width: 100, 
+    height: 100, 
+    borderRadius: 50, 
+    backgroundColor: "#f0f0f0", 
+    justifyContent: "center", 
+    alignItems: "center", 
+    borderWidth: 1, 
+    borderColor: "#ddd" 
+  },
+  imageUploadText: { 
+    color: "#666", 
+    textAlign: "center" 
+  },
+  profileImage: { 
+    width: 100, 
+    height: 100, 
+    borderRadius: 50 
+  },
+  documentPreview: { 
+    alignItems: "center", 
+    marginTop: 10 
+  },
+  documentImage: { 
+    width: 200, 
+    height: 150, 
+    resizeMode: "contain", 
+    borderWidth: 1, 
+    borderColor: "#ddd" 
+  },
+  documentName: { 
+    marginTop: 5, 
+    color: "#666" 
+  },
+  dateInputContainer: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    marginBottom: 10 
+  },
+  dateInputPart: { 
+    flex: 1, 
+    height: 40, 
+    borderColor: "#ddd", 
+    borderWidth: 1, 
+    borderRadius: 5, 
+    paddingHorizontal: 10, 
+    textAlign: "center" 
+  },
+  dateSeparator: { 
+    paddingHorizontal: 5, 
+    fontSize: 16 
+  },
+  modalPickerContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: 'rgba(0,0,0,0.5)' 
+  },
+  modalPickerContent: { 
+    backgroundColor: '#fff', 
+    width: '80%', 
+    borderRadius: 10, 
+    padding: 20 
+  },
+  serviceOption: { 
+    padding: 15, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#eee' 
+  },
+  serviceOptionText: { 
+    fontSize: 16 
+  },
+  cancelButton: { 
+    padding: 15, 
+    marginTop: 10, 
+    backgroundColor: '#f0f0f0', 
+    borderRadius: 5, 
+    alignItems: 'center' 
+  },
+  cancelButtonText: { 
+    color: '#ff0000', 
+    fontSize: 16 
+  },
+  confirmationTitle: { 
+    fontSize: 16, 
+    marginBottom: 20, 
+    color: "#333", 
+    textAlign: "center" 
+  },
+  termsContainer: { 
+    marginBottom: 20 
+  },
+  checkboxContainer: { 
+    flexDirection: "row", 
+    alignItems: "flex-start", 
+    marginBottom: 15 
+  },
+  termsTextContainer: { 
+    flex: 1, 
+    marginLeft: 10 
+  },
+  termsText: { 
+    fontSize: 14, 
+    color: "#4a5568", 
+    lineHeight: 20 
+  },
+  linkText: { 
+    color: "#3182ce", 
+    textDecorationLine: "underline" 
+  },
+  sliderLabel: { 
+    fontSize: 14, 
+    marginTop: 10, 
+    color: "#333" 
+  },
+  sliderValue: { 
+    textAlign: "center", 
+    marginBottom: 10, 
+    color: "#666" 
+  },
+  alertContainer: {
     position: "absolute",
-    right: 10,
-  },
-  button: {
-    backgroundColor: "#1fb28a",
-    padding: 12,
+    top: 10,
+    left: 20,
+    right: 20,
+    padding: 15,
     borderRadius: 5,
-    alignItems: "center",
-    marginVertical: 10,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  backButton: {
-    backgroundColor: "#666",
-    padding: 12,
-    borderRadius: 5,
-    alignItems: "center",
-    flex: 1,
-    marginRight: 10,
-  },
-  nextButton: {
-    backgroundColor: "#1fb28a",
-    padding: 12,
-    borderRadius: 5,
-    alignItems: "center",
-    flex: 1,
-  },
-  submitButton: {
-    backgroundColor: "#1fb28a",
-    padding: 12,
-    borderRadius: 5,
-    alignItems: "center",
-    flex: 1,
-  },
-  navigationButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  profileImageContainer: {
     alignItems: "center",
-    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  imageUploadButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "#f0f0f0",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  imageUploadText: {
-    color: "#666",
-    textAlign: "center",
-  },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  documentPreview: {
-    alignItems: "center",
-    marginTop: 10,
-  },
-  documentImage: {
-    width: 200,
-    height: 150,
-    resizeMode: "contain",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  documentName: {
-    marginTop: 5,
-    color: "#666",
-  },
-  confirmationContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  confirmationText: {
-    fontSize: 18,
-    textAlign: "center",
-    color: "#1fb28a",
-  },
-  loginLinkContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 10,
-  },
-  loginText: {
-    color: "#666",
-  },
-  loginLink: {
-    color: "#1fb28a",
-    fontWeight: "bold",
-  },
-  note: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 10,
-  },
-  sliderLabel: {
-    fontSize: 14,
-    marginTop: 10,
-    color: "#333",
-  },
-  sliderValue: {
-    textAlign: "center",
-    marginBottom: 10,
-    color: "#666",
-  },
-  dateInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  dateInput: {
-    height: 40,
-    borderColor: "#ddd",
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    backgroundColor: "#fff",
-  },
-  dateInputPart: {
-    flex: 1,
-    textAlign: "center",
-  },
-  dateSeparator: {
-    paddingHorizontal: 5,
-    fontSize: 16,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  modalContent: {
-    backgroundColor: "white",
-    padding: 20,
-    borderRadius: 10,
-    width: "90%",
-  },
-  locationTitleText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 15,
-    textAlign: "center",
-  },
-  statusContainer: {
-    alignItems: "center",
-    padding: 20,
-  },
-  statusText: {
-    marginTop: 10,
-    textAlign: "center",
-  },
-  infoBox: {
-    marginBottom: 20,
-  },
-  text: {
-    marginBottom: 5,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  buttonlocation: {
-    flex: 1,
-    marginHorizontal: 5,
+  alertsuccess: { backgroundColor: "#4caf50" },
+  alerterror: { backgroundColor: "#f44336" },
+  alertwarning: { backgroundColor: "#ff9800" },
+  alertText: { 
+    color: "#fff", 
+    flex: 1, 
+    marginRight: 10 
   },
 });
 
