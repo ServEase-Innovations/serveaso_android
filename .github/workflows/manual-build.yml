@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # ---------------------------------------
       # CHECKOUT
       # ---------------------------------------
@@ -29,9 +30,10 @@ jobs:
           ref: ${{ github.event.inputs.branch }}
 
       # ---------------------------------------
-      # CACHE NODE + GRADLE (HUGE SPEED BOOST)
+      # CACHE: NODE + GRADLE + ANDROID SDK
       # ---------------------------------------
-      - name: Cache Node Modules
+
+      - name: Cache node_modules
         uses: actions/cache@v3
         id: node-cache
         with:
@@ -45,12 +47,18 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+            android/.gradle
+          key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      - name: Cache Android SDK
+        uses: actions/cache@v3
+        with:
+          path: /usr/local/lib/android/sdk
+          key: android-sdk-v1
 
       # ---------------------------------------
-      # JAVA SETUP
+      # SETUP JAVA & ANDROID SDK
       # ---------------------------------------
       - name: Set up Java 17
         uses: actions/setup-java@v3
@@ -58,22 +66,30 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Install Required Android Packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "build-tools;34.0.0" "platforms;android-34" "platform-tools"
+
       # ---------------------------------------
-      # GLOBAL GRADLE OPTIMIZATIONS
+      # ULTRA-OPTIMIZED GRADLE CONFIG
       # ---------------------------------------
       - name: Configure Gradle Performance
         run: |
           mkdir -p ~/.gradle
           cat <<EOF > ~/.gradle/gradle.properties
-          org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m
           org.gradle.daemon=true
           org.gradle.parallel=true
           org.gradle.caching=true
           org.gradle.configureondemand=true
           org.gradle.workers.max=4
-          # Removed deprecated android.enableBuildCache
-          EOF
 
+          kotlin.incremental=true
+          kotlin.incremental.useClasspathSnapshot=true
+
+          org.gradle.cache.compress=true
+          EOF
 
       # ---------------------------------------
       # KEYSTORE SETUP
@@ -91,7 +107,7 @@ jobs:
           EOF
 
       # ---------------------------------------
-      # SETUP NODE + INSTALL DEPS
+      # NODE SETUP
       # ---------------------------------------
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -99,8 +115,8 @@ jobs:
           node-version: 18
           cache: "npm"
 
-      - name: Install Node Dependencies
-        run: npm install
+      - name: Install Dependencies (Fast)
+        run: npm install --omit=dev
         if: steps.node-cache.outputs.cache-hit != 'true'
 
       # ---------------------------------------
@@ -112,11 +128,10 @@ jobs:
           LAST_TAG=$(git describe --tags --abbrev=0 || echo "v0.0.0")
           VERSION_CODE=$(git rev-list --count HEAD)
           VERSION_NAME="$LAST_TAG+build.$VERSION_CODE"
-
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
 
-      - name: Apply version to build.gradle
+      - name: Apply version
         run: |
           sed -i "s/versionCode .*/versionCode $VERSION_CODE/" android/app/build.gradle
           sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" android/app/build.gradle
@@ -124,13 +139,17 @@ jobs:
       # ---------------------------------------
       # BUILD RELEASE APK (FASTEST)
       # ---------------------------------------
-      - name: Build Android Release APK
+      - name: Build APK
         run: |
           cd android
-          ./gradlew assembleRelease --parallel --build-cache --no-daemon
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --parallel \
+            --build-cache \
+            --max-workers=4
 
       # ---------------------------------------
-      # UPLOAD ARTIFACT
+      # UPLOAD APK ARTIFACT
       # ---------------------------------------
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
@@ -139,7 +158,7 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
 
       # ---------------------------------------
-      # FIREBASE AUTH (SERVICE ACCOUNT → BEST)
+      # FIREBASE AUTH
       # ---------------------------------------
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
