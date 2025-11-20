@@ -71,8 +71,9 @@ jobs:
           org.gradle.caching=true
           org.gradle.configureondemand=true
           org.gradle.workers.max=4
-          android.enableBuildCache=true
+          # Removed deprecated android.enableBuildCache
           EOF
+
 
       # ---------------------------------------
       # KEYSTORE SETUP
