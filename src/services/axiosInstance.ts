@@ -1,9 +1,12 @@
 import axios, { AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Config } from 'react-native-config';
+// import Config from "react-native-config";
 
 // Create an axios instance with the base URL
 const axiosInstance = axios.create({
-  baseURL: 'https://servease-be-5x7f.onrender.com', // Change this to your API's base URL
+  // baseURL: 'https://servease-be-5x7f.onrender.com', // Change this to your API's base URL
+   baseURL: Config.API_BASE_URL,
 });
 
 // Request Interceptor

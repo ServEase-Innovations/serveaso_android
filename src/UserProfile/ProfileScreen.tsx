@@ -20,10 +20,11 @@ import axios from "axios";
 import { useAppUser } from "../context/AppUserContext";
 import MobileNumberDialog from "./MobileNumberDialog";
 import axiosInstance from "../services/axiosInstance";
+import utilsInstance from "../services/utilsInstance";
 
 const { width } = Dimensions.get('window');
 
-// Interfaces
+// Extended Interfaces
 interface Address {
   id: string;
   type: string;
@@ -32,6 +33,30 @@ interface Address {
   country: string;
   postalCode: string;
   isPrimary: boolean;
+  rawData?: {
+    formattedAddress: string;
+    latitude: number;
+    longitude: number;
+    placeId: string;
+  };
+}
+
+interface PermanentAddress {
+  field1: string;
+  field2: string;
+  ctArea: string;
+  pinNo: string;
+  state: string;
+  country: string;
+}
+
+interface CorrespondenceAddress {
+  field1: string;
+  field2: string;
+  ctArea: string;
+  pinNo: string;
+  state: string;
+  country: string;
 }
 
 interface UserData {
@@ -57,6 +82,8 @@ interface ServiceProvider {
   pincode: number;
   currentLocation: string;
   nearbyLocation: string;
+  permanentAddress: PermanentAddress;
+  correspondenceAddress: CorrespondenceAddress;
 }
 
 interface CustomerDetails {
@@ -66,6 +93,18 @@ interface CustomerDetails {
   mobileNo: string | null;
   altMobileNo: string | null;
   email: string;
+}
+
+interface ValidationState {
+  loading: boolean;
+  error: string;
+  isAvailable: boolean | null;
+  formatError: boolean;
+}
+
+interface OriginalData {
+  userData: UserData;
+  addresses: Address[];
 }
 
 const ProfileScreen = () => {
@@ -91,11 +130,22 @@ const ProfileScreen = () => {
     contactNumber: "",
     altContactNumber: ""
   });
+
+  const [originalData, setOriginalData] = useState<OriginalData>({
+    userData: {
+      firstName: "",
+      lastName: "",
+      contactNumber: "",
+      altContactNumber: ""
+    },
+    addresses: []
+  });
   
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [showAddAddress, setShowAddAddress] = useState(false);
   const [newAddress, setNewAddress] = useState({
     type: "Home",
+    customType: "",
     street: "",
     city: "",
     country: "",
@@ -106,6 +156,34 @@ const ProfileScreen = () => {
   const [altCountryCode, setAltCountryCode] = useState("+91");
   const [showCountryCodePicker, setShowCountryCodePicker] = useState(false);
   const [showAltCountryCodePicker, setShowAltCountryCodePicker] = useState(false);
+
+  // Validation states
+  const [contactValidation, setContactValidation] = useState<ValidationState>({
+    loading: false,
+    error: '',
+    isAvailable: null,
+    formatError: false
+  });
+  const [altContactValidation, setAltContactValidation] = useState<ValidationState>({
+    loading: false,
+    error: '',
+    isAvailable: null,
+    formatError: false
+  });
+
+  // Track which fields have been validated
+  const [validatedFields, setValidatedFields] = useState<Set<string>>(new Set());
+
+  // Function to handle user preference selection (like Header component)
+  const handleUserPreference = (preference?: string) => {
+    console.log("User preference selected: ", preference);
+
+    if (!preference) {
+      setNewAddress(prev => ({ ...prev, type: "Other", customType: "" }));
+    } else {
+      setNewAddress(prev => ({ ...prev, type: preference, customType: "" }));
+    }
+  };
 
   // Function to get user's first letter for profile picture
   const getUserInitial = () => {
@@ -167,6 +245,247 @@ const ProfileScreen = () => {
     return number;
   };
 
+  // Mobile number validation functions
+  const validateMobileFormat = (number: string): boolean => {
+    const mobilePattern = /^[0-9]{10}$/;
+    return mobilePattern.test(number);
+  };
+
+  const checkMobileAvailability = async (number: string, isAlternate: boolean = false): Promise<boolean> => {
+    if (!number || !validateMobileFormat(number)) {
+      return false;
+    }
+
+    const setValidation = isAlternate ? setAltContactValidation : setContactValidation;
+    const fieldName = isAlternate ? 'altContactNumber' : 'contactNumber';
+    
+    setValidation({
+      loading: true,
+      error: '',
+      isAvailable: null,
+      formatError: false
+    });
+
+    try {
+      // Use alternateNo parameter for alternative contact number
+      const endpoint = isAlternate 
+        ? `/api/serviceproviders/check-alternateNo/${encodeURIComponent(number)}`
+        : `/api/serviceproviders/check-mobile/${encodeURIComponent(number)}`;
+      
+      const response = await axiosInstance.get(endpoint);
+      
+      const isAvailable = response.data.available !== false;
+      
+      setValidation({
+        loading: false,
+        error: isAvailable ? '' : `${isAlternate ? 'Alternate' : 'Mobile'} number is already registered`,
+        isAvailable,
+        formatError: false
+      });
+
+      // Mark this field as validated
+      if (isAvailable) {
+        setValidatedFields(prev => {
+          const newSet = new Set(prev);
+          newSet.add(fieldName);
+          return newSet;
+        });
+      }
+
+      return isAvailable;
+    } catch (error: any) {
+      console.error('Error validating mobile number:', error);
+      
+      let errorMessage = `Error checking ${isAlternate ? 'alternate' : 'mobile'} number`;
+      if (error.response?.status === 409) {
+        errorMessage = `${isAlternate ? 'Alternate' : 'Mobile'} number is already registered`;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      setValidation({
+        loading: false,
+        error: errorMessage,
+        isAvailable: false,
+        formatError: false
+      });
+
+      return false;
+    }
+  };
+
+  const useDebouncedValidation = () => {
+    const timeouts = {
+      contact: null as NodeJS.Timeout | null,
+      alternate: null as NodeJS.Timeout | null
+    };
+
+    return (number: string, isAlternate: boolean = false) => {
+      const timeoutKey = isAlternate ? 'alternate' : 'contact';
+      
+      if (timeouts[timeoutKey]) {
+        clearTimeout(timeouts[timeoutKey]!);
+      }
+
+      timeouts[timeoutKey] = setTimeout(() => {
+        checkMobileAvailability(number, isAlternate);
+      }, 500);
+    };
+  };
+
+  const debouncedValidation = useDebouncedValidation();
+
+  const handleContactNumberChange = (value: string) => {
+    const cleanedValue = value.replace(/\D/g, '').slice(0, 10);
+    setUserData(prev => ({ ...prev, contactNumber: cleanedValue }));
+
+    if (cleanedValue.length === 10) {
+      debouncedValidation(cleanedValue, false);
+      
+      // Clear format error when we have exactly 10 digits
+      setContactValidation(prev => ({
+        ...prev,
+        formatError: false,
+        error: prev.error === 'Please enter a valid 10-digit mobile number' ? '' : prev.error
+      }));
+      
+      if (userData.altContactNumber === cleanedValue) {
+        setAltContactValidation(prev => ({
+          ...prev,
+          error: 'Alternate number cannot be same as contact number',
+          isAvailable: false,
+          formatError: false
+        }));
+      } else if (userData.altContactNumber && altContactValidation.error === 'Alternate number cannot be same as contact number') {
+        setAltContactValidation(prev => ({
+          ...prev,
+          error: '',
+          isAvailable: null,
+          formatError: false
+        }));
+        if (validateMobileFormat(userData.altContactNumber)) {
+          debouncedValidation(userData.altContactNumber, true);
+        }
+      }
+    } else {
+      setContactValidation({
+        loading: false,
+        error: cleanedValue ? 'Please enter a valid 10-digit mobile number' : '',
+        isAvailable: null,
+        formatError: !!cleanedValue && cleanedValue.length !== 10
+      });
+    }
+  };
+
+  const handleAltContactNumberChange = (value: string) => {
+    const cleanedValue = value.replace(/\D/g, '').slice(0, 10);
+    setUserData(prev => ({ ...prev, altContactNumber: cleanedValue }));
+
+    if (cleanedValue && cleanedValue.length === 10) {
+      // Clear format error when we have exactly 10 digits
+      setAltContactValidation(prev => ({
+        ...prev,
+        formatError: false,
+        error: prev.error === 'Please enter a valid 10-digit mobile number' ? '' : prev.error
+      }));
+
+      if (cleanedValue === userData.contactNumber) {
+        setAltContactValidation({
+          loading: false,
+          error: 'Alternate number cannot be same as contact number',
+          isAvailable: false,
+          formatError: false
+        });
+      } else {
+        debouncedValidation(cleanedValue, true);
+      }
+    } else {
+      setAltContactValidation({
+        loading: false,
+        error: cleanedValue ? 'Please enter a valid 10-digit mobile number' : '',
+        isAvailable: null,
+        formatError: !!cleanedValue && cleanedValue.length !== 10
+      });
+    }
+  };
+
+  const areNumbersUnique = (): boolean => {
+    if (!userData.contactNumber || !userData.altContactNumber) return true;
+    return userData.contactNumber !== userData.altContactNumber;
+  };
+
+  // Check if any field has been modified
+  const hasChanges = (): boolean => {
+    // Check user data changes
+    const userDataChanged = 
+      userData.firstName !== originalData.userData.firstName ||
+      userData.lastName !== originalData.userData.lastName ||
+      userData.contactNumber !== originalData.userData.contactNumber ||
+      userData.altContactNumber !== originalData.userData.altContactNumber;
+
+    // Check address changes (simplified check)
+    const addressesChanged = 
+      addresses.length !== originalData.addresses.length ||
+      addresses.some((addr, index) => {
+        const originalAddr = originalData.addresses[index];
+        if (!originalAddr) return true;
+        return (
+          addr.street !== originalAddr.street ||
+          addr.city !== originalAddr.city ||
+          addr.country !== originalAddr.country ||
+          addr.postalCode !== originalAddr.postalCode ||
+          addr.type !== originalAddr.type
+        );
+      });
+
+    return userDataChanged || addressesChanged || showAddAddress;
+  };
+
+  const validateAllFields = async (): Promise<boolean> => {
+    // Only validate fields that have changed and are mobile numbers
+    const contactNumberChanged = userData.contactNumber !== originalData.userData.contactNumber;
+    const altContactNumberChanged = userData.altContactNumber !== originalData.userData.altContactNumber;
+
+    if (contactNumberChanged) {
+      if (!validateMobileFormat(userData.contactNumber)) {
+        Alert.alert("Validation Error", "Please enter a valid 10-digit contact number");
+        return false;
+      }
+
+      // Only check availability if not already validated
+      if (!validatedFields.has('contactNumber')) {
+        const isContactAvailable = await checkMobileAvailability(userData.contactNumber, false);
+        if (!isContactAvailable) {
+          Alert.alert("Validation Error", "Contact number is not available");
+          return false;
+        }
+      }
+    }
+
+    if (altContactNumberChanged && userData.altContactNumber) {
+      if (!validateMobileFormat(userData.altContactNumber)) {
+        Alert.alert("Validation Error", "Please enter a valid 10-digit alternate contact number");
+        return false;
+      }
+
+      if (!areNumbersUnique()) {
+        Alert.alert("Validation Error", "Contact number and alternate contact number must be different");
+        return false;
+      }
+
+      // Only check availability if not already validated
+      if (!validatedFields.has('altContactNumber')) {
+        const isAltContactAvailable = await checkMobileAvailability(userData.altContactNumber, true);
+        if (!isAltContactAvailable) {
+          Alert.alert("Validation Error", "Alternate contact number is not available");
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
   // Fetch customer details
   const fetchCustomerDetails = async (customerId: number) => {
     try {
@@ -193,16 +512,138 @@ const ProfileScreen = () => {
       console.log("Mapped mobile numbers:", { mobileNo, altMobileNo });
 
       setCustomerData(customer);
-      setUserData(prev => ({
-        ...prev,
+      
+      const updatedUserData = {
+        firstName: customer.firstName || "",
+        lastName: customer.lastName || "",
         contactNumber: mobileNo ? mobileNo.toString() : "",
         altContactNumber: altMobileNo ? altMobileNo.toString() : ""
+      };
+
+      setUserData(updatedUserData);
+      setOriginalData(prev => ({
+        ...prev,
+        userData: updatedUserData
       }));
 
       return customer;
     } catch (error) {
       console.error("Error fetching customer details:", error);
       return null;
+    }
+  };
+
+  // Function to save address to user-settings API
+  const saveAddressToUserSettings = async (addressData: any) => {
+    if (!userId || userRole !== "CUSTOMER") return;
+
+    try {
+      // First, get current user settings
+      const response = await utilsInstance.get(`/user-settings/${userId}`);
+      const currentSettings = response.data;
+
+      let existingLocations = [];
+      
+      if (Array.isArray(currentSettings) && currentSettings.length > 0) {
+        existingLocations = currentSettings[0].savedLocations || [];
+      } else {
+        // If no settings exist, create new one
+        await utilsInstance.post("/user-settings", {
+          customerId: userId,
+          savedLocations: []
+        });
+      }
+
+      // Create the new location object
+      const addressType = addressData.type === "Other" && addressData.customType 
+        ? addressData.customType 
+        : addressData.type;
+
+      const newLocation = {
+        name: addressType,
+        location: {
+          address: [{
+            formatted_address: addressData.street,
+            address_components: [
+              { long_name: addressData.city, types: ["locality"] },
+              { long_name: addressData.country, types: ["country"] },
+              { long_name: addressData.postalCode, types: ["postal_code"] },
+            ],
+            geometry: {
+              location: {
+                lat: addressData.rawData?.latitude || 0,
+                lng: addressData.rawData?.longitude || 0
+              }
+            },
+            place_id: addressData.rawData?.placeId || `manual_${Date.now()}`
+          }],
+          lat: addressData.rawData?.latitude || 0,
+          lng: addressData.rawData?.longitude || 0
+        }
+      };
+
+      // Add the new location to existing locations
+      const updatedLocations = [...existingLocations, newLocation];
+
+      // Prepare payload
+      const payload = {
+        customerId: userId,
+        savedLocations: updatedLocations
+      };
+
+      // Update user settings
+      await utilsInstance.put(`/user-settings/${userId}`, payload);
+      
+      console.log("✅ Address saved successfully to user settings");
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to save address to user settings:", error);
+      throw error;
+    }
+  };
+
+  // Function to update addresses in user-settings API
+  const updateAddressesInUserSettings = async (updatedAddresses: Address[]) => {
+    if (!userId || userRole !== "CUSTOMER") return;
+
+    try {
+      const savedLocations = updatedAddresses.map((addr) => {
+        const addressType = addr.type;
+
+        return {
+          name: addressType,
+          location: {
+            address: [{
+              formatted_address: addr.street,
+              address_components: [
+                { long_name: addr.city, types: ["locality"] },
+                { long_name: addr.country, types: ["country"] },
+                { long_name: addr.postalCode, types: ["postal_code"] },
+              ],
+              geometry: {
+                location: {
+                  lat: addr.rawData?.latitude || 0,
+                  lng: addr.rawData?.longitude || 0
+                }
+              },
+              place_id: addr.rawData?.placeId || `manual_${Date.now()}`
+            }],
+            lat: addr.rawData?.latitude || 0,
+            lng: addr.rawData?.longitude || 0
+          }
+        };
+      });
+
+      const payload = {
+        customerId: userId,
+        savedLocations: savedLocations
+      };
+
+      await utilsInstance.put(`/user-settings/${userId}`, payload);
+      console.log("✅ Addresses updated successfully in user settings");
+    } catch (error) {
+      console.error("❌ Failed to update addresses in user settings:", error);
+      throw error;
     }
   };
 
@@ -243,16 +684,28 @@ const ProfileScreen = () => {
         // Set first name and last name from available data
         if (auth0User?.name) {
           const nameParts = auth0User.name.split(" ");
-          setUserData(prev => ({
-            ...prev,
+          const initialUserData = {
             firstName: nameParts[0] || "",
-            lastName: nameParts.slice(1).join(" ") || ""
+            lastName: nameParts.slice(1).join(" ") || "",
+            contactNumber: "",
+            altContactNumber: ""
+          };
+          setUserData(initialUserData);
+          setOriginalData(prev => ({
+            ...prev,
+            userData: initialUserData
           }));
         } else if (appUser?.nickname) {
-          setUserData(prev => ({
-            ...prev,
+          const initialUserData = {
             firstName: appUser.nickname || "",
-            lastName: ""
+            lastName: "",
+            contactNumber: "",
+            altContactNumber: ""
+          };
+          setUserData(initialUserData);
+          setOriginalData(prev => ({
+            ...prev,
+            userData: initialUserData
           }));
         }
 
@@ -287,82 +740,161 @@ const ProfileScreen = () => {
   // Fetch customer addresses
   const fetchCustomerAddresses = async (customerId: number) => {
     try {
-      const response = await axios.get(
-        `https://utils-ndt3.onrender.com/user-settings/${customerId}`
-      );
-
+      const response = await utilsInstance.get(`/user-settings/${customerId}`);
       const data = response.data;
 
       if (Array.isArray(data) && data.length > 0) {
         const allSavedLocations = data.flatMap(doc => doc.savedLocations || []);
 
-        const mappedAddresses: Address[] = allSavedLocations
-          .filter((loc: any) => loc.location?.formatted_address)
-          .map((loc: any, idx: number) => ({
-            id: loc._id || idx.toString(),
-            type: loc.name || "Other",
-            street: loc.location.formatted_address,
-            city:
-              loc.location.address_components?.find((c: any) =>
-                c.types.includes("locality")
-              )?.long_name || "",
-            country:
-              loc.location.address_components?.find((c: any) =>
-                c.types.includes("country")
-              )?.long_name || "",
-            postalCode:
-              loc.location.address_components?.find((c: any) =>
-                c.types.includes("postal_code")
-              )?.long_name || "",
-            isPrimary: loc.isPrimary || idx === 0
-          }));
+        // Use a Map to deduplicate addresses by location coordinates
+        const uniqueAddresses = new Map();
+        
+        allSavedLocations
+          .filter((loc: any) => loc.location?.address?.[0]?.formatted_address)
+          .forEach((loc: any, idx: number) => {
+            const primaryAddress = loc.location.address[0];
+            const addressComponents = primaryAddress.address_components || [];
+            
+            const getComponent = (type: string) => {
+              const component = addressComponents.find((c: any) => c.types.includes(type));
+              return component?.long_name || "";
+            };
 
+            // Create a unique key based on coordinates or formatted address
+            const locationKey = loc.location.lat && loc.location.lng 
+              ? `${loc.location.lat},${loc.location.lng}`
+              : primaryAddress.formatted_address;
+
+            // Only add if this location doesn't exist yet
+            if (!uniqueAddresses.has(locationKey)) {
+              uniqueAddresses.set(locationKey, {
+                id: loc._id || `addr_${idx}`,
+                type: loc.name || "Other",
+                street: primaryAddress.formatted_address,
+                city: getComponent("locality") || 
+                      getComponent("administrative_area_level_3") || 
+                      getComponent("administrative_area_level_4") || 
+                      "",
+                country: getComponent("country") || "",
+                postalCode: getComponent("postal_code") || "",
+                isPrimary: idx === 0,
+                rawData: {
+                  formattedAddress: primaryAddress.formatted_address,
+                  latitude: loc.location.lat,
+                  longitude: loc.location.lng,
+                  placeId: primaryAddress.place_id
+                }
+              });
+            } else {
+              console.log(`Duplicate address found: ${primaryAddress.formatted_address}`);
+            }
+          });
+
+        const mappedAddresses = Array.from(uniqueAddresses.values());
+        
         setAddresses(mappedAddresses);
+        setOriginalData(prev => ({
+          ...prev,
+          addresses: mappedAddresses
+        }));
+        console.log("Deduplicated addresses:", mappedAddresses);
+      } else {
+        console.log("No address data found");
+        setAddresses([]);
+        setOriginalData(prev => ({
+          ...prev,
+          addresses: []
+        }));
       }
     } catch (err) {
       console.error("Failed to fetch customer addresses:", err);
+      setAddresses([]);
+      setOriginalData(prev => ({
+        ...prev,
+        addresses: []
+      }));
     }
   };
 
   // Fetch service provider data
   const fetchServiceProviderData = async (serviceProviderId: string) => {
     try {
-      const mockServiceProviderData: ServiceProvider = {
-        serviceproviderId: parseInt(serviceProviderId),
-        firstName: userData.firstName,
-        middleName: null,
-        lastName: userData.lastName,
-        mobileNo: parseInt(userData.contactNumber.replace("+", "")) || 1234567890,
-        alternateNo: userData.altContactNumber ? parseInt(userData.altContactNumber.replace("+", "")) : null,
-        emailId: auth0User?.email || appUser?.email || "",
-        gender: "Prefer not to say",
-        buildingName: "Office Building",
-        locality: "Business District",
-        street: "Main Street",
-        pincode: 123456,
-        currentLocation: "City Center",
-        nearbyLocation: "Downtown"
+      const response = await axiosInstance.get(
+        `/api/serviceproviders/get/serviceprovider/${serviceProviderId}`
+      );
+
+      const data = response.data;
+      setServiceProviderData(data);
+
+      const updatedUserData = {
+        firstName: data.firstName || "",
+        lastName: data.lastName || "",
+        contactNumber: data.mobileNo ? data.mobileNo.toString() : "",
+        altContactNumber: data.alternateNo ? data.alternateNo.toString() : ""
       };
 
-      setServiceProviderData(mockServiceProviderData);
-
-      setUserData(prev => ({
+      setUserData(updatedUserData);
+      setOriginalData(prev => ({
         ...prev,
-        contactNumber: mockServiceProviderData.mobileNo ? mockServiceProviderData.mobileNo.toString() : "",
-        altContactNumber: mockServiceProviderData.alternateNo ? mockServiceProviderData.alternateNo.toString() : ""
+        userData: updatedUserData
       }));
 
-      const serviceProviderAddress: Address = {
-        id: "1",
-        type: "Home",
-        street: `${mockServiceProviderData.buildingName || ""} ${mockServiceProviderData.street || ""} ${mockServiceProviderData.locality || ""}`.trim(),
-        city: mockServiceProviderData.nearbyLocation || mockServiceProviderData.currentLocation || "",
-        country: "India",
-        postalCode: mockServiceProviderData.pincode ? mockServiceProviderData.pincode.toString() : "",
-        isPrimary: true,
-      };
+      const addresses: Address[] = [];
 
-      setAddresses([serviceProviderAddress]);
+      if (data.permanentAddress) {
+        const permAddr = data.permanentAddress;
+        const streetAddress = `${permAddr.field1 || ""} ${permAddr.field2 || ""}`.trim() || 
+                             data.street || 
+                             data.buildingName || 
+                             "";
+        
+        addresses.push({
+          id: "permanent",
+          type: "Permanent",
+          street: streetAddress || "Address not specified",
+          city: permAddr.ctArea || data.locality || data.currentLocation || "",
+          country: permAddr.country || "India",
+          postalCode: permAddr.pinNo || (data.pincode ? data.pincode.toString() : ""),
+          isPrimary: true,
+        });
+      }
+
+      if (data.correspondenceAddress) {
+        const corrAddr = data.correspondenceAddress;
+        const streetAddress = `${corrAddr.field1 || ""} ${corrAddr.field2 || ""}`.trim() || 
+                             data.street || 
+                             data.buildingName || 
+                             "";
+        
+        addresses.push({
+          id: "correspondence",
+          type: "Correspondence",
+          street: streetAddress || "Address not specified",
+          city: corrAddr.ctArea || data.locality || data.currentLocation || "",
+          country: corrAddr.country || "India",
+          postalCode: corrAddr.pinNo || (data.pincode ? data.pincode.toString() : ""),
+          isPrimary: false,
+        });
+      }
+
+      if (addresses.length === 0) {
+        const serviceProviderAddress: Address = {
+          id: "1",
+          type: "Home",
+          street: `${data.buildingName || ""} ${data.street || ""} ${data.locality || ""}`.trim(),
+          city: data.nearbyLocation || data.currentLocation || "",
+          country: "India",
+          postalCode: data.pincode ? data.pincode.toString() : "",
+          isPrimary: true,
+        };
+        addresses.push(serviceProviderAddress);
+      }
+
+      setAddresses(addresses);
+      setOriginalData(prev => ({
+        ...prev,
+        addresses: addresses
+      }));
     } catch (error) {
       console.error("Failed to fetch service provider data:", error);
     }
@@ -376,34 +908,105 @@ const ProfileScreen = () => {
   };
 
   const handleSave = async () => {
+    // Validate only changed mobile numbers before saving
+    const isValid = await validateAllFields();
+    if (!isValid) {
+      return;
+    }
+
     setIsSaving(true);
 
     try {
       if (userRole === "SERVICE_PROVIDER" && userId) {
-        const currentAddress = addresses[0];
-
-        const payload = {
+        // Only include changed fields in the payload
+        const payload: any = {
           serviceproviderId: userId,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          mobileNo: userData.contactNumber?.replace("+", "") || null,
-          alternateNo: userData.altContactNumber?.replace("+", "") || null,
-          buildingName: currentAddress.street || "",
-          street: currentAddress.street || "",
-          locality: currentAddress.city || "",
-          pincode: currentAddress.postalCode || null,
-          currentLocation: currentAddress.city || "",
-          nearbyLocation: currentAddress.city || "",
         };
 
-        console.log("Saving service provider data:", payload);
-        Alert.alert("Success", "Profile updated successfully");
-      } else {
-        console.log("Saving customer data:", { ...userData, addresses });
-        Alert.alert("Success", "Profile updated successfully");
+        // Add only changed fields
+        if (userData.firstName !== originalData.userData.firstName) {
+          payload.firstName = userData.firstName;
+        }
+        if (userData.lastName !== originalData.userData.lastName) {
+          payload.lastName = userData.lastName;
+        }
+        if (userData.contactNumber !== originalData.userData.contactNumber) {
+          payload.mobileNo = userData.contactNumber?.replace("+", "") || null;
+        }
+        if (userData.altContactNumber !== originalData.userData.altContactNumber) {
+          payload.alternateNo = userData.altContactNumber?.replace("+", "") || null;
+        }
+
+        // Only include address data if addresses changed
+        const permanentAddress = addresses.find(addr => addr.type === "Permanent");
+        const correspondenceAddress = addresses.find(addr => addr.type === "Correspondence");
+
+        if (permanentAddress) {
+          payload.permanentAddress = {
+            field1: permanentAddress.street.split(' ')[0] || "",
+            field2: permanentAddress.street || "",
+            ctArea: permanentAddress.city || "",
+            pinNo: permanentAddress.postalCode || "",
+            state: "West Bengal",
+            country: permanentAddress.country || "India"
+          };
+        }
+
+        if (correspondenceAddress) {
+          payload.correspondenceAddress = {
+            field1: correspondenceAddress.street.split(' ')[0] || "",
+            field2: correspondenceAddress.street || "",
+            ctArea: correspondenceAddress.city || "",
+            pinNo: correspondenceAddress.postalCode || "",
+            state: "West Bengal",
+            country: correspondenceAddress.country || "India"
+          };
+        }
+
+        await axiosInstance.put(
+          `/api/serviceproviders/update/serviceprovider/${userId}`,
+          payload
+        );
+        await fetchServiceProviderData(userId.toString());
+      } else if (userRole === "CUSTOMER" && userId) {
+        // Only include changed fields in the payload
+        const payload: any = {
+          customerid: userId,
+        };
+
+        if (userData.firstName !== originalData.userData.firstName) {
+          payload.firstName = userData.firstName;
+        }
+        if (userData.lastName !== originalData.userData.lastName) {
+          payload.lastName = userData.lastName;
+        }
+        if (userData.contactNumber !== originalData.userData.contactNumber) {
+          payload.mobileNo = userData.contactNumber?.replace("+", "") || null;
+        }
+        if (userData.altContactNumber !== originalData.userData.altContactNumber) {
+          payload.alternateNo = userData.altContactNumber?.replace("+", "") || null;
+        }
+
+        await axiosInstance.put(
+          `/api/customer/update-customer/${userId}`,
+          payload
+        );
+        
+        await fetchCustomerDetails(userId);
+        
+        // Update addresses in user-settings if they changed
+        if (JSON.stringify(addresses) !== JSON.stringify(originalData.addresses)) {
+          await updateAddressesInUserSettings(addresses);
+        }
       }
 
+      // Reset validation states and tracked fields
+      setValidatedFields(new Set());
+      setContactValidation({ loading: false, error: '', isAvailable: null, formatError: false });
+      setAltContactValidation({ loading: false, error: '', isAvailable: null, formatError: false });
+      
       setIsEditing(false);
+      Alert.alert("Success", "Profile updated successfully");
     } catch (error) {
       console.error("Failed to save data:", error);
       Alert.alert("Error", "Failed to save changes. Please try again.");
@@ -415,6 +1018,24 @@ const ProfileScreen = () => {
   const handleCancel = () => {
     setIsEditing(false);
     setShowAddAddress(false);
+    
+    // Reset to original data
+    setUserData(originalData.userData);
+    setAddresses([...originalData.addresses]);
+    
+    // Reset validation states
+    setValidatedFields(new Set());
+    setContactValidation({ loading: false, error: '', isAvailable: null, formatError: false });
+    setAltContactValidation({ loading: false, error: '', isAvailable: null, formatError: false });
+  };
+
+  const handleEditStart = () => {
+    // Store current state as original data when starting to edit
+    setOriginalData({
+      userData: { ...userData },
+      addresses: [...addresses]
+    });
+    setIsEditing(true);
   };
 
   const toggleAddress = (id: string) => {
@@ -426,9 +1047,25 @@ const ProfileScreen = () => {
   // Add Address functionality
   const handleAddAddress = async () => {
     if (newAddress.street && newAddress.city && newAddress.country && newAddress.postalCode) {
-      const addressToAdd = {
-        ...newAddress,
-        id: Date.now().toString(),
+      // Use custom type if "Other" is selected and customType is provided
+      const addressType = newAddress.type === "Other" && newAddress.customType 
+        ? newAddress.customType 
+        : newAddress.type;
+
+      const addressToAdd: Address = {
+        type: addressType,
+        street: newAddress.street,
+        city: newAddress.city,
+        country: newAddress.country,
+        postalCode: newAddress.postalCode,
+        id: `addr_${Date.now()}`,
+        isPrimary: newAddress.isPrimary,
+        rawData: {
+          formattedAddress: newAddress.street,
+          latitude: 0,
+          longitude: 0,
+          placeId: `manual_${Date.now()}`
+        }
       };
 
       let updatedAddresses;
@@ -441,36 +1078,27 @@ const ProfileScreen = () => {
 
       setAddresses(updatedAddresses);
 
+      // Save to user-settings API
       if (userRole === "CUSTOMER" && userId) {
         try {
-          const payload = {
-            customerId: userId,
-            savedLocations: [
-              {
-                name: addressToAdd.type,
-                location: {
-                  formatted_address: `${addressToAdd.street}, ${addressToAdd.city}, ${addressToAdd.country} - ${addressToAdd.postalCode}`,
-                  address_components: [
-                    { long_name: addressToAdd.city, types: ["locality"] },
-                    { long_name: addressToAdd.country, types: ["country"] },
-                    { long_name: addressToAdd.postalCode, types: ["postal_code"] },
-                  ],
-                },
-                isPrimary: addressToAdd.isPrimary,
-              },
-            ],
-          };
-
-          await axios.post("https://utils-ndt3.onrender.com/user-settings", payload);
-          console.log("✅ Address saved successfully:", payload);
+          await saveAddressToUserSettings(addressToAdd);
+          
+          // Refresh addresses from API to ensure consistency
+          await fetchCustomerAddresses(userId);
+          
+          console.log("✅ Address saved successfully");
         } catch (err) {
           console.error("❌ Failed to save new address:", err);
           Alert.alert("Error", "Could not save address. Try again.");
+          // Revert local state if API call fails
+          setAddresses(addresses);
+          return;
         }
       }
 
       setNewAddress({
-        type: userRole === "SERVICE_PROVIDER" ? "Home" : "Home",
+        type: "Home",
+        customType: "",
         street: "",
         city: "",
         country: "",
@@ -478,6 +1106,8 @@ const ProfileScreen = () => {
         isPrimary: false,
       });
       setShowAddAddress(false);
+    } else {
+      Alert.alert("Validation Error", "Please fill in all address fields");
     }
   };
 
@@ -492,7 +1122,7 @@ const ProfileScreen = () => {
   // Get available address types based on user role
   const getAvailableAddressTypes = () => {
     if (userRole === "SERVICE_PROVIDER") {
-      return ["Home"];
+      return ["Permanent", "Correspondence"];
     }
     return ["Home", "Work", "Other"];
   };
@@ -516,7 +1146,7 @@ const ProfileScreen = () => {
   };
 
   // Remove address
-  const removeAddress = (id: string) => {
+  const removeAddress = async (id: string) => {
     if (addresses.length <= 1) return;
     
     const updatedAddresses = addresses.filter(addr => addr.id !== id);
@@ -526,6 +1156,19 @@ const ProfileScreen = () => {
     }
     
     setAddresses(updatedAddresses);
+
+    // Also remove from user-settings API
+    if (userRole === "CUSTOMER" && userId) {
+      try {
+        await updateAddressesInUserSettings(updatedAddresses);
+        console.log("✅ Address removed from user settings");
+      } catch (error) {
+        console.error("❌ Failed to remove address from user settings:", error);
+        // Revert local state if API call fails
+        setAddresses(addresses);
+        Alert.alert("Error", "Could not remove address. Try again.");
+      }
+    }
   };
 
   // Country code options
@@ -537,6 +1180,32 @@ const ProfileScreen = () => {
     { label: "+65 (SG)", value: "+65" },
     { label: "+971 (UAE)", value: "+971" },
   ];
+
+  const getUserIdDisplay = () => {
+    if (userRole === "SERVICE_PROVIDER") {
+      return appUser?.serviceProviderId || "N/A";
+    } else {
+      return appUser?.customerid || "N/A";
+    }
+  };
+
+  const isFormValid = (): boolean => {
+    // Check if contact number is valid (if changed)
+    const contactNumberChanged = userData.contactNumber !== originalData.userData.contactNumber;
+    const altContactNumberChanged = userData.altContactNumber !== originalData.userData.altContactNumber;
+
+    const contactValid = !contactNumberChanged || 
+      (validateMobileFormat(userData.contactNumber) && 
+       contactValidation.isAvailable !== false);
+
+    const altContactValid = !altContactNumberChanged || 
+      (userData.altContactNumber === '' || 
+       (validateMobileFormat(userData.altContactNumber) && 
+        altContactValidation.isAvailable !== false &&
+        areNumbersUnique()));
+
+    return contactValid && altContactValid;
+  };
 
   // Loading Screen Component
   const LoadingScreen = () => (
@@ -669,38 +1338,19 @@ const ProfileScreen = () => {
                 Hello, {getDisplayName()}
               </Text>
               <Text style={styles.roleText}>
-                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}, {appUser?.serviceProviderId ||
-                  appUser?.customerid ||
-                  userId?.toString() ||
-                  "ID: N/A"}
+                {userRole === "SERVICE_PROVIDER" ? "Service Provider" : "Customer"}, {getUserIdDisplay()}
               </Text>    
+              {userRole === "CUSTOMER" && !hasValidMobileNumbers() && (
+                <Text style={styles.mobileWarning}>
+                  ⚠️ Mobile number required
+                </Text>
+              )}
               {/* Edit Profile Button */}
               <View style={styles.editButtonContainer}>
-                {isEditing ? (
-                  <View style={styles.editButtons}>
-                    <TouchableOpacity
-                      style={[styles.button, styles.cancelButton]}
-                      onPress={handleCancel}
-                      disabled={isSaving}
-                    >
-                      <Text style={styles.buttonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.button, styles.saveButton]}
-                      onPress={handleSave}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? (
-                        <ActivityIndicator size="small" color="white" />
-                      ) : (
-                        <Text style={styles.buttonText}>Save Changes</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                ) : (
+                {!isEditing && (
                   <TouchableOpacity
                     style={[styles.button, styles.editButton]}
-                    onPress={() => setIsEditing(true)}
+                    onPress={handleEditStart}
                   >
                     <Text style={styles.buttonText}>Edit Profile</Text>
                   </TouchableOpacity>
@@ -772,6 +1422,16 @@ const ProfileScreen = () => {
                   placeholder="Last"
                 />
               </View>
+              <View style={styles.ultraCompactNameInput}>
+                <Text style={styles.compactLabel}>
+                  {userRole === "SERVICE_PROVIDER" ? "Provider ID" : "User ID"}
+                </Text>
+                <TextInput
+                  style={[styles.ultraCompactInput, styles.readOnlyInput]}
+                  value={getUserIdDisplay()}
+                  editable={false}
+                />
+              </View>
             </View>
           </View>
 
@@ -809,16 +1469,42 @@ const ProfileScreen = () => {
                   style={[
                     styles.phoneInput, 
                     !isEditing && styles.readOnlyInput,
-                    !hasValidMobileNumbers() && userRole === "CUSTOMER" && styles.invalidInput
+                    !hasValidMobileNumbers() && userRole === "CUSTOMER" && styles.invalidInput,
+                    contactValidation.error && styles.invalidInput
                   ]}
                   value={formatMobileNumber(userData.contactNumber)}
-                  onChangeText={(value) => handleInputChange("contactNumber", value)}
-                  placeholder="No contact number provided"
+                  onChangeText={handleContactNumberChange}
+                  placeholder="Enter 10-digit number"
                   editable={isEditing}
                   keyboardType="phone-pad"
+                  maxLength={10}
                 />
+                {isEditing && (
+                  <View style={styles.validationIcon}>
+                    {contactValidation.loading && (
+                      <ActivityIndicator size="small" color="#3b82f6" />
+                    )}
+                    {contactValidation.isAvailable && !contactValidation.loading && (
+                      <Icon name="check" size={16} color="#10b981" />
+                    )}
+                    {contactValidation.isAvailable === false && !contactValidation.loading && (
+                      <Icon name="alert-circle" size={16} color="#ef4444" />
+                    )}
+                  </View>
+                )}
               </View>
-              {userRole === "CUSTOMER" && !hasValidMobileNumbers() && (
+              
+              {/* Validation Messages */}
+              {contactValidation.error && (
+                <Text style={styles.validationError}>{contactValidation.error}</Text>
+              )}
+              {contactValidation.formatError && isEditing && (
+                <Text style={styles.validationError}>Please enter exactly 10 digits</Text>
+              )}
+              {contactValidation.isAvailable && (
+                <Text style={styles.validationSuccess}>Contact number is available</Text>
+              )}
+              {userRole === "CUSTOMER" && !hasValidMobileNumbers() && !isEditing && (
                 <Text style={styles.mobileRequiredText}>
                   Mobile number is required for bookings and notifications
                 </Text>
@@ -843,14 +1529,43 @@ const ProfileScreen = () => {
                   </View>
                 )}
                 <TextInput
-                  style={[styles.phoneInput, !isEditing && styles.readOnlyInput]}
+                  style={[
+                    styles.phoneInput, 
+                    !isEditing && styles.readOnlyInput,
+                    altContactValidation.error && styles.invalidInput
+                  ]}
                   value={formatMobileNumber(userData.altContactNumber)}
-                  onChangeText={(value) => handleInputChange("altContactNumber", value)}
-                  placeholder="No alternative number"
+                  onChangeText={handleAltContactNumberChange}
+                  placeholder="Enter 10-digit number"
                   editable={isEditing}
                   keyboardType="phone-pad"
+                  maxLength={10}
                 />
+                {isEditing && (
+                  <View style={styles.validationIcon}>
+                    {altContactValidation.loading && (
+                      <ActivityIndicator size="small" color="#3b82f6" />
+                    )}
+                    {altContactValidation.isAvailable && !altContactValidation.loading && (
+                      <Icon name="check" size={16} color="#10b981" />
+                    )}
+                    {altContactValidation.isAvailable === false && !altContactValidation.loading && (
+                      <Icon name="alert-circle" size={16} color="#ef4444" />
+                    )}
+                  </View>
+                )}
               </View>
+              
+              {/* Validation Messages */}
+              {altContactValidation.error && (
+                <Text style={styles.validationError}>{altContactValidation.error}</Text>
+              )}
+              {altContactValidation.formatError && isEditing && (
+                <Text style={styles.validationError}>Please enter exactly 10 digits</Text>
+              )}
+              {altContactValidation.isAvailable && (
+                <Text style={styles.validationSuccess}>Alternate number is available</Text>
+              )}
             </View>
           </View>
 
@@ -939,33 +1654,66 @@ const ProfileScreen = () => {
                   </TouchableOpacity>
                 </View>
                 
-                <View style={styles.addressFormRow}>
-                  <View style={styles.addressFormInput}>
-                    <Text style={styles.inputLabel}>Address Type</Text>
-                    <View style={styles.pickerContainer}>
-                      <Picker
-                        selectedValue={newAddress.type}
-                        onValueChange={(value) => handleAddressInputChange("type", value)}
-                        style={styles.picker}
-                      >
-                        {getAvailableAddressTypes().map(type => (
-                          <Picker.Item key={type} label={type} value={type} />
-                        ))}
-                      </Picker>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.primaryCheckboxContainer}>
+                {/* Address Type Selection */}
+                <View style={styles.addressTypeSelection}>
+                  <Text style={styles.inputLabel}>Save As</Text>
+                  <View style={styles.addressTypeButtons}>
                     <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={() => handleAddressInputChange("isPrimary", !newAddress.isPrimary)}
+                      style={[
+                        styles.addressTypeButton,
+                        newAddress.type === "Home" && styles.addressTypeButtonActive
+                      ]}
+                      onPress={() => handleUserPreference("Home")}
                     >
-                      {newAddress.isPrimary && <Icon name="check" size={16} color="#0a2a66" />}
+                      <Icon name="home" size={14} color={newAddress.type === "Home" ? "#0a2a66" : "#666"} />
+                      <Text style={[
+                        styles.addressTypeButtonText,
+                        newAddress.type === "Home" && styles.addressTypeButtonTextActive
+                      ]}>Home</Text>
                     </TouchableOpacity>
-                    <Text style={styles.checkboxLabel}>Set as primary address</Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.addressTypeButton,
+                        newAddress.type === "Work" && styles.addressTypeButtonActive
+                      ]}
+                      onPress={() => handleUserPreference("Work")}
+                    >
+                      <Icon name="briefcase" size={14} color={newAddress.type === "Work" ? "#0a2a66" : "#666"} />
+                      <Text style={[
+                        styles.addressTypeButtonText,
+                        newAddress.type === "Work" && styles.addressTypeButtonTextActive
+                      ]}>Work</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.addressTypeButton,
+                        newAddress.type === "Other" && styles.addressTypeButtonActive
+                      ]}
+                      onPress={() => handleUserPreference()}
+                    >
+                      <Icon name="map-pin" size={14} color={newAddress.type === "Other" ? "#0a2a66" : "#666"} />
+                      <Text style={[
+                        styles.addressTypeButtonText,
+                        newAddress.type === "Other" && styles.addressTypeButtonTextActive
+                      ]}>Other</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
                 
+                {/* Custom Type Input for "Other" */}
+                {newAddress.type === "Other" && (
+                  <View style={styles.addressFormInput}>
+                    <Text style={styles.inputLabel}>Location Name</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={newAddress.customType}
+                      onChangeText={(value) => handleAddressInputChange("customType", value)}
+                      placeholder="Enter location name"
+                    />
+                  </View>
+                )}
+
+                {/* Address Details */}
                 <View style={styles.addressFormInput}>
                   <Text style={styles.inputLabel}>Street Address</Text>
                   <TextInput
@@ -1007,13 +1755,36 @@ const ProfileScreen = () => {
                     />
                   </View>
                 </View>
+
+                <View style={styles.primaryCheckboxContainer}>
+                  <TouchableOpacity
+                    style={styles.checkbox}
+                    onPress={() => handleAddressInputChange("isPrimary", !newAddress.isPrimary)}
+                  >
+                    {newAddress.isPrimary && <Icon name="check" size={16} color="#0a2a66" />}
+                  </TouchableOpacity>
+                  <Text style={styles.checkboxLabel}>Set as primary address</Text>
+                </View>
                 
-                <TouchableOpacity
-                  onPress={handleAddAddress}
-                  style={styles.addAddressSubmitButton}
-                >
-                  <Text style={styles.addAddressSubmitText}>Add Address</Text>
-                </TouchableOpacity>
+                <View style={styles.addAddressActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => setShowAddAddress(false)}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleAddAddress}
+                    style={[
+                      styles.addAddressSubmitButton,
+                      (!newAddress.street || !newAddress.city || !newAddress.country || !newAddress.postalCode) && 
+                      styles.addAddressSubmitButtonDisabled
+                    ]}
+                    disabled={!newAddress.street || !newAddress.city || !newAddress.country || !newAddress.postalCode}
+                  >
+                    <Text style={styles.addAddressSubmitText}>Save Address</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -1022,21 +1793,20 @@ const ProfileScreen = () => {
             ) : (
               <View style={styles.addressesList}>
                 {addresses.map((address, idx) => {
-                  const isExpanded = idx === 0 || expandedAddressIds.includes(address.id);
+                  const isExpanded = userRole === "SERVICE_PROVIDER" || expandedAddressIds.includes(address.id);
 
                   return (
                     <View
                       key={address.id}
                       style={[
                         styles.addressCard,
-                        address.isPrimary && styles.primaryAddressCard,
-                        isExpanded && styles.expandedAddressCard
+                        address.isPrimary && styles.primaryAddressCard
                       ]}
                     >
                       {/* Header */}
                       <View style={styles.addressHeader}>
                         <View style={styles.addressTitleContainer}>
-                          {isEditing ? (
+                          {isEditing && userRole === "CUSTOMER" ? (
                             <View style={styles.pickerContainer}>
                               <Picker
                                 selectedValue={address.type}
@@ -1059,25 +1829,15 @@ const ProfileScreen = () => {
                         </View>
 
                         <View style={styles.addressActions}>
-                          {isEditing && addresses.length > 1 && (
-                            <>
-                              {!address.isPrimary && (
-                                <TouchableOpacity
-                                  onPress={() => setPrimaryAddress(address.id)}
-                                  style={styles.addressActionButton}
-                                >
-                                  <Text style={styles.setPrimaryText}>Set Primary</Text>
-                                </TouchableOpacity>
-                              )}
-                              <TouchableOpacity
-                                onPress={() => removeAddress(address.id)}
-                                style={styles.addressActionButton}
-                                >
-                                <Icon name="x" size={20} color="#dc2626" />
-                              </TouchableOpacity>
-                            </>
+                          {isEditing && userRole === "CUSTOMER" && addresses.length > 1 && (
+                            <TouchableOpacity
+                              onPress={() => removeAddress(address.id)}
+                              style={styles.addressActionButton}
+                            >
+                              <Icon name="x" size={20} color="#dc2626" />
+                            </TouchableOpacity>
                           )}
-                          {idx !== 0 && (
+                          {userRole === "CUSTOMER" && (
                             <TouchableOpacity
                               onPress={() => toggleAddress(address.id)}
                               style={styles.addressActionButton}
@@ -1093,9 +1853,9 @@ const ProfileScreen = () => {
                       </View>
 
                       {/* Body (only show when expanded) */}
-                      {isExpanded && (
+                      {(isExpanded || userRole === "SERVICE_PROVIDER") && (
                         <View style={styles.addressDetails}>
-                          {isEditing ? (
+                          {isEditing && userRole === "CUSTOMER" ? (
                             <>
                               <View style={styles.addressFormInput}>
                                 <Text style={styles.inputLabel}>Street Address</Text>
@@ -1142,6 +1902,19 @@ const ProfileScreen = () => {
                               </Text>
                             </>
                           )}
+                          {userRole === "SERVICE_PROVIDER" && (
+                            <Text style={styles.serviceProviderNote}>
+                              Service provider addresses are managed separately
+                            </Text>
+                          )}
+                        </View>
+                      )}
+
+                      {userRole === "CUSTOMER" && !isExpanded && (
+                        <View style={styles.addressPreview}>
+                          <Text style={styles.addressPreviewText} numberOfLines={1}>
+                            {address.street}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -1159,58 +1932,44 @@ const ProfileScreen = () => {
               <Text style={styles.sectionTitle}>Service Status</Text>
               
               <View style={styles.statusCard}>
-                <View style={styles.statusGrid}>
-                  <View style={styles.statusItem}>
-                    <Text style={styles.statusLabel}>Profile Status</Text>
-                    <View style={styles.statusValue}>
-                      <View style={[styles.statusIndicator, styles.statusActive]} />
-                      <Text style={styles.statusText}>Active</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.statusItem}>
-                    <Text style={styles.statusLabel}>Verification</Text>
-                    <View style={styles.statusValue}>
-                      <View style={[styles.statusIndicator, styles.statusActive]} />
-                      <Text style={styles.statusText}>Verified</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.statusItem}>
-                    <Text style={styles.statusLabel}>Availability</Text>
-                    <View style={styles.statusValue}>
-                      <View style={[styles.statusIndicator, styles.statusActive]} />
-                      <Text style={styles.statusText}>Available</Text>
-                    </View>
-                  </View>
+                <View style={styles.statusContent}>
+                  <Text style={styles.statusTitle}>Account Status</Text>
+                  <Text style={styles.statusDescription}>Active Service Provider</Text>
                 </View>
-                
-                <View style={styles.statusFooter}>
-                  <Text style={styles.statusUpdateText}>
-                    Last updated: {new Date().toLocaleDateString()}
-                  </Text>
-                  <TouchableOpacity>
-                    <Text style={styles.statusDetailsLink}>View complete status details</Text>
-                  </TouchableOpacity>
+                <View style={styles.verifiedBadge}>
+                  <Text style={styles.verifiedBadgeText}>Verified</Text>
                 </View>
               </View>
             </View>
           )}
 
-          {/* Submit Button */}
+          {/* Action Buttons */}
           {isEditing && (
-            <View style={styles.submitContainer}>
-              <TouchableOpacity 
-                style={styles.submitButton} 
-                onPress={handleSave}
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Save Changes</Text>
-                )}
-              </TouchableOpacity>
+            <View style={styles.actionButtonsContainer}>
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.cancelActionButton]}
+                  onPress={handleCancel}
+                  disabled={isSaving}
+                >
+                  <Text style={styles.cancelActionButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton, 
+                    styles.saveActionButton,
+                    (!isFormValid() || !hasChanges() || isSaving) && styles.saveActionButtonDisabled
+                  ]}
+                  onPress={handleSave}
+                  disabled={!isFormValid() || !hasChanges() || isSaving}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={styles.saveActionButtonText}>Save Changes</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -1218,7 +1977,7 @@ const ProfileScreen = () => {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>© 2024 ServEaso All rights reserved.</Text>
+        <Text style={styles.footerText}>© 2025 MyApp. All rights reserved.</Text>
       </View>
     </ScrollView>
   );
@@ -1308,11 +2067,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 4,
   },
   mobileWarning: {
     color: "#dc2626",
     fontSize: 12,
+    marginBottom: 8,
   },
   mobileWarningSmall: {
     color: "#dc2626",
@@ -1343,19 +2103,9 @@ const styles = StyleSheet.create({
   editButton: {
     backgroundColor: "#0a2a66",
   },
-  cancelButton: {
-    backgroundColor: "#6c757d",
-  },
-  saveButton: {
-    backgroundColor: "#0a2a66",
-  },
   buttonText: {
     color: "white",
     fontWeight: "600",
-  },
-  editButtons: {
-    flexDirection: "row",
-    gap: 12,
   },
   mainContent: {
     alignItems: "center",
@@ -1409,17 +2159,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 16,
   },
-  // New styles for name row
-  nameRow: {
-    flexDirection: "column",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    gap: 12,
-  },
-  nameInput: {
-    flex: 1,
-    marginBottom: 16,
-  },
   inputRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1455,6 +2194,108 @@ const styles = StyleSheet.create({
     backgroundColor: "#e2e8f0",
     marginVertical: 20,
   },
+  // Ultra compact styles
+  ultraCompactNameRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 8,
+  },
+  ultraCompactNameInput: {
+    flex: 1,
+  },
+  ultraCompactInput: {
+    width: "100%",
+    paddingStart: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 6,
+    fontSize: 14,
+    minHeight: 40,
+  },
+  compactLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4a5568",
+    marginBottom: 6,
+  },
+  // Phone input styles
+  phoneInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  countryCodeContainer: {
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRightWidth: 0,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+    backgroundColor: '#f7fafc',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minWidth: 80,
+  },
+  countryCodeText: {
+    fontSize: 14,
+    color: '#4a5568',
+  },
+  phoneInput: {
+    flex: 1,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    fontSize: 14,
+  },
+  validationIcon: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    transform: [{ translateY: -8 }],
+  },
+  validationError: {
+    color: '#dc2626',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  validationSuccess: {
+    color: '#16a34a',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  // Modal styles for country code picker
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  pickerModal: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 20,
+  },
+  pickerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  pickerButton: {
+    backgroundColor: '#0a2a66',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  pickerButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
   // Address section styles
   addressesSection: {
     marginBottom: 20,
@@ -1472,30 +2313,43 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
   },
-  expandedAddressCard: {
-    padding: 16,
+  primaryAddressCard: {
+    borderColor: '#93c5fd',
+    backgroundColor: '#dbeafe',
   },
   addressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  addressTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   addressType: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   primaryBadge: {
-    backgroundColor: "#dbeafe",
+    backgroundColor: '#dbeafe',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    alignSelf: "flex-start",
-    marginTop: 4,
+    alignSelf: 'flex-start',
+    marginLeft: 8,
   },
   primaryBadgeText: {
-    color: "#1e40af",
+    color: '#1e40af',
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
+  },
+  addressActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addressActionButton: {
+    padding: 4,
+    marginLeft: 8,
   },
   addressDetails: {
     marginTop: 8,
@@ -1505,27 +2359,226 @@ const styles = StyleSheet.create({
     color: "#666",
     marginBottom: 4,
   },
-  submitContainer: {
-    alignItems: "center",
-    marginTop: 16,
+  addressPreview: {
+    marginTop: 8,
   },
-  submitButton: {
-    backgroundColor: "#0a2a66",
-    paddingVertical: 14,
-    paddingHorizontal: 40,
+  addressPreviewText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  serviceProviderNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 8,
+  },
+  addressesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  addAddressButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addAddressText: {
+    color: '#0a2a66',
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  addAddressForm: {
+    borderWidth: 1,
+    borderColor: '#93c5fd',
     borderRadius: 8,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.23,
-    shadowRadius: 2.62,
-    elevation: 4,
+    padding: 16,
+    marginBottom: 16,
+    backgroundColor: '#dbeafe',
   },
-  submitButtonText: {
-    color: "white",
-    fontWeight: "bold",
+  addAddressFormHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  addAddressFormTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e40af',
+  },
+  addressTypeSelection: {
+    marginBottom: 16,
+  },
+  addressTypeButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  addressTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 6,
+    backgroundColor: 'white',
+    gap: 4,
+  },
+  addressTypeButtonActive: {
+    backgroundColor: '#dbeafe',
+    borderColor: '#93c5fd',
+  },
+  addressTypeButtonText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  addressTypeButtonTextActive: {
+    color: '#1e40af',
+  },
+  addressFormRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 12,
+  },
+  addressFormInput: {
+    marginBottom: 12,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 44,
+    backgroundColor: 'white',
+  },
+  primaryCheckboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 4,
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: '#4a5568',
+  },
+  addAddressActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  cancelButtonText: {
+    color: '#4b5563',
+    fontWeight: '600',
+  },
+  addAddressSubmitButton: {
+    backgroundColor: '#0a2a66',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  addAddressSubmitButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  addAddressSubmitText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  // Service status section styles
+  serviceStatusSection: {
+    marginBottom: 20,
+  },
+  statusCard: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusContent: {
+    flex: 1,
+  },
+  statusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2d3748',
+    marginBottom: 4,
+  },
+  statusDescription: {
+    fontSize: 14,
+    color: '#718096',
+  },
+  verifiedBadge: {
+    backgroundColor: '#d1fae5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  verifiedBadgeText: {
+    color: '#065f46',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Action buttons styles
+  actionButtonsContainer: {
+    marginTop: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  actionButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  cancelActionButton: {
+    backgroundColor: '#6b7280',
+  },
+  saveActionButton: {
+    backgroundColor: '#0a2a66',
+  },
+  saveActionButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  cancelActionButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  saveActionButtonText: {
+    color: 'white',
+    fontWeight: '600',
     fontSize: 14,
   },
   footer: {
@@ -1538,7 +2591,7 @@ const styles = StyleSheet.create({
     color: "#718096",
     fontSize: 12,
   },
-  // Skeleton styles
+  // Skeleton styles (keep existing ones)
   headerSkeleton: {
     paddingTop: 60,
     paddingBottom: 30,
@@ -1616,7 +2669,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 16,
   },
-  // New skeleton styles for name row
   nameRowSkeleton: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1680,267 +2732,6 @@ const styles = StyleSheet.create({
     height: 16,
     backgroundColor: "#eee",
     borderRadius: 4,
-  },
-  // Rest of the existing styles...
-  phoneInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  countryCodeContainer: {
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRightWidth: 0,
-    borderTopLeftRadius: 8,
-    borderBottomLeftRadius: 8,
-    backgroundColor: '#f7fafc',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minWidth: 80,
-  },
-  countryCodeText: {
-    fontSize: 14,
-    color: '#4a5568',
-  },
-  phoneInput: {
-    flex: 1,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
-    fontSize: 14,
-  },
-  addressesHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  addAddressButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addAddressText: {
-    color: '#0a2a66',
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  addAddressForm: {
-    borderWidth: 1,
-    borderColor: '#93c5fd',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-    backgroundColor: '#dbeafe',
-  },
-  addAddressFormHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  addAddressFormTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e40af',
-  },
-  addressFormRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    gap: 12,
-  },
-  addressFormInput: {
-    marginBottom: 12,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  picker: {
-    height: 44,
-    backgroundColor: 'white',
-  },
-  primaryCheckboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginBottom: 12,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 4,
-    marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    color: '#4a5568',
-  },
-  addAddressSubmitButton: {
-    backgroundColor: '#0a2a66',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  addAddressSubmitText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  primaryAddressCard: {
-    borderColor: '#93c5fd',
-    backgroundColor: '#dbeafe',
-  },
-  addressTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addressActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addressActionButton: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  setPrimaryText: {
-    color: '#0a2a66',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // Modal styles for country code picker
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  pickerModal: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 20,
-  },
-  pickerTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  pickerButton: {
-    backgroundColor: '#0a2a66',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  pickerButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  // Service status section styles
-  serviceStatusSection: {
-    marginBottom: 20,
-  },
-  statusCard: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  statusGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statusItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statusLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#718096',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  statusValue: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  statusActive: {
-    backgroundColor: '#10b981',
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2d3748',
-  },
-  statusFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  statusUpdateText: {
-    fontSize: 12,
-    color: '#718096',
-  },
-  statusDetailsLink: {
-    fontSize: 12,
-    color: '#0a2a66',
-    fontWeight: '600',
-  },
-  // Ultra compact styles
-  ultraCompactNameRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    gap: 8, // Even smaller gap
-  },
-  ultraCompactNameInput: {
-    flex: 1,
-    
-  },
-  ultraCompactInput: {
-    width: "100%",
-    // padding: 8, // Even smaller padding
-     paddingStart: 10,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 6, // Slightly smaller border radius
-    fontSize: 14,
-    minHeight: 40, // Smaller height
-  },
-  compactLabel: {
-    fontSize: 14, // Smaller label
-    fontWeight: "600",
-    color: "#4a5568",
-    marginBottom: 6,
   },
 });
 

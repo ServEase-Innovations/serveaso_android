@@ -5,9 +5,11 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Config from "react-native-config";
 
 const PaymentInstance = axios.create({
-  baseURL: "https://payments-j5id.onrender.com",
+  baseURL: Config.PAYMENT_API_URL,
+  // baseURL: "https://payments-j5id.onrender.com",
   timeout: 30000, // Longer timeout for payment processing
 });
 

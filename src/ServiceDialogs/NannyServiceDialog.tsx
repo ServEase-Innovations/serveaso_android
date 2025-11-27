@@ -28,6 +28,7 @@ import { useAppUser } from '../context/AppUserContext';
 import BookingService from '../services/bookingService';
 import { CartDialog } from '../CartDiaog/CartDialog';
 import LinearGradient from 'react-native-linear-gradient';
+import BookingSuccessDialog from '../Common/BookingSuccessDialog'; // Import the success dialog
 
 // Type definitions
 type PackageType = 'day' | 'night' | 'fullTime';
@@ -144,6 +145,34 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   const allCartItems = useSelector(selectCartItems);
   const nannyCartItems = allCartItems.filter(isNannyCartItem);
   const dispatch = useDispatch();
+  // Handle success dialog close
+const handleSuccessDialogClose = () => {
+  setShowSuccessDialog(false);
+  dispatch(removeFromCart({ type: 'meal' }));
+  dispatch(removeFromCart({ type: 'maid' }));
+  dispatch(removeFromCart({ type: 'nanny' }));
+  setShowCartDialog(false);
+  handleClose();
+  if (sendDataToParent) {
+    sendDataToParent('BOOKINGS');
+  }
+};
+
+// Handle navigation to bookings
+const handleNavigateToBookings = () => {
+  setShowSuccessDialog(false);
+  dispatch(removeFromCart({ type: 'meal' }));
+  dispatch(removeFromCart({ type: 'maid' }));
+  dispatch(removeFromCart({ type: 'nanny' }));
+  setShowCartDialog(false);
+  handleClose();
+  if (sendDataToParent) {
+    sendDataToParent('BOOKINGS');
+  }
+};
+
+const [showSuccessDialog, setShowSuccessDialog] = useState(false); // State for success dialog
+const [bookingSuccessDetails, setBookingSuccessDetails] = useState<any>(null); // State for booking details
 
   const providerFullName = `${providerDetails?.firstName} ${providerDetails?.lastName}`;
 
@@ -520,25 +549,38 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
 
       const result = await BookingService.bookAndPay(payload);
 
-      Alert.alert(
-        "Success ✅", 
-        result?.verifyResult?.message || "Booking & Payment Successful!",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              dispatch(removeFromCart({ type: 'meal' }));
-              dispatch(removeFromCart({ type: 'maid' }));
-              dispatch(removeFromCart({ type: 'nanny' }));
-              setShowCartDialog(false);
-              handleClose();
-              if (sendDataToParent) {
-                sendDataToParent('BOOKINGS');
-              }
-            }
-          }
-        ]
-      );
+      // Alert.alert(
+      //   "Success ✅", 
+      //   result?.verifyResult?.message || "Booking & Payment Successful!",
+      //   [
+      //     {
+      //       text: "OK",
+      //       onPress: () => {
+      //         dispatch(removeFromCart({ type: 'meal' }));
+      //         dispatch(removeFromCart({ type: 'maid' }));
+      //         dispatch(removeFromCart({ type: 'nanny' }));
+      //         setShowCartDialog(false);
+      //         handleClose();
+      //         if (sendDataToParent) {
+      //           sendDataToParent('BOOKINGS');
+      //         }
+      //       }
+      //     }
+      //   ]
+      // );
+      // Prepare booking details for success dialog
+const successDetails = {
+  providerName: providerFullName,
+  serviceType: "Nanny Service",
+  totalAmount: baseTotal,
+  bookingDate: bookingType?.startDate || new Date().toISOString().split('T')[0],
+  persons: selectedPackages[0]?.age || 1, // Use first package age or default
+  careType: activeTab,
+};
+
+// Set booking details and show success dialog
+setBookingSuccessDetails(successDetails);
+setShowSuccessDialog(true);
 
     } catch (err: any) {
       console.error("Checkout error:", err);
@@ -711,6 +753,13 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
   }, [packages, renderPackage]);
 
   return (    
+    // <Modal
+    //   visible={open}
+    //   animationType="slide"
+    //   transparent={true}
+    //   onRequestClose={handleClose}
+    // >
+     <>
     <Modal
       visible={open}
       animationType="slide"
@@ -809,7 +858,17 @@ const NannyServicesDialog: React.FC<NannyServicesDialogProps> = ({
         handleClose={() => setShowCartDialog(false)}
         handleCheckout={handleCheckout}
       />
+
+       {/* Success Dialog */}
+    <BookingSuccessDialog
+      open={showSuccessDialog}
+      onClose={handleSuccessDialogClose}
+      bookingDetails={bookingSuccessDetails}
+      message="Nanny Service Booking & Payment Successful"
+      onNavigateToBookings={handleNavigateToBookings}
+    />
     </Modal>
+      </>
   );
 };
 

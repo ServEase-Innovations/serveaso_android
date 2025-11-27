@@ -20,7 +20,7 @@ import { useDispatch } from "react-redux";
 import { add } from "../features/bookingTypeSlice";
 import { DETAILS } from "../Constants/pagesConstants";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import RadioButton from '../common/RadioButton';
+import RadioButton from '../Common/RadioButton';
 import ServiceProviderRegistration from '../ServiceProviderRegistration';
 import ServiceDetailsDialog from './ServiceDetailsDialog'; 
 import MaidServiceDialog from "../ServiceDialogs/MaidServiceDialog";

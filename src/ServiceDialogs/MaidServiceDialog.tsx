@@ -26,6 +26,7 @@ import { usePricingFilterService } from '../utils/PricingFilter';
 import BookingService, { BookingPayload } from '../services/bookingService';
 import { useAppUser } from '../context/AppUserContext';
 import LinearGradient from "react-native-linear-gradient";
+import BookingSuccessDialog from '../Common/BookingSuccessDialog'; // Import the success dialog
 
 interface MaidServiceDialogProps {
   open: boolean;
@@ -132,6 +133,26 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   const { getFilteredPricing } = usePricingFilterService();
   const maidPricing = getFilteredPricing('maid');
   console.log('Maid Pricing Data:', maidPricing);
+
+const [showSuccessDialog, setShowSuccessDialog] = useState(false); // State for success dialog
+const [bookingSuccessDetails, setBookingSuccessDetails] = useState<any>(null); // State for booking details
+// Handle success dialog close
+const handleSuccessDialogClose = () => {
+  setShowSuccessDialog(false);
+  if (sendDataToParent) {
+    sendDataToParent(BOOKINGS);
+  }
+  handleClose();
+};
+
+// Handle navigation to bookings
+const handleNavigateToBookings = () => {
+  setShowSuccessDialog(false);
+  if (sendDataToParent) {
+    sendDataToParent(BOOKINGS);
+  }
+  handleClose();
+};
 
   const [cartItems, setCartItems] = useState<CartItemsType>(() => {
     const initialCartItems: CartItemsType = {
@@ -482,6 +503,7 @@ const MaidServiceDialog: React.FC<MaidServiceDialogProps> = ({
   const getPriceDisplayText = () => {
     return bookingType?.bookingPreference?.toLowerCase() === 'date' ? 'Per Day' : 'Monthly service';
   };
+
 const handleCheckout = async () => {
   try {
     setLoading(true);
@@ -627,22 +649,35 @@ const handleCheckout = async () => {
     
     console.log("✅ bookAndPay result:", result);
 
-    // Success handling
-    Alert.alert(
-      "Success ✅", 
-      result?.verifyResult?.message || "Maid Service Booking & Payment Successful",
-      [
-        {
-          text: "OK",
-          onPress: () => {
-            if (sendDataToParent) {
-              sendDataToParent(BOOKINGS);
-            }
-            handleClose();
-          }
-        }
-      ]
-    );
+    // // Success handling
+    // Alert.alert(
+    //   "Success ✅", 
+    //   result?.verifyResult?.message || "Maid Service Booking & Payment Successful",
+    //   [
+    //     {
+    //       text: "OK",
+    //       onPress: () => {
+    //         if (sendDataToParent) {
+    //           sendDataToParent(BOOKINGS);
+    //         }
+    //         handleClose();
+    //       }
+    //     }
+    //   ]
+    // );
+    // Prepare booking details for success dialog
+const successDetails = {
+  providerName: providerFullName,
+  serviceType: "Maid Service",
+  totalAmount: baseTotal,
+  bookingDate: bookingType?.startDate || new Date().toISOString().split("T")[0],
+  persons: packageStates.utensilCleaning.persons,
+};
+
+// Set booking details and show success dialog
+setBookingSuccessDetails(successDetails);
+setShowSuccessDialog(true);
+
 
   } catch (error: any) {
     console.error('❌ Checkout error:', error);
@@ -687,7 +722,8 @@ const handleCheckout = async () => {
   if (!open) return null;
 
   return (
-    <Modal
+    <>
+      <Modal
       visible={open}
       animationType="slide"
       transparent={true}
@@ -1221,6 +1257,16 @@ const handleCheckout = async () => {
         </View>
       </View>
     </Modal>
+     {/* Success Dialog */}
+    <BookingSuccessDialog
+      open={showSuccessDialog}
+      onClose={handleSuccessDialogClose}
+      bookingDetails={bookingSuccessDetails}
+      message="Maid Service Booking & Payment Successful"
+      onNavigateToBookings={handleNavigateToBookings}
+    />
+
+    </>
   );
 };
 

@@ -5,9 +5,11 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Config from "react-native-config";
 
 const utilsInstance = axios.create({
-  baseURL: "https://utils-ndt3.onrender.com",
+   baseURL: Config.UTILS_API_URL,   // 👈 dynamic URL
+  // baseURL: "https://utils-ndt3.onrender.com",
   // You can also switch to your local/dev URLs
   // baseURL: "http://localhost:8080",
 });

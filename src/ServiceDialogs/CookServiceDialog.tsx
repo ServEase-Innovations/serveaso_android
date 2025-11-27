@@ -27,6 +27,7 @@ import axios from 'axios';
 import { useAppUser } from '../context/AppUserContext';
 import BookingService, { BookingPayload } from '../services/bookingService';
 import LinearGradient from 'react-native-linear-gradient';
+import BookingSuccessDialog from '../Common/BookingSuccessDialog';
 
 interface Package {
   name: string;
@@ -96,6 +97,23 @@ const DemoCook = ({
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
 //using for location fetching from head.tsx
     const [currentLocation, setCurrentLocation] = React.useState<LocationData | null>(null);
+
+//Booking Success Dialog
+const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+const [bookingSuccessDetails, setBookingSuccessDetails] = useState<any>(null);
+
+const handleSuccessDialogClose = () => {
+  setSuccessDialogOpen(false);
+};
+
+const handleNavigateToBookings = () => {
+  setSuccessDialogOpen(false);
+  if (sendDataToParent) {
+    sendDataToParent(BOOKINGS);
+  }
+  onClose();
+  setShowCartDialog(false);
+};
 
   const getBookingTypeFromPreference = (bookingPreference: string | undefined): string => {
     if (!bookingPreference) return 'MONTHLY';
@@ -405,6 +423,156 @@ const DemoCook = ({
     setShowCartDialog(true);
   };
 
+// const handleCheckout = async () => {
+//   try {
+//     setLoading(true);
+
+//     const selectedPackages = packages.filter(pkg => pkg.selected);
+    
+//     if (selectedPackages.length === 0) {
+//       Alert.alert("Error", "Please select at least one package");
+//       setLoading(false);
+//       return;
+//     }
+
+//     const baseTotal = selectedPackages.reduce((sum, pkg) => sum + pkg.price, 0);
+//     const customerId = appUser?.customerid || user?.customerid || 19;
+
+//     const responsibilities = {
+//       tasks: selectedPackages.map(pkg => ({
+//         taskType: pkg.name.charAt(0).toUpperCase() + pkg.name.slice(1),
+//         persons: pkg.persons || 1
+//       }))
+//     };
+
+//     // Format start_time properly
+//     const currentBookingType = getBookingTypeFromPreference(bookingType?.bookingPreference);
+//     const startTime = formatTimeForBackend(bookingType?.timeRange);
+
+//     // Conditional serviceproviderid logic - FIXED
+//     const isOnDemand = currentBookingType === "ON_DEMAND";
+    
+//     // Handle serviceproviderid properly to match BookingPayload type
+//     let serviceproviderid: number | null = null;
+//     if (!isOnDemand && providerDetails?.serviceproviderId) {
+//       serviceproviderid = Number(providerDetails.serviceproviderId);
+//     }
+
+//     console.log("Determined serviceproviderid:", bookingType);
+
+//     const demoForStartTime = bookingType?.timeRange.split("-");
+//     console.log("Demo for start time :", demoForStartTime + ":00")
+//     // Prepare payload matching BookingPayload interface
+//     const payload: BookingPayload = {
+//       customerid: customerId,
+//       serviceproviderid: serviceproviderid, // Now properly typed as number | null
+//       start_date: bookingType?.demoForStartTime || new Date().toISOString().split("T")[0],
+//       end_date: bookingType?.end_Date || new Date().toISOString().split("T")[0],
+//       responsibilities: responsibilities,
+//       booking_type: currentBookingType,
+//       taskStatus: "NOT_STARTED",
+//       service_type: "COOK",
+//       base_amount: baseTotal,
+//       payment_mode: "razorpay",
+//       start_time: demoForStartTime[0].trim()
+//     };
+
+//     console.log("Prepared booking payload:", payload);
+
+
+//     console.log("📦 Booking payload:", JSON.stringify(payload, null, 2));
+//     console.log(`🔍 Booking Type: ${currentBookingType}, Service Provider ID: ${serviceproviderid}`);
+
+//     // Validate payload before sending
+//     if (!validatePayload(payload)) {
+//       Alert.alert("Validation Error", "Please check your booking details");
+//       setLoading(false);
+//       return;
+//     }
+
+//     // ✅ Use the bookAndPay method exactly like in React web version
+//     console.log("🚀 Calling BookingService.bookAndPay...");
+//     const result = await BookingService.bookAndPay(payload);
+    
+//     console.log("✅ bookAndPay result:", result);
+
+//     setBookingSuccessDetails({
+//   providerName: providerDetails?.firstName ? `${providerDetails.firstName} ${providerDetails.lastName}` : 'Service Provider',
+//   serviceType: 'Home Cook Service',
+//   totalAmount: baseTotal,
+//   bookingDate: bookingType?.startDate || new Date().toISOString().split("T")[0],
+//   persons: selectedPackages.reduce((sum, pkg) => sum + (pkg.persons || 1), 0),
+//   message: result?.verifyResult?.message || "Booking & Payment Successful ✅"
+// });
+
+// setShowCartDialog(false);
+// onClose();
+// setSuccessDialogOpen(true); // Show success dialog
+
+//     // // ✅ Success handling - matching your React web version
+//     // setSnackbarMessage(result?.verifyResult?.message || "Booking & Payment Successful ✅");
+//     // setSnackbarSeverity("success");
+//     // setSnackbarVisible(true);
+
+//     // Clear cart and close dialogs
+//     selectedPackages.forEach(pkg => {
+//       dispatch(removeFromCart({
+//         id: pkg.name.toUpperCase(),
+//         type: 'meal'
+//       }));
+//     });
+
+//     if (sendDataToParent) {
+//       sendDataToParent(BOOKINGS);
+//     }
+    
+//     setTimeout(() => {
+//       setShowCartDialog(false);
+//       onClose();
+//     }, 2000);
+
+//   } catch (error: any) {
+//     console.error('❌ Checkout error:', error);
+    
+//     // ✅ Enhanced error handling - matching your React web version
+//     let backendMessage = "Failed to initiate payment";
+    
+//     if (error?.response?.data) {
+//       if (typeof error.response.data === "string") {
+//         backendMessage = error.response.data;
+//       } else if (error.response.data.error) {
+//         backendMessage = error.response.data.error;
+//       } else if (error.response.data.message) {
+//         backendMessage = error.response.data.message;
+//       }
+//     } else if (error.message) {
+//       backendMessage = error.message;
+//     }
+
+//     // Handle Razorpay specific errors
+//     if (error?.code) {
+//       switch (error.code) {
+//         case 0:
+//           backendMessage = "Payment cancelled by user";
+//           break;
+//         case 1:
+//           backendMessage = "Payment failed. Please try again.";
+//           break;
+//         case 2:
+//           backendMessage = "Network error. Please check your internet connection.";
+//           break;
+//         default:
+//           backendMessage = error.description || "Payment failed";
+//       }
+//     }
+
+//     setSnackbarMessage(backendMessage);
+//     setSnackbarSeverity("error");
+//     setSnackbarVisible(true);
+//   } finally {
+//     setLoading(false);
+//   }
+// };
 const handleCheckout = async () => {
   try {
     setLoading(true);
@@ -431,7 +599,7 @@ const handleCheckout = async () => {
     const currentBookingType = getBookingTypeFromPreference(bookingType?.bookingPreference);
     const startTime = formatTimeForBackend(bookingType?.timeRange);
 
-    // Conditional serviceproviderid logic - FIXED
+    // Conditional serviceproviderid logic
     const isOnDemand = currentBookingType === "ON_DEMAND";
     
     // Handle serviceproviderid properly to match BookingPayload type
@@ -443,11 +611,12 @@ const handleCheckout = async () => {
     console.log("Determined serviceproviderid:", bookingType);
 
     const demoForStartTime = bookingType?.timeRange.split("-");
-    console.log("Demo for start time :", demoForStartTime + ":00")
+    console.log("Demo for start time:", demoForStartTime + ":00");
+    
     // Prepare payload matching BookingPayload interface
     const payload: BookingPayload = {
       customerid: customerId,
-      serviceproviderid: serviceproviderid, // Now properly typed as number | null
+      serviceproviderid: serviceproviderid,
       start_date: bookingType?.demoForStartTime || new Date().toISOString().split("T")[0],
       end_date: bookingType?.end_Date || new Date().toISOString().split("T")[0],
       responsibilities: responsibilities,
@@ -460,8 +629,6 @@ const handleCheckout = async () => {
     };
 
     console.log("Prepared booking payload:", payload);
-
-
     console.log("📦 Booking payload:", JSON.stringify(payload, null, 2));
     console.log(`🔍 Booking Type: ${currentBookingType}, Service Provider ID: ${serviceproviderid}`);
 
@@ -472,18 +639,23 @@ const handleCheckout = async () => {
       return;
     }
 
-    // ✅ Use the bookAndPay method exactly like in React web version
+    // ✅ Use the bookAndPay method
     console.log("🚀 Calling BookingService.bookAndPay...");
     const result = await BookingService.bookAndPay(payload);
     
     console.log("✅ bookAndPay result:", result);
 
-    // ✅ Success handling - matching your React web version
-    setSnackbarMessage(result?.verifyResult?.message || "Booking & Payment Successful ✅");
-    setSnackbarSeverity("success");
-    setSnackbarVisible(true);
+    // ✅ SUCCESS: Set booking success details and show success dialog
+    setBookingSuccessDetails({
+      providerName: providerDetails?.firstName ? `${providerDetails.firstName} ${providerDetails.lastName}` : 'Service Provider',
+      serviceType: 'Home Cook Service',
+      totalAmount: baseTotal,
+      bookingDate: bookingType?.startDate || new Date().toISOString().split("T")[0],
+      persons: selectedPackages.reduce((sum, pkg) => sum + (pkg.persons || 1), 0),
+      message: result?.verifyResult?.message || "Booking & Payment Successful ✅"
+    });
 
-    // Clear cart and close dialogs
+    // ✅ Clear cart
     selectedPackages.forEach(pkg => {
       dispatch(removeFromCart({
         id: pkg.name.toUpperCase(),
@@ -491,19 +663,15 @@ const handleCheckout = async () => {
       }));
     });
 
-    if (sendDataToParent) {
-      sendDataToParent(BOOKINGS);
-    }
-    
-    setTimeout(() => {
-      setShowCartDialog(false);
-      onClose();
-    }, 2000);
+    // ✅ Close cart dialog and main dialog, then show success dialog
+    setShowCartDialog(false);
+    onClose();
+    setSuccessDialogOpen(true);
 
   } catch (error: any) {
     console.error('❌ Checkout error:', error);
     
-    // ✅ Enhanced error handling - matching your React web version
+    // ✅ Enhanced error handling
     let backendMessage = "Failed to initiate payment";
     
     if (error?.response?.data) {
@@ -535,9 +703,8 @@ const handleCheckout = async () => {
       }
     }
 
-    setSnackbarMessage(backendMessage);
-    setSnackbarSeverity("error");
-    setSnackbarVisible(true);
+    // Show error alert instead of snackbar
+    Alert.alert("Payment Failed", backendMessage);
   } finally {
     setLoading(false);
   }
@@ -729,6 +896,8 @@ const handleCheckout = async () => {
         </View>
       </View>
 
+
+
       {/* Cart Dialog */}
       {/* <CartDialog
         open={showCartDialog}
@@ -741,9 +910,15 @@ const handleCheckout = async () => {
   handleClose={() => setShowCartDialog(false)}
   handleCheckout={handleCheckout} // This should work now
 />
-
+<BookingSuccessDialog
+  open={successDialogOpen}
+  onClose={handleSuccessDialogClose}
+  bookingDetails={bookingSuccessDetails}
+  message={bookingSuccessDetails?.message}
+  onNavigateToBookings={handleNavigateToBookings}
+/>
       {/* Snackbar for notifications */}
-      <Modal
+      {/* <Modal
         visible={snackbarVisible}
         transparent
         animationType="fade"
@@ -760,7 +935,7 @@ const handleCheckout = async () => {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </Modal> */}
     </Modal>
   );
 };

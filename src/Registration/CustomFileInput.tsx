@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import Button from '../common/Button';
+import Button from '../Common/Button';
 
 // Define proper TypeScript interfaces for React Native file objects
 interface RNFile {

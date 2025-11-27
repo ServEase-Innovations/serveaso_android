@@ -18,8 +18,8 @@ import { useFieldValidation } from "../hooks/useFieldValidation";
 import ProfileImageUpload from "./ProfileImageUpload";
 import CustomFileInput from "./CustomFileInput";
 import AddressComponent from "./AddressComponent";
-import { TermsCheckboxes } from "../common/TermsCheckboxes";
-import Button from "../common/Button";
+import { TermsCheckboxes } from "../Common/TermsCheckboxes";
+import Button from "../Common/Button";
 import axiosInstance from "../services/axiosInstance";
 
 // Define proper file interface for React Native

@@ -37,6 +37,7 @@ import { useDispatch } from "react-redux";
 import { add } from "./src/features/pricingSlice";
 import MobileNumberDialog from "./src/UserProfile/MobileNumberDialog";
 import axiosInstance from "./src/services/axiosInstance";
+import Config from "react-native-config";
 
 interface Engagement {
   engagement_id: number;
@@ -73,6 +74,9 @@ const MainApp = () => {
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const socketRef = useRef<Socket | null>(null);
   const SOCKET_URL = "https://payments-j5id.onrender.com";
+
+  console.log("Loaded ENV =", Config.API_BASE_URL);
+  // console.log("UTILS BASE URL =", process.env.REACT_APP_UTLIS_URL);
 
   const dispatch = useDispatch();
   const { appUser } = useAppUser();
