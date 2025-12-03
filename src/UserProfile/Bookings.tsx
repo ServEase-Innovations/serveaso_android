@@ -35,6 +35,8 @@ import WalletDialog from './WalletDialog';
 import LinearGradient from 'react-native-linear-gradient';
 import PaymentInstance from '../services/paymentInstance';
 import { useAppUser } from '../context/AppUserContext';
+// Add this import at the top with other dialog imports
+import ServicesDialog from '../ServiceDialogs/ServicesDialog';
 
 
 // Implement Card component
@@ -394,6 +396,8 @@ const Booking: React.FC = () => {
   const [reviewedBookings, setReviewedBookings] = useState<number[]>([]);
   const [vacationManagementDialogOpen, setVacationManagementDialogOpen] = useState(false);
   const [selectedBookingForVacationManagement, setSelectedBookingForVacationManagement] = useState<Booking | null>(null);
+  // Add this state variable with other state declarations
+  const [servicesDialogOpen, setServicesDialogOpen] = useState(false);
 
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
@@ -1187,7 +1191,11 @@ const Booking: React.FC = () => {
               <Icon name="calendar" size={48} color="#9ca3af" />
               <Text style={styles.emptyStateTitle}>No Upcoming Bookings</Text>
               <Text style={styles.emptyStateText}>Ready to book your next service?</Text>
-              <Button style={styles.emptyStateButton}>
+              {/* Update the empty state button in the upcoming bookings section */}
+              <Button 
+                style={styles.emptyStateButton}
+                onPress={() => setServicesDialogOpen(true)}
+              >
                 <Text>Book a Service</Text>
               </Button>
             </Card>
@@ -1277,6 +1285,18 @@ const Booking: React.FC = () => {
       <WalletDialog 
         open={walletDialogOpen}
         onClose={() => setWalletDialogOpen(false)}
+      />
+
+      {/* Add the ServicesDialog component with other dialog components at the bottom */}
+      <ServicesDialog
+        open={servicesDialogOpen}
+        onClose={() => setServicesDialogOpen(false)}
+        onServiceSelect={(serviceType) => {
+          // Handle service selection
+          console.log('Selected service type:', serviceType);
+          // You can navigate to booking form or handle the selection
+          // Example: navigation.navigate('BookingForm', { serviceType });
+        }}
       />
 
       {/* Snackbar for notifications */}

@@ -19,7 +19,7 @@ import { BookingCard } from './BookingCard';
 import { PaymentHistory } from './PaymentHistory';
 import { useAuth0 } from 'react-native-auth0';
 import { AllBookingsDialog } from './AllBookingsDialog';
-import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from '../common/BookingUtils';
+// import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from '../common/BookingUtils';
 import axiosInstance from '../services/axiosInstance';
 import LinearGradient from 'react-native-linear-gradient';
 import { ReviewsDialog } from './ReviewDialog';
@@ -27,6 +27,7 @@ import axios, { AxiosResponse } from 'axios';
 import PaymentInstance from '../services/paymentInstance';
 import { useAppUser } from '../context/AppUserContext';
 import ProviderCalendarBig from './ProviderCalendarBig';
+// import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from '../common/BookingUtils';
 
 // Types for API response
 interface CustomerHoliday {
