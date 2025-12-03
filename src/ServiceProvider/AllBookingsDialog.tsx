@@ -12,10 +12,9 @@ import {
   DimensionValue
 } from "react-native";
 import { Calendar, MapPin, X } from "lucide-react-native";
-import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from "../common/BookingUtils";
+// import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from "./../common/BookingUtils";
 import PaymentInstance from "../services/paymentInstance";
 import dayjs from "dayjs";
-
 interface Booking {
   id: string;
   clientName: string;

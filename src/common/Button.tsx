@@ -1,142 +1,156 @@
+// src/components/ui/button.tsx
 import React from 'react';
 import {
   TouchableOpacity,
   Text,
+  View,
   StyleSheet,
+  TouchableOpacityProps,
+  ActivityIndicator,
   ViewStyle,
   TextStyle,
-  ActivityIndicator,
-  GestureResponderEvent,
 } from 'react-native';
 
-interface ButtonProps {
-  variant?: 'contained' | 'outlined' | 'text';
-  size?: 'small' | 'medium' | 'large';
+interface ButtonProps extends TouchableOpacityProps {
+  className?: string;
+  children: React.ReactNode;
+  startIcon?: React.ReactNode;
+  endIcon?: React.ReactNode;
   disabled?: boolean;
   loading?: boolean;
-  onPress: (event: GestureResponderEvent) => void;
-  style?: ViewStyle;
-  title: string;
-  testID?: string;
+  variant?: 'primary' | 'secondary' | 'outline';
+  size?: 'small' | 'medium' | 'large';
 }
 
-export const Button: React.FC<ButtonProps> = ({
-  variant = 'contained',
-  size = 'medium',
+export function Button({
+  className,
+  children,
+  startIcon,
+  endIcon,
   disabled = false,
   loading = false,
-  onPress,
+  variant = 'outline',
+  size = 'medium',
   style,
-  title,
-  testID,
-}) => {
-  const getButtonStyle = (): ViewStyle => {
-    const baseStyle: ViewStyle = {
-      paddingHorizontal: size === 'small' ? 12 : size === 'medium' ? 16 : 20,
-      paddingVertical: size === 'small' ? 8 : size === 'medium' ? 12 : 16,
-      borderRadius: 4,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'row',
-      minHeight: size === 'small' ? 36 : size === 'medium' ? 44 : 52,
-      opacity: disabled ? 0.6 : 1,
-    };
-
+  ...props
+}: ButtonProps) {
+  const getVariantStyles = (): { container: ViewStyle; text: TextStyle } => {
     switch (variant) {
-      case 'contained':
+      case 'primary':
         return {
-          ...baseStyle,
-          backgroundColor: '#1976d2',
-          borderWidth: 1,
-          borderColor: '#1976d2',
+          container: {
+            backgroundColor: disabled ? '#e5e7eb' : '#1d4ed8',
+            borderColor: disabled ? '#d1d5db' : '#1d4ed8',
+          },
+          text: {
+            color: disabled ? '#6b7280' : '#ffffff',
+          },
         };
-      case 'outlined':
+      case 'secondary':
         return {
-          ...baseStyle,
-          backgroundColor: 'transparent',
-          borderWidth: 1,
-          borderColor: '#1976d2',
+          container: {
+            backgroundColor: disabled ? '#e5e7eb' : '#f3f4f6',
+            borderColor: disabled ? '#d1d5db' : '#f3f4f6',
+          },
+          text: {
+            color: disabled ? '#6b7280' : '#374151',
+          },
         };
-      case 'text':
-        return {
-          ...baseStyle,
-          backgroundColor: 'transparent',
-          borderWidth: 0,
-        };
+      case 'outline':
       default:
-        return baseStyle;
+        return {
+          container: {
+            backgroundColor: disabled ? '#e5e7eb' : 'transparent',
+            borderColor: disabled ? '#d1d5db' : '#1d4ed8',
+          },
+          text: {
+            color: disabled ? '#6b7280' : '#1d4ed8',
+          },
+        };
     }
   };
 
-  const getTextStyle = (): TextStyle => {
-    const baseStyle: TextStyle = {
-      fontSize: size === 'small' ? 14 : size === 'medium' ? 16 : 18,
-      fontWeight: '500',
-      textAlign: 'center',
-    };
-
-    switch (variant) {
-      case 'contained':
-        return {
-          ...baseStyle,
-          color: '#ffffff',
-        };
-      case 'outlined':
-        return {
-          ...baseStyle,
-          color: '#1976d2',
-        };
-      case 'text':
-        return {
-          ...baseStyle,
-          color: '#1976d2',
-        };
+  const getSizeStyles = () => {
+    switch (size) {
+      case 'small':
+        return { paddingHorizontal: 12, paddingVertical: 6, fontSize: 14 };
+      case 'large':
+        return { paddingHorizontal: 20, paddingVertical: 12, fontSize: 16 };
+      case 'medium':
       default:
-        return baseStyle;
+        return { paddingHorizontal: 16, paddingVertical: 8, fontSize: 15 };
     }
   };
 
-  const getSpinnerColor = (): string => {
-    switch (variant) {
-      case 'contained':
-        return '#ffffff';
-      case 'outlined':
-      case 'text':
-        return '#1976d2';
-      default:
-        return '#ffffff';
-    }
-  };
+  const variantStyles = getVariantStyles();
+  const sizeStyles = getSizeStyles();
 
   return (
     <TouchableOpacity
-      style={[getButtonStyle(), style]}
-      onPress={onPress}
       disabled={disabled || loading}
-      testID={testID}
+      style={[
+        styles.baseContainer,
+        variantStyles.container,
+        {
+          paddingHorizontal: sizeStyles.paddingHorizontal,
+          paddingVertical: sizeStyles.paddingVertical,
+          opacity: disabled ? 0.5 : 1,
+        },
+        style,
+      ]}
       activeOpacity={0.7}
+      {...props}
     >
-      {loading && (
+      {loading ? (
         <ActivityIndicator
+          color={variantStyles.text.color}
           size="small"
-          color={getSpinnerColor()}
-          style={styles.spinner}
+          style={styles.loader}
         />
+      ) : (
+        <View style={styles.content}>
+          {startIcon && <View style={styles.iconStart}>{startIcon}</View>}
+          <Text
+            style={[
+              styles.baseText,
+              variantStyles.text,
+              { fontSize: sizeStyles.fontSize },
+            ]}
+          >
+            {children}
+          </Text>
+          {endIcon && <View style={styles.iconEnd}>{endIcon}</View>}
+        </View>
       )}
-      <Text style={[getTextStyle(), loading && styles.textWithSpinner]}>
-        {title}
-      </Text>
     </TouchableOpacity>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  spinner: {
-    marginRight: 8,
+  baseContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 44,
   },
-  textWithSpinner: {
-    marginLeft: 0,
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  baseText: {
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  iconStart: {
+    marginRight: 4,
+  },
+  iconEnd: {
+    marginLeft: 4,
+  },
+  loader: {
+    marginHorizontal: 8,
   },
 });
-
-export default Button;

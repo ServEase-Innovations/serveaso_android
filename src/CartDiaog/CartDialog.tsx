@@ -13,7 +13,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { removeFromCart, selectCartItems, updateCartItem } from '../features/addToSlice';
 import { CartItem, isMaidCartItem, isMealCartItem, isNannyCartItem } from '../types/cartSlice';
-import { TermsCheckboxes } from '../common/TermsCheckboxes';
+import { TermsCheckboxes } from '../Common/TermsCheckboxes';
+// import { TermsCheckboxes } from '../common/TermsCheckboxes';
 
 interface CartDialogProps {
   open: boolean;
