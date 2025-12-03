@@ -1,5 +1,8 @@
 name: Android Manual Build & Firebase Distribution
 
+# -----------------------------------------
+# ONLY manual trigger — no auto build
+# -----------------------------------------
 on:
   workflow_dispatch:
     inputs:
@@ -15,22 +18,23 @@ on:
           - production
 
 jobs:
-  build-android:
+  ci-build:
     runs-on: ubuntu-latest
 
     steps:
-      # ------------------------------------------------------
+
+      # -------------------------------
       # CHECKOUT SELECTED BRANCH
-      # ------------------------------------------------------
+      # -------------------------------
       - name: Checkout selected branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.inputs.branch }}
 
-      # ------------------------------------------------------
-      # GLOBAL GRADLE MEMORY FIX
-      # ------------------------------------------------------
+      # -------------------------------
+      # FIX GRADLE MEMORY ISSUES
+      # -------------------------------
       - name: Configure Global Gradle Memory
         run: |
           mkdir -p ~/.gradle
@@ -42,9 +46,9 @@ jobs:
           android.useFullClasspathForDexingTransform=true
           EOF
 
-      # ------------------------------------------------------
+      # -------------------------------
       # KEYSTORE SETUP
-      # ------------------------------------------------------
+      # -------------------------------
       - name: Decode Android Keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
@@ -58,18 +62,18 @@ jobs:
           MYAPP_UPLOAD_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}
           EOF
 
-      # ------------------------------------------------------
-      # JAVA SETUP
-      # ------------------------------------------------------
+      # -------------------------------
+      # SETUP JAVA
+      # -------------------------------
       - name: Set up Java 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
 
-      # ------------------------------------------------------
+      # -------------------------------
       # AUTO VERSIONING
-      # ------------------------------------------------------
+      # -------------------------------
       - name: Auto Versioning
         id: version
         run: |
@@ -85,55 +89,44 @@ jobs:
           sed -i "s/versionCode .*/versionCode $VERSION_CODE/" android/app/build.gradle
           sed -i "s/versionName .*/versionName \"$VERSION_NAME\"/" android/app/build.gradle
 
-      # ------------------------------------------------------
-      # NODE SETUP
-      # ------------------------------------------------------
+      # -------------------------------
+      # NODE SETUP + DEPS
+      # -------------------------------
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Install dependencies
+      - name: Install Node dependencies
         run: npm install
 
-      # ------------------------------------------------------
-      # BUILD RELEASE APK
-      # ------------------------------------------------------
+      # -------------------------------
+      # BUILD APK
+      # -------------------------------
       - name: Build Release APK
         run: |
           cd android
           ./gradlew assembleRelease --stacktrace
 
-      # ------------------------------------------------------
-      # UPLOAD ARTIFACT
-      # ------------------------------------------------------
+      # -------------------------------
+      # UPLOAD APK ARTIFACT
+      # -------------------------------
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
 
-      # ------------------------------------------------------
+      # -------------------------------
       # FIREBASE DISTRIBUTION
-      # ------------------------------------------------------
-      - name: Distribute to Firebase App Distribution
-        run: |
-          # Write service account JSON file
-          printf '%s' "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > service-account.json
-
-          # Authenticate using GOOGLE_APPLICATION_CREDENTIALS
-          export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/service-account.json"
-
-          npm install -g firebase-tools
-
-          # Validate auth
-          firebase apps:list --project "${{ secrets.FIREBASE_PROJECT_ID }}"
-
-          # Distribute to testers OR groups
-          firebase appdistribution:distribute "android/app/build/outputs/apk/release/app-release.apk" \
-            --app "${{ secrets.FIREBASE_APP_ID }}" \
-            --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
-            --groups "${{ secrets.FIREBASE_GROUP }}" \
-            --testers "${{ secrets.FIREBASE_TESTERS }}" \
-            --release-notes "Build ${{ env.VERSION_NAME }}" \
-            --notify
+      # USING OFFICIAL ACTION
+      # -------------------------------
+      - name: Send APK to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          appId: ${{ secrets.FIREBASE_APP_ID }}
+          testers: ${{ secrets.FIREBASE_TESTERS }}
+          groups: ${{ secrets.FIREBASE_GROUPS }}
+          releaseNotes: "Build ${{ env.VERSION_NAME }}"
+          file: "android/app/build/outputs/apk/release/app-release.apk"
