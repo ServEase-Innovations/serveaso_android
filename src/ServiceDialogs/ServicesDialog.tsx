@@ -20,6 +20,9 @@ import CookServicesDialog from '../ServiceDialogs/CookServiceDialog';
 import MaidServiceDialog from '../ServiceDialogs/MaidServiceDialog';
 import NannyServicesDialog from '../ServiceDialogs/NannyServiceDialog';
 
+// Import DETAILS constant
+import { DETAILS } from '../Constants/pagesConstants';
+
 // Import local images - same as in HomePage
 const cookImage = require("../../assets/images/Cooknew.png");
 const maidImage = require("../../assets/images/Maidnew.png");
@@ -57,7 +60,7 @@ const ServicesDialog: React.FC<ServicesDialogProps> = ({
   const [selectedType, setSelectedType] = useState<'COOK' | 'MAID' | 'NANNY' | ''>('');
   const [selectedService, setSelectedService] = useState('');
 
-  const [selectedOption, setSelectedOption] = useState<string>("Date"); // Changed from "Date" to empty string
+  const [selectedOption, setSelectedOption] = useState<string>("Date");
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
   const [startTime, setStartTime] = useState<dayjs.Dayjs | null>(null);
@@ -94,15 +97,17 @@ const ServicesDialog: React.FC<ServicesDialogProps> = ({
     }
   };
 
-  // HANDLE BOOKING SAVE - SIMILAR TO HOMEPAGE
+  // HANDLE BOOKING SAVE - UPDATED TO MATCH REACT CODE
   const handleBookingSave = (bookingDetails: any) => {
     console.log("📝 handleBookingSave called with:", bookingDetails);
     
+    // Helper functions to format date and time
     const formatDate = (value: any) => {
       if (!value) return "";
-      const date = new Date(value);
-      if (isNaN(date.getTime())) return value;
-      return date.toISOString().split("T")[0];
+      if (typeof value === 'string') {
+        return value.split("T")[0];
+      }
+      return "";
     };
 
     const formatTime = (value: any) => {
@@ -110,27 +115,22 @@ const ServicesDialog: React.FC<ServicesDialogProps> = ({
       
       console.log("🔧 formatTime input:", value, typeof value);
       
-      // If it's a dayjs object, use it directly
+      // If it's a dayjs object
       if (value && typeof value === 'object' && value.format) {
-        console.log("📅 Using dayjs format");
         return value.format("HH:mm");
       }
       
       // If it's a Date object
       if (value instanceof Date) {
-        console.log("📅 Using Date object");
         return value.toTimeString().slice(0, 5);
       }
       
-      // If it's already a string, clean it up
+      // If it's already a string
       if (typeof value === 'string') {
-        console.log("📅 Processing string time:", value);
-        
         let timeStr = value.trim();
         
         // Handle 12-hour format with AM/PM
         if (timeStr.includes('AM') || timeStr.includes('PM')) {
-          console.log("🕒 Converting 12-hour to 24-hour format");
           const [timePart, period] = timeStr.split(/\s+/);
           let [hours, minutes] = timePart.split(':').map(Number);
           
@@ -140,41 +140,53 @@ const ServicesDialog: React.FC<ServicesDialogProps> = ({
             hours = 0;
           }
           
-          const result = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          console.log("🔄 Converted:", timeStr, "→", result);
-          return result;
+          return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         }
         
-        // If it's already in 24-hour format, clean and return
-        const cleaned = timeStr.replace(/\s+/g, '');
-        console.log("🧹 Cleaned time:", timeStr, "→", cleaned);
-        return cleaned;
+        return timeStr.replace(/\s+/g, '');
       }
       
-      console.log("❌ Unhandled time format");
       return "";
     };
 
+    // NEW LOGIC: Create booking object matching React code structure
+    let timeRange = "";
+    let timeSlot = "";
+
+    if (selectedOption === "Date") {
+      timeRange = `${formatTime(bookingDetails.startTime) || ""}-${formatTime(bookingDetails.endTime) || ""}`;
+      timeSlot = `${formatTime(bookingDetails.startTime) || ""}-${formatTime(bookingDetails.endTime) || ""}`;
+    } else if (selectedOption === "Short term") {
+      timeRange = formatTime(bookingDetails.startTime) || "";
+      timeSlot = `${formatTime(bookingDetails.startTime) || ""}-${formatTime(bookingDetails.endTime) || ""}`;
+    } else {
+      timeRange = formatTime(bookingDetails.startTime) || "";
+      timeSlot = formatTime(bookingDetails.startTime) || "";
+    }
+
     const booking = {
-      start_date: formatDate(bookingDetails.startDate),
-      start_time: formatTime(bookingDetails.startTime),
-      end_date: formatDate(bookingDetails.endDate || bookingDetails.startDate),
-      end_time: formatTime(bookingDetails.endTime),
-      timeRange:
-        bookingDetails.startTime && bookingDetails.endTime
-          ? `${formatTime(bookingDetails.startTime)} - ${formatTime(bookingDetails.endTime)}`
-          : formatTime(bookingDetails.startTime) || "",
+      startDate: formatDate(bookingDetails.startDate),
+      endDate: formatDate(bookingDetails.endDate || bookingDetails.startDate),
+      timeRange: timeRange,
       bookingPreference: selectedOption,
       housekeepingRole: selectedType,
+      startTime: formatTime(bookingDetails.startTime),
+      endTime: formatTime(bookingDetails.endTime),
+      timeSlot: timeSlot
     };
 
-    console.log("✅ Final booking object:", JSON.stringify(booking, null, 2));
+    console.log("✅ Final booking object (React Native):", JSON.stringify(booking, null, 2));
 
+    // Dispatch booking to Redux - match React code
+    dispatch(addBooking(booking));
+    
     // Close booking dialog
     setBookingDialogOpen(false);
 
-    // OPEN SERVICE-SPECIFIC DIALOG BASED ON SELECTED TYPE (like HomePage)
+    // Handle navigation based on booking type - match React code logic
     if (selectedOption === "Date") {
+      console.log("Opening service-specific dialog for Date booking");
+      // Open appropriate service dialog
       switch (selectedType) {
         case "COOK":
           setShowCookDialog(true);
@@ -185,18 +197,76 @@ const ServicesDialog: React.FC<ServicesDialogProps> = ({
         case "NANNY":
           setShowNannyServicesDialog(true);
           break;
-        default:
-          if (sendDataToParent) {
-            sendDataToParent('DETAILS');
-          }
       }
     } else {
+      console.log(`Non-Date booking (${selectedOption}), navigating to ${DETAILS}`);
       if (sendDataToParent) {
-        sendDataToParent('DETAILS');
+        sendDataToParent(DETAILS);
+      } else {
+        console.error("sendDataToParent is undefined in handleBookingSave");
       }
     }
+  };
 
-    dispatch(add(booking));
+  // NEW FUNCTION: Handle service dialog close - match React code
+  const handleServiceDialogClose = () => {
+    console.log("handleServiceDialogClose called");
+    setShowCookDialog(false);
+    setShowMaidServiceDialog(false);
+    setShowNannyServicesDialog(false);
+    
+    // Always navigate to DETAILS after service dialog closes
+    if (sendDataToParent) {
+      console.log("Calling sendDataToParent(DETAILS) from handleServiceDialogClose");
+      sendDataToParent(DETAILS);
+    } else {
+      console.error("ERROR: sendDataToParent is undefined in handleServiceDialogClose");
+    }
+  };
+
+  // FIXED: Create proper booking type object to pass to service dialogs
+  const getBookingType = () => {
+    // Create a booking type object similar to HomePage
+    const formatDateForBooking = (date: string | null) => {
+      if (!date) return "";
+      try {
+        return new Date(date).toISOString().split("T")[0];
+      } catch {
+        return "";
+      }
+    };
+
+    const formatTimeForBooking = (time: dayjs.Dayjs | null) => {
+      if (!time) return "";
+      try {
+        return time.format("HH:mm");
+      } catch {
+        return "";
+      }
+    };
+
+    // Create time range string
+    let timeRange = "";
+    if (startTime && endTime) {
+      timeRange = `${formatTimeForBooking(startTime)} - ${formatTimeForBooking(endTime)}`;
+    } else if (startTime) {
+      timeRange = formatTimeForBooking(startTime);
+    }
+
+    return {
+      startDate: formatDateForBooking(startDate),
+      endDate: formatDateForBooking(endDate || startDate),
+      timeRange: timeRange,
+      bookingPreference: selectedOption,
+      housekeepingRole: selectedType,
+      // Add all expected properties to avoid undefined errors
+      startTime: formatTimeForBooking(startTime),
+      endTime: formatTimeForBooking(endTime),
+      start_date: formatDateForBooking(startDate),
+      start_time: formatTimeForBooking(startTime),
+      end_date: formatDateForBooking(endDate || startDate),
+      end_time: formatTimeForBooking(endTime)
+    };
   };
 
   // HANDLE OPTION CHANGE - SIMILAR TO HOMEPAGE
@@ -210,15 +280,17 @@ const ServicesDialog: React.FC<ServicesDialogProps> = ({
     setEndTime(null);
   };
 
-  // HANDLE SERVICE DIALOG CLOSE
-  const handleServiceDialogClose = () => {
-    setShowCookDialog(false);
-    setShowMaidServiceDialog(false);
-    setShowNannyServicesDialog(false);
-    
-    if (sendDataToParent) {
-      sendDataToParent('DETAILS');
-    }
+  // NEW FUNCTION: Handle booking dialog close - match React code
+  const handleBookingDialogClose = () => {
+    console.log("Booking dialog closed");
+    setBookingDialogOpen(false);
+    // Reset states when booking dialog is closed without saving
+    setSelectedType('');
+    setSelectedOption("Date");
+    setStartDate(null);
+    setEndDate(null);
+    setStartTime(null);
+    setEndTime(null);
   };
 
   // Theme colors
@@ -350,11 +422,7 @@ const ServicesDialog: React.FC<ServicesDialogProps> = ({
                           styles.selectButton,
                           { backgroundColor: service.accentColor }
                         ]}
-                        onPress={(e) => {
-                          // Prevent card click from also triggering
-                          e.stopPropagation();
-                          handleServiceSelect(service.id);
-                        }}
+                        onPress={() => handleServiceSelect(service.id)}
                         activeOpacity={0.8}
                       >
                         <Text style={styles.buttonText}>
@@ -370,18 +438,10 @@ const ServicesDialog: React.FC<ServicesDialogProps> = ({
         </View>
       </Modal>
 
-      {/* Booking Dialog - SIMILAR TO HOMEPAGE */}
+      {/* Booking Dialog - Updated to use new handler */}
       <BookingDialog
         open={bookingDialogOpen}
-        onClose={() => {
-          setBookingDialogOpen(false);
-          // Reset states when closing
-          setSelectedOption("Date");
-          setStartDate(null);
-          setEndDate(null);
-          setStartTime(null);
-          setEndTime(null);
-        }}
+        onClose={handleBookingDialogClose}
         onSave={handleBookingSave}
         selectedOption={selectedOption}
         onOptionChange={handleOptionChange}
@@ -395,107 +455,44 @@ const ServicesDialog: React.FC<ServicesDialogProps> = ({
         setEndTime={setEndTime}
       />
 
-      {/* Service Dialogs - SIMILAR TO HOMEPAGE */}
+      {/* Service Dialogs - UPDATED TO MATCH HOMEPAGE PATTERN EXACTLY */}
+      
+      {/* CookServicesDialog - uses onClose prop (no open prop) */}
       {showCookDialog && (
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogBox}>
             <CookServicesDialog
-              open={showCookDialog}
-              handleClose={() => {
-                setShowCookDialog(false);
-                if (sendDataToParent) {
-                  sendDataToParent('DETAILS');
-                }
-              }}
+              onClose={handleServiceDialogClose}
               sendDataToParent={sendDataToParent}
-              bookingType={{
-                start_date: startDate ? new Date(startDate).toISOString().split("T")[0] : "",
-                start_time: startTime ? startTime.format("HH:mm") : "",
-                end_date: endDate
-                  ? new Date(endDate).toISOString().split("T")[0]
-                  : startDate
-                  ? new Date(startDate).toISOString().split("T")[0]
-                  : "",
-                end_time: endTime ? endTime.format("HH:mm") : "",
-                timeRange:
-                  startTime && endTime
-                    ? `${startTime.format("HH:mm")} - ${endTime.format("HH:mm")}`
-                    : startTime
-                    ? startTime.format("HH:mm")
-                    : "",
-                bookingPreference: selectedOption,
-                housekeepingRole: selectedType,
-              }}
+              bookingType={getBookingType()}
             />
           </View>
         </View>
       )}
 
+      {/* NannyServicesDialog - uses open and handleClose props */}
       {showNannyServicesDialog && (
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogBox}>
             <NannyServicesDialog
               open={showNannyServicesDialog}
-              handleClose={() => {
-                setShowNannyServicesDialog(false);
-                if (sendDataToParent) {
-                  sendDataToParent('DETAILS');
-                }
-              }}
+              handleClose={handleServiceDialogClose}
               sendDataToParent={sendDataToParent}
-              bookingType={{
-                start_date: startDate ? new Date(startDate).toISOString().split("T")[0] : "",
-                start_time: startTime ? startTime.format("HH:mm") : "",
-                end_date: endDate
-                  ? new Date(endDate).toISOString().split("T")[0]
-                  : startDate
-                  ? new Date(startDate).toISOString().split("T")[0]
-                  : "",
-                end_time: endTime ? endTime.format("HH:mm") : "",
-                timeRange:
-                  startTime && endTime
-                    ? `${startTime.format("HH:mm")} - ${endTime.format("HH:mm")}`
-                    : startTime
-                    ? startTime.format("HH:mm")
-                    : "",
-                bookingPreference: selectedOption,
-                housekeepingRole: selectedType,
-              }}
+              bookingType={getBookingType()}
             />
           </View>
         </View>
       )}
 
+      {/* MaidServiceDialog - uses open and handleClose props */}
       {showMaidServiceDialog && (
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogBox}>
             <MaidServiceDialog
               open={showMaidServiceDialog}
-              handleClose={() => {
-                setShowMaidServiceDialog(false);
-                if (sendDataToParent) {
-                  sendDataToParent('DETAILS');
-                }
-              }}
+              handleClose={handleServiceDialogClose}
               sendDataToParent={sendDataToParent}
-              bookingType={{
-                start_date: startDate ? new Date(startDate).toISOString().split("T")[0] : "",
-                start_time: startTime ? startTime.format("HH:mm") : "",
-                end_date: endDate
-                  ? new Date(endDate).toISOString().split("T")[0]
-                  : startDate
-                  ? new Date(startDate).toISOString().split("T")[0]
-                  : "",
-                end_time: endTime ? endTime.format("HH:mm") : "",
-                timeRange:
-                  startTime && endTime
-                    ? `${startTime.format("HH:mm")} - ${endTime.format("HH:mm")}`
-                    : startTime
-                    ? startTime.format("HH:mm")
-                    : "",
-                bookingPreference: selectedOption,
-                housekeepingRole: selectedType,
-              }}
+              bookingType={getBookingType()}
             />
           </View>
         </View>
@@ -544,6 +541,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
     zIndex: 1300,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   closeButtonMobile: {
     width: 32,
@@ -660,7 +658,7 @@ const styles = StyleSheet.create({
   },
 });
 
-// Helper function for alpha colors - move this outside component
+// Helper function for alpha colors
 const alpha = (color: string, opacity: number) => {
   if (color.startsWith('rgb')) {
     const rgb = color.match(/\d+/g);
