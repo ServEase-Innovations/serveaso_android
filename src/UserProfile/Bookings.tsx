@@ -212,7 +212,7 @@ const getStatusBadge = (status: string) => {
       return (
         <Badge style={styles.notStartedBadge}>
           <Icon name="clock" size={14} color="#6b7280" />
-          <Text style={styles.notStartedBadgeText}>NOT_STARTED</Text>
+          <Text style={styles.notStartedBadgeText}>Not Started</Text>
         </Badge>
       );
     default:
@@ -371,6 +371,17 @@ const formatTimeToAMPM = (timeString: string): string => {
 
 const formatTimeRange = (startTime: string, endTime: string): string => {
   return `${formatTimeToAMPM(startTime)} - ${formatTimeToAMPM(endTime)}`;
+};
+
+const formatDateForDisplay = (dateString: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
 };
 
 const Booking: React.FC = () => {
@@ -957,7 +968,7 @@ const Booking: React.FC = () => {
     { value: 'CANCELLED', label: 'Cancelled', count: upcomingBookings.filter(b => b.taskStatus === 'CANCELLED').length },
   ];
 
-  // Improved renderBookingItem with new action buttons logic
+  // UPDATED: Improved renderBookingItem with new structured layout
   const renderBookingItem = ({ item }: { item: Booking }) => {
     const serviceType = item.serviceType || item.service_type;
     const hasModifications = item.modifications && item.modifications.length > 0;
@@ -965,8 +976,9 @@ const Booking: React.FC = () => {
     
     return (
       <Card style={styles.bookingCard}>
-        <View style={styles.cardHeader}>
-          <View style={styles.serviceInfo}>
+        {/* First Line: Service Title with Logo and Status Badges */}
+        <View style={styles.firstLineContainer}>
+          <View style={styles.serviceTitleContainer}>
             <Icon 
               name={getServiceIcon(serviceType)} 
               size={24} 
@@ -975,101 +987,133 @@ const Booking: React.FC = () => {
                 serviceType === 'cleaning' ? '#ec4899' : 
                 serviceType === 'nanny' ? '#ef4444' : '#000'
               } 
+              style={styles.serviceIcon}
             />
-            <View>
-              <Text style={styles.serviceTitle}>{getServiceTitle(serviceType)}</Text>
-              <Text style={styles.bookingId}>Booking #{item.id}</Text>
-            </View>
+            <Text style={styles.serviceTitle}>{getServiceTitle(serviceType)}</Text>
           </View>
-          <View style={styles.badgeContainer}>
+          <View style={styles.statusBadgesContainer}>
             {getBookingTypeBadge(item.bookingType)}
             {getStatusBadge(item.taskStatus)}
-            {hasModifications && (
-              <Badge style={styles.modifiedBadge}>
-                <Text style={styles.modifiedBadgeText}>Modified</Text>
-              </Badge>
-            )}
           </View>
         </View>
 
-        <View style={styles.cardContent}>
-          <View style={styles.bookingDetails}>
-            <View style={styles.detailRow}>
-              <Icon name="calendar" size={18} color="#6b7280" />
-              <Text style={styles.detailText}>
-                {formatDate(item.date)}
-                {hasModifications && (
-                  <Text style={styles.rescheduledText}> (Rescheduled)</Text>
-                )}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Icon name="clock" size={18} color="#6b7280" />
-              <Text style={styles.detailText}>
-                {formatTimeRange(item.start_time, item.end_time)}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Icon name="map-marker" size={18} color="#6b7280" />
-              <Text style={styles.detailText}>{item.address}</Text>
-            </View>
-
-            {/* Show modification details if available */}
-            {modificationDetails ? (
-              <View style={styles.modificationDetails}>
-                <Text style={styles.modificationText}>{modificationDetails}</Text>
-              </View>
-            ) : null}
+        {/* Second Line: Booking ID and Booking Date */}
+        <View style={styles.secondLineContainer}>
+          <View style={styles.bookingIdContainer}>
+            <Icon name="tag" size={16} color="#6b7280" />
+            <Text style={styles.bookingIdText}>Booking #{item.id}</Text>
           </View>
-
-          <View style={styles.providerInfo}>
-            <View>
-              <Text style={styles.providerName}>{item.serviceProviderName}</Text>
-              <View style={styles.ratingContainer}>
-                <Icon name="star" size={16} color="#f59e0b" />
-                <Text style={styles.ratingText}>{4.5}</Text>
-              </View>
-            </View>
-            <Text style={styles.priceText}>₹{item.monthlyAmount}</Text>
+          <View style={styles.bookingDateContainer}>
+            <Icon name="calendar" size={16} color="#6b7280" />
+            <Text style={styles.bookingDateText}>{formatDateForDisplay(item.date)}</Text>
           </View>
-          
-          {item.responsibilities && (
-            <View style={styles.responsibilitiesContainer}>
-              <Text style={styles.responsibilitiesTitle}>Responsibilities:</Text>
-              <View style={styles.responsibilitiesList}>
-                {[
-                  ...(item.responsibilities.tasks || []).map(task => ({ task, isAddon: false })),
-                  ...(item.responsibilities.add_ons || []).map(task => ({ task, isAddon: true })),
-                ].map((item: any, index: number) => {
-                  const { task, isAddon } = item;
-
-                  const taskLabel =
-                    typeof task === "object" && task !== null
-                      ? Object.entries(task)
-                          .filter(([key]) => key !== "taskType")
-                          .map(([key, value]) => `${value} ${key}`)
-                          .join(", ")
-                      : "";
-
-                  const taskName = typeof task === "object" ? task.taskType : task;
-
-                  return (
-                    <View key={index} style={styles.responsibilityBadge}>
-                      <Text style={styles.responsibilityText}>
-                        {isAddon ? "Add-ons - " : ""}
-                        {taskName} {taskLabel && `- ${taskLabel}`}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          )}
         </View>
+
+        {/* Third Line: Time and Address */}
+        <View style={styles.thirdLineContainer}>
+          <View style={styles.timeContainer}>
+            <Icon name="clock" size={16} color="#6b7280" />
+            <Text style={styles.timeText}>
+              {formatTimeRange(item.start_time, item.end_time)}
+            </Text>
+          </View>
+          <View style={styles.addressContainer}>
+            <Icon name="map-marker" size={16} color="#6b7280" />
+            <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text>
+          </View>
+        </View>
+
+        {/* Fourth Line: Provider Rating, Responsibilities, and Amount */}
+        <View style={styles.fourthLineContainer}>
+          <View style={styles.providerRatingContainer}>
+            <View style={styles.ratingRow}>
+              <Icon name="account" size={16} color="#6b7280" />
+              <Text style={styles.providerNameText} numberOfLines={1}>
+                {item.serviceProviderName}
+              </Text>
+            </View>
+            <View style={styles.ratingRow}>
+              <Icon name="star" size={16} color="#f59e0b" />
+              <Text style={styles.ratingText}>4.5</Text>
+            </View>
+          </View>
+
+        {item.responsibilities && (
+  <View style={styles.responsibilitiesContainer}>
+    <Text style={styles.responsibilitiesTitle}>Responsibilities:</Text>
+    <View style={styles.responsibilitiesList}>
+      {[
+        ...(item.responsibilities.tasks || []).map(task => ({ task, isAddon: false })),
+        ...(item.responsibilities.add_ons || []).map(task => ({ task, isAddon: true })),
+      ].slice(0, 2).map((item: any, index: number) => {
+        const { task, isAddon } = item;
+        const taskLabel =
+          typeof task === "object" && task !== null
+            ? Object.entries(task)
+                .filter(([key]) => key !== "taskType")
+                .map(([key, value]) => `${value} ${key}`)
+                .join(", ")
+            : "";
+        const taskName = typeof task === "object" ? task.taskType : task;
+
+        return (
+          <View key={index} style={styles.responsibilityBadge}>
+            <Text style={styles.responsibilityText}>
+              {isAddon ? "Add-ons - " : ""}
+              {taskName} {taskLabel && `- ${taskLabel}`}
+            </Text>
+          </View>
+        );
+      })}
+      {/* Safe calculation of more items */}
+      {(() => {
+        const tasksCount = item.responsibilities?.tasks?.length || 0;
+        const addonsCount = item.responsibilities?.add_ons?.length || 0;
+        const totalCount = tasksCount + addonsCount;
+        
+        if (totalCount > 2) {
+          return (
+            <View style={styles.moreResponsibilitiesBadge}>
+              <Text style={styles.moreResponsibilitiesText}>
+                +{totalCount - 2} more
+              </Text>
+            </View>
+          );
+        }
+        return null;
+      })()}
+    </View>
+  </View>
+)}
+
+          <View style={styles.amountContainer}>
+            <Text style={styles.amountText}>₹{item.monthlyAmount}</Text>
+            <Text style={styles.amountLabel}>Total Amount</Text>
+          </View>
+        </View>
+
+        {/* Show modification details if available */}
+        {modificationDetails ? (
+          <View style={styles.modificationContainer}>
+            <Icon name="information" size={16} color="#6b7280" />
+            <Text style={styles.modificationText}>{modificationDetails}</Text>
+          </View>
+        ) : null}
+
+        {/* Vacation Details if available */}
+        {item.hasVacation && item.vacationDetails && (
+          <View style={styles.vacationContainer}>
+            <Icon name="beach" size={16} color="#3b82f6" />
+            <Text style={styles.vacationText}>
+              Vacation: {item.vacationDetails.leave_start_date} to {item.vacationDetails.leave_end_date}
+            </Text>
+          </View>
+        )}
 
         <Separator style={styles.separator} />
 
-        <View style={styles.actionButtons}>
+        {/* Action Buttons */}
+        <View style={styles.actionButtonsContainer}>
           {renderActionButtons(item)}
         </View>
       </Card>
@@ -1312,8 +1356,9 @@ const Booking: React.FC = () => {
   );
 };
 
-// Updated Styles with new styles for modification features
+// UPDATED: Complete Styles with new structured layout
 const styles = StyleSheet.create({
+  // Basic Components
   card: {
     backgroundColor: '#fff',
     borderRadius: 8,
@@ -1323,6 +1368,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     marginBottom: 16,
+    padding: 16,
   },
   button: {
     backgroundColor: '#fff',
@@ -1352,8 +1398,10 @@ const styles = StyleSheet.create({
   separatorBase: {
     height: 1,
     backgroundColor: '#e5e7eb',
-    marginVertical: 8,
+    marginVertical: 12,
   },
+
+  // Container
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
@@ -1367,6 +1415,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     color: '#4b5563',
   },
+
+  // Header
   header: {
     padding: 16,
     borderBottomWidth: 1,
@@ -1425,6 +1475,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
+
+  // Sections
   section: {
     padding: 16,
   },
@@ -1472,6 +1524,8 @@ const styles = StyleSheet.create({
   pastBadgeText: {
     color: '#6b7280',
   },
+
+  // Status Filter Tabs
   statusFilterContainer: {
     marginBottom: 16,
   },
@@ -1506,81 +1560,221 @@ const styles = StyleSheet.create({
     color: '#4b5563',
     fontWeight: '600',
   },
+
+  // Booking Card Layout
   bookingCard: {
     marginBottom: 16,
     borderRadius: 8,
     overflow: 'hidden',
   },
-  cardHeader: {
+
+  // First Line: Service Title and Status Badges
+  firstLineContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 16,
-    paddingBottom: 0,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  serviceInfo: {
+  serviceTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+  },
+  serviceIcon: {
+    marginRight: 8,
   },
   serviceTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginLeft: 12,
+    color: '#111827',
   },
-  bookingId: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginLeft: 12,
-  },
-  badgeContainer: {
+  statusBadgesContainer: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
   },
-  cardContent: {
-    padding: 16,
+
+  // Second Line: Booking ID and Booking Date
+  secondLineContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
-  bookingDetails: {
+  bookingIdContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  detailText: {
-    marginLeft: 8,
-    color: '#4b5563',
-  },
-  providerInfo: {
-    alignItems: 'flex-end',
-  },
-  providerName: {
-    fontWeight: '500',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  ratingText: {
-    marginLeft: 4,
-    fontSize: 12,
+  bookingIdText: {
+    marginLeft: 6,
+    fontSize: 14,
     color: '#6b7280',
   },
-  priceText: {
+  bookingDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 2,
+    justifyContent: 'flex-end',
+  },
+  bookingDateText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'right',
+  },
+
+  // Third Line: Time and Address
+  thirdLineContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  timeText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  addressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 2,
+    justifyContent: 'flex-end',
+  },
+  addressText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#6b7280',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+
+  // Fourth Line: Provider Rating, Responsibilities, and Amount
+  fourthLineContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  providerRatingContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  providerNameText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#4b5563',
+    flexShrink: 1,
+  },
+  ratingText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#f59e0b',
+  },
+  responsibilitiesContainer: {
+    flex: 2,
+    marginHorizontal: 8,
+  },
+  responsibilitiesTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  responsibilitiesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  responsibilityBadge: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  responsibilityText: {
+    fontSize: 10,
+    color: '#4b5563',
+  },
+  moreResponsibilitiesBadge: {
+    backgroundColor: '#e5e7eb',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginBottom: 6,
+  },
+  moreResponsibilitiesText: {
+    fontSize: 10,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  amountContainer: {
+    flex: 1,
+    alignItems: 'flex-end',
+    marginLeft: 8,
+  },
+  amountText: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#3b82f6',
-    marginTop: 8,
+    marginBottom: 4,
   },
+  amountLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+
+  // Modification and Vacation Containers
+  modificationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+    padding: 8,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  modificationText: {
+    marginLeft: 8,
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    flex: 1,
+  },
+  vacationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    padding: 8,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  vacationText: {
+    marginLeft: 8,
+    fontSize: 12,
+    color: '#1e40af',
+  },
+
+  // Action Buttons
   separator: {
-    marginHorizontal: 16,
+    marginHorizontal: 0,
   },
-  actionButtons: {
+  actionButtonsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 16,
     gap: 8,
   },
   actionButton: {
@@ -1605,6 +1799,8 @@ const styles = StyleSheet.create({
   vacationModifiedText: {
     color: '#1e40af',
   },
+
+  // Empty State
   emptyStateCard: {
     alignItems: 'center',
     padding: 32,
@@ -1622,6 +1818,8 @@ const styles = StyleSheet.create({
   emptyStateButton: {
     marginTop: 16,
   },
+
+  // Badge Styles
   activeBadge: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
     borderColor: 'rgba(59, 130, 246, 0.2)',
@@ -1707,46 +1905,8 @@ const styles = StyleSheet.create({
     color: '#ca8a04',
     fontSize: 12,
   },
-  responsibilitiesContainer: {
-    marginTop: 12,
-  },
-  responsibilitiesTitle: {
-    fontWeight: '600',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  responsibilitiesList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  responsibilityBadge: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginRight: 6,
-    marginBottom: 6,
-  },
-  responsibilityText: {
-    fontSize: 12,
-    color: '#4b5563',
-  },
-  modificationDetails: {
-    marginTop: 8,
-    padding: 8,
-    backgroundColor: '#f9fafb',
-    borderRadius: 4,
-  },
-  modificationText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-  },
-  rescheduledText: {
-    color: '#10b981',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+
+  // Snackbar
   snackbar: {
     position: 'absolute',
     bottom: 0,
