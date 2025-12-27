@@ -96,6 +96,15 @@ interface CustomerHoliday {
   active: boolean;
 }
 
+interface TodayService {
+  service_day_id: string;
+  status: string;
+  can_start: boolean;
+  can_generate_otp: boolean;
+  can_complete: boolean;
+  otp_active: boolean;
+}
+
 interface Task {
   taskType: string;
   [key: string]: any;
@@ -160,6 +169,7 @@ interface Booking {
     start_date?: string;
   };
   modifications: Modification[];
+  today_service?: TodayService;
 }
 
 const getServiceIcon = (type: string) => {
@@ -557,7 +567,8 @@ const Booking: React.FC = () => {
                   leave_end_date: item.vacation.end_date || item.vacation.leave_end_date,
                 }
               : null,
-            modifications: modifications
+            modifications: modifications,
+            today_service: item.today_service
           };
         })
       : [];
@@ -787,6 +798,145 @@ const Booking: React.FC = () => {
       throw error;
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  // NEW: renderScheduledMessage function from React code - MOVED INSIDE COMPONENT
+  const renderScheduledMessage = (booking: Booking) => {
+    if (!booking.today_service) return null;
+
+    const { status, can_generate_otp, otp_active } = booking.today_service;
+
+    switch (status) {
+      case "SCHEDULED":
+        return (
+          <View style={styles.scheduledMessageContainer}>
+            <View style={styles.scheduledMessageCard}>
+              <View style={styles.scheduledMessageHeader}>
+                <Icon name="check-circle" size={16} color="#10b981" />
+                <View style={styles.scheduledMessageTitleContainer}>
+                  <Text style={styles.scheduledMessageTitle}>
+                    Confirmed: Scheduled for today.
+                  </Text>
+                  <Badge style={styles.scheduledBadge}>
+                    <Text style={styles.scheduledBadgeText}>Scheduled</Text>
+                  </Badge>
+                </View>
+              </View>
+              <Text style={styles.scheduledMessageText}>
+                We are waiting for the provider to initiate start process at {formatTimeToAMPM(booking.start_time)}.
+              </Text>
+            </View>
+          </View>
+        );
+
+      case "IN_PROGRESS":
+        return (
+          <View style={styles.scheduledMessageContainer}>
+            <View style={styles.inProgressMessageCard}>
+              <View style={styles.scheduledMessageHeader}>
+                <Icon name="check-circle" size={16} color="#10b981" />
+                <View style={styles.scheduledMessageTitleContainer}>
+                  <Text style={styles.scheduledMessageTitle}>
+                    Your service is in progress!
+                  </Text>
+                  <Badge style={styles.inProgressBadge}>
+                    <Text style={styles.inProgressBadgeText}>In Progress</Text>
+                  </Badge>
+                </View>
+              </View>
+              <Text style={styles.scheduledMessageText}>
+                The provider has started session. Please generate OTP below so they can complete task.
+              </Text>
+              
+              {/* OTP Generation Button */}
+              <View style={styles.otpButtonContainer}>
+                <Button
+                  style={[styles.otpButton, otp_active && styles.otpButtonDisabled]}
+                  onPress={() => {/* Handle OTP generation */}}
+                  disabled={otp_active}
+                >
+                  <Icon name="check-circle" size={16} color="#fff" />
+                  <Text style={styles.otpButtonText}>
+                    {otp_active ? "OTP Generated" : "Generate & Share OTP"}
+                  </Text>
+                </Button>
+                
+                {otp_active && (
+                  <Badge style={styles.otpActiveBadge}>
+                    <Text style={styles.otpActiveBadgeText}>OTP Active</Text>
+                  </Badge>
+                )}
+              </View>
+              
+              {/* OTP Display Section (if OTP is generated) */}
+              {otp_active && (
+                <View style={styles.otpDisplayContainer}>
+                  <Text style={styles.otpDisplayLabel}>Share this OTP with your provider:</Text>
+                  <View style={styles.otpDisplay}>
+                    <Text style={styles.otpCode}>123456</Text>
+                    <Button
+                      style={styles.copyOtpButton}
+                      onPress={() => {
+                        // Copy OTP to clipboard
+                        // navigator.clipboard.writeText("123456");
+                        Alert.alert("Success", "OTP copied to clipboard!");
+                      }}
+                    >
+                      <Text style={styles.copyOtpButtonText}>Copy</Text>
+                    </Button>
+                  </View>
+                  <Text style={styles.otpExpiryText}>Valid for 10 minutes</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        );
+
+      case "COMPLETED":
+        return (
+          <View style={styles.scheduledMessageContainer}>
+            <View style={styles.completedMessageCard}>
+              <View style={styles.scheduledMessageHeader}>
+                <Icon name="check-circle" size={16} color="#10b981" />
+                <View style={styles.scheduledMessageTitleContainer}>
+                  <Text style={styles.scheduledMessageTitle}>
+                    Service Completed Successfully!
+                  </Text>
+                  <Badge style={styles.completedBadge}>
+                    <Text style={styles.completedBadgeText}>Completed</Text>
+                  </Badge>
+                </View>
+              </View>
+              <Text style={styles.scheduledMessageText}>
+                Your {getServiceTitle(booking.service_type)} service has been completed at {formatTimeToAMPM(booking.end_time)}. 
+                We hope you enjoyed the service!
+              </Text>
+              
+              {/* Review Prompt Section */}
+              <View style={styles.reviewPromptContainer}>
+                <View style={styles.reviewPromptContent}>
+                  <Text style={styles.reviewPromptTitle}>
+                    How was your experience?
+                  </Text>
+                  <Text style={styles.reviewPromptSubtitle}>
+                    Help us improve by leaving a review for your provider
+                  </Text>
+                </View>
+                <Button
+                  style={styles.leaveReviewButton}
+                  onPress={() => handleLeaveReviewClick(booking)}
+                >
+                  <Icon name="message-text" size={16} color="#000" />
+                  <Text style={styles.leaveReviewButtonText}>Leave Review</Text>
+                </Button>
+              </View>
+            </View>
+          </View>
+        );
+
+      default:
+        return null;
     }
   };
 
@@ -1109,6 +1259,11 @@ const Booking: React.FC = () => {
             </Text>
           </View>
         )}
+
+        {/* Scheduled Message Section */}
+        <View style={styles.scheduledMessageSection}>
+          {renderScheduledMessage(item)}
+        </View>
 
         <Separator style={styles.separator} />
 
@@ -1768,6 +1923,207 @@ const styles = StyleSheet.create({
     color: '#1e40af',
   },
 
+  // Scheduled Message Section Styles
+  scheduledMessageSection: {
+    marginTop: 8,
+  },
+  scheduledMessageContainer: {
+    marginTop: 16,
+    width: '100%',
+  },
+  scheduledMessageCard: {
+    padding: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  inProgressMessageCard: {
+    padding: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  completedMessageCard: {
+    padding: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  scheduledMessageHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  scheduledMessageTitleContainer: {
+    flex: 1,
+    marginLeft: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  scheduledMessageTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    flex: 1,
+  },
+  scheduledMessageText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  scheduledBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    marginLeft: 8,
+  },
+  scheduledBadgeText: {
+    color: '#10b981',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  inProgressBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    marginLeft: 8,
+  },
+  inProgressBadgeText: {
+    color: '#10b981',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  completedBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    marginLeft: 8,
+  },
+  completedBadgeText: {
+    color: '#10b981',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  otpButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  otpButton: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+    minWidth: 180,
+    flex: 1,
+  },
+  otpButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    borderColor: '#9ca3af',
+  },
+  otpButtonText: {
+    color: '#fff',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  otpActiveBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  otpActiveBadgeText: {
+    color: '#10b981',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  otpDisplayContainer: {
+    backgroundColor: '#f9fafb',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  otpDisplayLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#4b5563',
+    marginBottom: 4,
+  },
+  otpDisplay: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  otpCode: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    letterSpacing: 4,
+    color: '#111827',
+  },
+  copyOtpButton: {
+    backgroundColor: 'transparent',
+    borderColor: '#d1d5db',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  copyOtpButtonText: {
+    color: '#4b5563',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  otpExpiryText: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  reviewPromptContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#a7f3d0',
+    paddingTop: 12,
+    marginTop: 12,
+  },
+  reviewPromptContent: {
+    flex: 1,
+  },
+  reviewPromptTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#4b5563',
+  },
+  reviewPromptSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  leaveReviewButton: {
+    backgroundColor: 'transparent',
+    borderColor: '#d1d5db',
+    marginLeft: 8,
+  },
+  leaveReviewButtonText: {
+    color: '#000',
+    marginLeft: 4,
+    fontSize: 12,
+  },
+
   // Action Buttons
   separator: {
     marginHorizontal: 0,
@@ -1829,15 +2185,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 4,
   },
-  completedBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  completedBadgeText: {
-    color: '#10b981',
-    fontSize: 12,
-    marginLeft: 4,
-  },
+  // completedBadge: {
+  //   backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  //   borderColor: 'rgba(16, 185, 129, 0.2)',
+  // },
+  // completedBadgeText: {
+  //   color: '#10b981',
+  //   fontSize: 12,
+  //   marginLeft: 4,
+  // },
   cancelledBadge: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderColor: 'rgba(239, 68, 68, 0.2)',
@@ -1847,15 +2203,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 4,
   },
-  inProgressBadge: {
-    backgroundColor: 'rgba(107, 114, 128, 0.1)',
-    borderColor: 'rgba(107, 114, 128, 0.3)',
-  },
-  inProgressBadgeText: {
-    color: '#6b7280',
-    fontSize: 12,
-    marginLeft: 4,
-  },
+  // inProgressBadge: {
+  //   backgroundColor: 'rgba(107, 114, 128, 0.1)',
+  //   borderColor: 'rgba(107, 114, 128, 0.3)',
+  // },
+  // inProgressBadgeText: {
+  //   color: '#6b7280',
+  //   fontSize: 12,
+  //   marginLeft: 4,
+  // },
   notStartedBadge: {
     backgroundColor: 'rgba(107, 114, 128, 0.1)',
     borderColor: 'rgba(107, 114, 128, 0.3)',
