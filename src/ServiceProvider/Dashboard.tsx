@@ -1,3 +1,4 @@
+// Dashboard.tsx
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -15,11 +16,10 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { DashboardMetricCard } from './DashboardMetricCard';
-import { BookingCard } from './BookingCard';
 import { PaymentHistory } from './PaymentHistory';
 import { useAuth0 } from 'react-native-auth0';
 import { AllBookingsDialog } from './AllBookingsDialog';
-// import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from '../common/BookingUtils';
+import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from '../common/BookingUtils';
 import axiosInstance from '../services/axiosInstance';
 import LinearGradient from 'react-native-linear-gradient';
 import { ReviewsDialog } from './ReviewDialog';
@@ -27,7 +27,7 @@ import axios, { AxiosResponse } from 'axios';
 import PaymentInstance from '../services/paymentInstance';
 import { useAppUser } from '../context/AppUserContext';
 import ProviderCalendarBig from './ProviderCalendarBig';
-// import { getBookingTypeBadge, getServiceTitle, getStatusBadge } from '../common/BookingUtils';
+import { OtpVerificationDialog } from './OtpVerificationDialog';
 
 // Types for API response
 interface CustomerHoliday {
@@ -185,41 +185,107 @@ const paymentHistory = [
   }
 ];
 
+// Function to format time string to AM/PM format
+const formatTimeToAMPM = (timeString: string): string => {
+  if (!timeString) return '';
+  
+  try {
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours, 10);
+    const minute = parseInt(minutes, 10);
+    
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    const displayMinute = minute.toString().padStart(2, '0');
+    
+    return `${displayHour}:${displayMinute} ${period}`;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return timeString;
+  }
+};
+
+// Function to format time range from start and end time strings
+const formatTimeRange = (startTime: string, endTime: string): string => {
+  return `${formatTimeToAMPM(startTime)} - ${formatTimeToAMPM(endTime)}`;
+};
+
 // Function to format API booking data for the BookingCard component
 const formatBookingForCard = (booking: any) => {
-  const startDateRaw = booking.startDate || booking.start_date;
-  const endDateRaw = booking.endDate || booking.endDate;
-  const startTimeStr = booking.startTime || "00:00";
-  const endTimeStr = booking.endTime || "00:00";
+  let date, timeRange;
+  
+  if (booking.start_epoch && booking.end_epoch) {
+    const startDate = new Date(booking.start_epoch * 1000);
+    const endDate = new Date(booking.end_epoch * 1000);
+    
+    const formattedDate = startDate.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+    
+    timeRange = `${startDate.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    })} - ${endDate.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    })}`;
+    
+    date = formattedDate;
+  } else {
+    const startDateRaw = booking.startDate || booking.start_date;
+    const startTimeStr = booking.startTime || "00:00";
+    const endTimeStr = booking.endTime || "00:00";
 
-  const startDate = new Date(startDateRaw);
-  const endDate = new Date(startDateRaw);
+    const startDate = new Date(startDateRaw);
+    const endDate = new Date(startDateRaw);
 
-  const [startHours, startMinutes] = startTimeStr.split(":").map(Number);
-  const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
+    const [startHours, startMinutes] = startTimeStr.split(":").map(Number);
+    const [endHours, endMinutes] = endTimeStr.split(":").map(Number);
 
-  startDate.setHours(startHours, startMinutes);
-  endDate.setHours(endHours, endMinutes);
+    startDate.setHours(startHours, startMinutes);
+    endDate.setHours(endHours, endMinutes);
 
-  const timeRange = `${startDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })} - ${endDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}`;
+    timeRange = formatTimeRange(booking.startTime, booking.endTime);
+    
+    date = startDate.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+  }
 
-  const clientName = [booking.firstname, booking.middlename, booking.lastname, booking.customerName]
-    .filter(Boolean)
-    .join(" ");
+  const clientName = booking.firstname || 
+                    booking.customerName || 
+                    booking.email || 
+                    "Client";
+
+  const bookingId = booking.engagement_id || booking.id;
+
+  const amount = booking.base_amount ? 
+    `₹${parseFloat(booking.base_amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 
+    "₹0";
 
   return {
-    id: booking.id.toString(),
-    bookingId: booking.id.toString(),
+    id: booking.engagement_id?.toString() || booking.id?.toString() || "",
+    bookingId: booking.engagement_id || booking.id,
+    engagement_id: booking.engagement_id?.toString() || booking.id?.toString(),
     clientName,
-    service: getServiceTitle(booking.serviceType || booking.service_type),
-    date: startDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    service: getServiceTitle(booking.service_type || booking.serviceType),
+    date: date,
     time: timeRange,
-    location: booking.address || "Address not provided",
-    status: booking.taskStatus === "COMPLETED" ? "completed" : 
-            booking.taskStatus === "IN_PROGRESS" ? "in-progress" : "upcoming",
-    amount: `₹${booking.monthlyAmount}`,
+    location: booking.address || booking.location || "Address not provided",
+    status: booking.task_status === "COMPLETED" ? "completed" : 
+            booking.task_status === "IN_PROGRESS" || booking.task_status === "STARTED" ? "in-progress" : 
+            booking.task_status === "NOT_STARTED" ? "upcoming" : "upcoming",
+    amount: amount,
     bookingData: booking,
     responsibilities: booking.responsibilities || {},
+    contact: booking.mobileno || "Contact info not available",
+    task_status: booking.task_status
   };
 };
 
@@ -465,6 +531,10 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
   const [taskStatus, setTaskStatus] = useState<Record<string, "IN_PROGRESS" | "COMPLETED" | undefined>>({});
   const [taskStatusUpdating, setTaskStatusUpdating] = useState<Record<string, boolean>>({});
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+  const [currentBooking, setCurrentBooking] = useState<any>(null);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   // Check if user is authenticated
   useEffect(() => {
@@ -562,6 +632,18 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
     }
   };
 
+  // Close dialog when verification completes successfully
+  useEffect(() => {
+    if (!verifyingOtp && otpDialogOpen && currentBooking) {
+      // Small delay to allow user to see success state if needed
+      const timer = setTimeout(() => {
+        handleCloseOtpDialog();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [verifyingOtp, otpDialogOpen, currentBooking]);
+
   // Fetch data when serviceProviderId changes
   useEffect(() => {
     if (serviceProviderId) {
@@ -575,41 +657,105 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
   };
 
   const handleContactClient = (booking: any) => {
+    const contactInfo = booking.contact || booking.bookingData?.mobileno || "Contact info not available";
+    
     Alert.alert(
       "Contact Information",
-      `Call ${booking.clientName} at ${booking.contact || "contact info not available"}`
+      `Call ${booking.clientName} at ${contactInfo}`
     );
   };
 
-  // New start/stop handler (replaces Switch behavior)
-  const handleStartStop = async (bookingId: string, start: boolean) => {
-    if (!bookingId) return;
+  const handleStartTask = async (bookingId: string, bookingData: any) => {
+    if (!bookingId || !bookingData) return;
 
-    const statusToSend = start ? "IN_PROGRESS" : "COMPLETED";
+    const serviceDayId = bookingData.today_service?.service_day_id;
+    if (!serviceDayId) {
+      Alert.alert("Error", "Service day ID not found. Cannot start service.");
+      return;
+    }
+
     const previousStatus = taskStatus[bookingId];
 
-    // optimistically update UI
-    setTaskStatus(prev => ({ ...prev, [bookingId]: statusToSend }));
+    setTaskStatus(prev => ({ ...prev, [bookingId]: "IN_PROGRESS" }));
     setTaskStatusUpdating(prev => ({ ...prev, [bookingId]: true }));
 
     try {
-      await PaymentInstance.put(
-        `/api/engagements/${bookingId}`,
-        { task_status: statusToSend },
-        { headers: { "Content-Type": "application/json" } }
+      await PaymentInstance.post(
+        `api/engagement-service/service-days/${serviceDayId}/start`,
+        {},
+        { 
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          } 
+        }
       );
 
-      Alert.alert("Success", `Task is now ${statusToSend}`);
+      Alert.alert("Service Started", "You have successfully started the service. Task is now IN_PROGRESS");
 
-      // Re-fetch the main data to keep UI in sync
       await fetchData();
     } catch (err) {
-      // revert optimistic update
       setTaskStatus(prev => ({ ...prev, [bookingId]: previousStatus }));
-      Alert.alert("Error", "Failed to update task status");
+      
+      let errorMessage = "Failed to start service";
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.message || err.message || errorMessage;
+      }
+      
+      Alert.alert("Error", errorMessage);
     } finally {
       setTaskStatusUpdating(prev => ({ ...prev, [bookingId]: false }));
     }
+  };
+
+  const handleStopTask = async (bookingId: string, bookingData: any) => {
+    setCurrentBooking({ bookingId, bookingData });
+    setOtpDialogOpen(true);
+  };
+
+  const handleVerifyOtp = async (otp: string) => {
+    if (!currentBooking) return;
+
+    const serviceDayId = currentBooking.bookingData.today_service?.service_day_id;
+    if (!serviceDayId) {
+      Alert.alert("Error", "Service day ID not found");
+      return Promise.reject(new Error("Service day ID not found"));
+    }
+
+    setVerifyingOtp(true);
+    try {
+      await PaymentInstance.post(
+        `api/engagement-service/service-days/${serviceDayId}/complete`,
+        { otp },
+        { 
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          } 
+        }
+      );
+
+      Alert.alert("Success", "Service completed successfully! Earnings credited to your account.");
+
+      setTaskStatus(prev => ({ ...prev, [currentBooking.bookingId]: "COMPLETED" }));
+      await fetchData();
+      return Promise.resolve();
+    } catch (err) {
+      let errorMessage = "Failed to complete service";
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.message || err.message || errorMessage;
+      }
+      
+      Alert.alert("Error", errorMessage);
+      return Promise.reject(err);
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleCloseOtpDialog = () => {
+    setOtpDialogOpen(false);
+    setCurrentBooking(null);
   };
 
   // Combine current and future bookings for display
@@ -627,6 +773,32 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
       console.log('Log out cancelled');
     }
   };
+
+  // Helper component for disabled button with loading
+  const DisabledButtonWithLoader = ({ isLoading }: { isLoading: boolean }) => (
+    <TouchableOpacity
+      style={[
+        {
+          borderRadius: 6,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          opacity: 0.6,
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderWidth: 1,
+          borderColor: '#D1D5DB',
+        }
+      ]}
+      disabled={true}
+    >
+      {isLoading ? (
+        <ActivityIndicator size="small" color="#3B82F6" />
+      ) : (
+        <Text style={{ color: '#3B82F6' }}>Loading...</Text>
+      )}
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -739,22 +911,42 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
                     </View>
                   ) : (
                     latestBooking.map((booking) => {
-                      // derive status helpers
-                      const originalStatus = booking.bookingData?.taskStatus ? String(booking.bookingData.taskStatus).toUpperCase() : undefined;
-                      const isInProgress = taskStatus[booking.id] === 'IN_PROGRESS' || originalStatus === 'IN_PROGRESS' || originalStatus === 'STARTED';
+                      // FIX: Check today_service status instead of just task_status
+                      const todayServiceStatus = booking.bookingData?.today_service?.status;
+                      const taskStatusOriginal = booking.task_status?.toUpperCase();
+                      
+                      // Check if service is in progress
+                      const isInProgress = todayServiceStatus === 'IN_PROGRESS' || 
+                                           taskStatus[booking.id] === 'IN_PROGRESS' || 
+                                           taskStatusOriginal === 'IN_PROGRESS' || 
+                                           taskStatusOriginal === 'STARTED';
+                      
+                      const isCompleted = todayServiceStatus === 'COMPLETED' || 
+                                          taskStatusOriginal === 'COMPLETED';
+                      
+                      const isNotStarted = todayServiceStatus === 'SCHEDULED' || 
+                                           taskStatusOriginal === 'NOT_STARTED';
+
+                      // Check if service can be started based on today_service
+                      const canStart = booking.bookingData?.today_service?.can_start === true;
+                      
+                      // Determine which button to show
+                      const showStartButton = isNotStarted && canStart;
+                      const showCompleteButton = isInProgress;
+                      const showCompletedButton = isCompleted;
 
                       return (
                         <View key={booking.id} style={styles.bookingItem}>
                           {/* Header */}
                           <View style={styles.bookingHeader}>
                             <View>
-                              <Text style={styles.bookingIdText}>Booking ID: {booking.bookingId}</Text>
+                              <Text style={styles.bookingIdText}>Booking ID: {booking.bookingId || "N/A"}</Text>
                               <Text style={styles.clientName}>{booking.clientName}</Text>
                               <Text style={styles.serviceType}>{booking.service}</Text>
                             </View>
                             <View style={styles.badgeContainer}>
                               {getBookingTypeBadge(booking.bookingData.booking_type || booking.bookingData.bookingType)}
-                              {getStatusBadge(booking.bookingData.taskStatus)}
+                              {getStatusBadge(booking.bookingData.task_status)}
                             </View>
                           </View>
                           
@@ -774,28 +966,28 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
                           <View style={styles.responsibilitiesContainer}>
                             <Text style={styles.detailLabel}>Responsibilities</Text>
                             <View style={styles.responsibilitiesList}>
-                              {[
-                                ...((booking.responsibilities?.tasks || []).map((task: any) => ({ task, isAddon: false }))),
-                                ...((booking.responsibilities?.add_ons || []).map((task: any) => ({ task, isAddon: true }))),
-                              ].map((item: any, index: number) => {
-                                const { task, isAddon } = item;
-                                const taskLabel =
-                                  typeof task === "object" && task !== null
-                                    ? Object.entries(task)
-                                        .filter(([key]) => key !== "taskType")
-                                        .map(([key, value]) => `${value} ${key}`)
-                                        .join(", ")
-                                    : "";
-                                const taskName = typeof task === "object" ? task.taskType : task;
+                              {booking.bookingData?.responsibilities?.tasks?.map((task: any, index: number) => {
+                                const taskLabel = task.persons ? `${task.persons} persons` : "";
                                 return (
                                   <Badge key={index} variant="outline" style={styles.responsibilityBadge}>
                                     <Text style={styles.responsibilityText}>
-                                      {isAddon ? "Add-ons: " : ""}
-                                      {taskName} {taskLabel && `- ${taskLabel}`}
+                                      {task.taskType} {taskLabel}
                                     </Text>
                                   </Badge>
                                 );
                               })}
+                              {booking.bookingData?.responsibilities?.add_ons?.map((addon: any, index: number) => (
+                                <Badge key={`addon-${index}`} variant="outline" style={[styles.responsibilityBadge, {backgroundColor: '#eff6ff'}]}>
+                                  <Text style={[styles.responsibilityText, {color: '#1d4ed8'}]}>
+                                    Add-on: {typeof addon === 'object' ? JSON.stringify(addon) : addon}
+                                  </Text>
+                                </Badge>
+                              ))}
+                              {(!booking.bookingData?.responsibilities?.tasks?.length && !booking.bookingData?.responsibilities?.add_ons?.length) && (
+                                <Text style={[styles.responsibilityText, {color: '#6b7280'}]}>
+                                  No responsibilities listed
+                                </Text>
+                              )}
                             </View>
                           </View>
                           
@@ -803,26 +995,82 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
                           <View style={styles.addressContainer}>
                             <Text style={styles.detailLabel}>Address</Text>
                             <Text style={styles.detailValue}>{booking.location || "Address not provided"}</Text>
+                            {booking.bookingData?.mobileno && (
+                              <Text style={[styles.detailLabel, {marginTop: 4, fontSize: 12}]}>
+                                Contact: {booking.bookingData.mobileno}
+                              </Text>
+                            )}
                           </View>
 
-                          {/* Start / Stop Buttons */}
+                          {/* Today's Service Status Badge */}
+                          {todayServiceStatus && (
+                            <View style={styles.todayServiceContainer}>
+                              <View style={styles.todayServiceRow}>
+                                <Text style={styles.detailLabel}>Today's Service:</Text>
+                                <Badge 
+                                  variant="outline"
+                                  style={[
+                                    styles.todayServiceBadge,
+                                    todayServiceStatus === 'SCHEDULED' && {backgroundColor: '#eff6ff', borderColor: '#93c5fd', borderWidth: 1},
+                                    todayServiceStatus === 'IN_PROGRESS' && {backgroundColor: '#dcfce7', borderColor: '#86efac', borderWidth: 1},
+                                    todayServiceStatus === 'COMPLETED' && {backgroundColor: '#f3e8ff', borderColor: '#c4b5fd', borderWidth: 1}
+                                  ]}
+                                >
+                                  <Text style={[
+                                    styles.todayServiceBadgeText,
+                                    todayServiceStatus === 'SCHEDULED' && {color: '#1e40af'},
+                                    todayServiceStatus === 'IN_PROGRESS' && {color: '#166534'},
+                                    todayServiceStatus === 'COMPLETED' && {color: '#5b21b6'}
+                                  ]}>
+                                    {todayServiceStatus}
+                                  </Text>
+                                </Badge>
+                              </View>
+                            </View>
+                          )}
+
+                          {/* Start / Complete Buttons */}
                           <View style={styles.taskActionContainer}>
                             <Text style={styles.detailLabel}>
-                              {isInProgress ? "Task In Progress" : (originalStatus === 'COMPLETED' ? 'Task Completed' : 'Not Started')}
+                              {isInProgress 
+                                ? "Task In Progress" 
+                                : isCompleted 
+                                  ? 'Task Completed' 
+                                  : isNotStarted
+                                    ? 'Not Started' 
+                                    : 'Upcoming'
+                              }
                             </Text>
                             <View style={styles.actionButtons}>
                               {taskStatusUpdating[booking.id] ? (
-                                <Button variant="outline" size="sm" disabled={true} onPress={() => {}} style={styles.disabledButton}>
-                                  <ActivityIndicator size="small" color="#3b82f6" />
+                                <DisabledButtonWithLoader isLoading={true} />
+                              ) : showCompleteButton ? (
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm" 
+                                  onPress={() => handleStopTask(booking.id, booking.bookingData)}
+                                >
+                                  <Text style={styles.stopButtonText}>Complete Task</Text>
                                 </Button>
-                              ) : isInProgress ? (
-                                <Button variant="destructive" size="sm" onPress={() => handleStartStop(booking.id, false)}>
-                                  <Text style={styles.stopButtonText}>Stop Task</Text>
-                                </Button>
-                              ) : (
-                                <Button variant="outline" size="sm" onPress={() => handleStartStop(booking.id, true)}>
+                              ) : showCompletedButton ? (
+                                <View style={[styles.completedButtonContainer, {backgroundColor: '#dcfce7', borderColor: '#22c55e', borderWidth: 1, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 12}]}>
+                                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                                    <MaterialIcon name="check-circle" size={16} color="#166534" style={{marginRight: 4}} />
+                                    <Text style={{color: '#166534', fontWeight: '500', fontSize: 14}}>Completed</Text>
+                                  </View>
+                                </View>
+                              ) : showStartButton ? (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onPress={() => handleStartTask(booking.id, booking.bookingData)}
+                                >
                                   <Text style={styles.startButtonText}>Start Task</Text>
                                 </Button>
+                              ) : (
+                                <View style={[styles.disabledButtonContainer, {backgroundColor: '#f9fafb', borderColor: '#d1d5db', borderWidth: 1, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 12}]}>
+                                  <Text style={{color: '#6b7280', fontSize: 14}}>Cannot Start Yet</Text>
+                                </View>
                               )}
                             </View>
                           </View>
@@ -943,22 +1191,27 @@ export default function Dashboard({ onProfilePress }: DashboardProps) {
       />
 
       {/* All Bookings Dialog */}
-      {/* <AllBookingsDialog
+      <AllBookingsDialog
         visible={showAllBookings}
         onClose={() => setShowAllBookings(false)}
         bookings={bookings}
         serviceProviderId={serviceProviderId}
         onContactClient={handleContactClient}
         trigger={undefined}
-      /> */}
-      <AllBookingsDialog
-  visible={showAllBookings}
-  onClose={() => setShowAllBookings(false)}
-  bookings={bookings}
-  serviceProviderId={serviceProviderId}
-  onContactClient={handleContactClient}
-  trigger={undefined} // Remove trigger since we're controlling visibility via state
-/>
+      />
+
+      {/* OTP Verification Dialog */}
+      <OtpVerificationDialog
+        open={otpDialogOpen}
+        onOpenChange={setOtpDialogOpen}
+        onVerify={handleVerifyOtp}
+        verifying={verifyingOtp}
+        bookingInfo={currentBooking ? {
+          clientName: currentBooking.bookingData?.firstname || currentBooking.bookingData?.customerName,
+          service: getServiceTitle(currentBooking.bookingData?.service_type || currentBooking.bookingData?.serviceType),
+          bookingId: currentBooking.bookingData?.engagement_id || currentBooking.bookingData?.id,
+        } : undefined}
+      />
     </SafeAreaView>
   );
 }
@@ -1133,6 +1386,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
+    backgroundColor: '#ffffff',
   },
   bookingHeader: {
     flexDirection: 'row',
@@ -1189,12 +1443,32 @@ const styles = StyleSheet.create({
   responsibilityBadge: {
     marginRight: 4,
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
   },
   responsibilityText: {
     fontSize: 10,
+    color: '#374151',
   },
   addressContainer: {
     marginBottom: 12,
+  },
+  todayServiceContainer: {
+    marginBottom: 12,
+  },
+  todayServiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  todayServiceBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  todayServiceBadgeText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   taskActionContainer: {
     flexDirection: 'row',
@@ -1206,7 +1480,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  disabledButton: {
+  completedButtonContainer: {
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  disabledButtonContainer: {
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     opacity: 0.6,
   },
   startButtonText: {
