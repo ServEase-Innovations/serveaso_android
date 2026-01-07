@@ -20,51 +20,85 @@ import NannyServicesDialog from "../ServiceDialogs/NannyServiceDialog";
 import axiosInstance from "../services/axiosInstance";
 import { useAppUser } from "../context/AppUserContext";
 
-// Types (keep your existing types)
-
+// Enhanced types based on React code
 interface BookingType {
   serviceproviderId: string;
   eveningSelection: string | null;
   morningSelection: string | null;
   timeRange?: string;
   duration?: number;
+  [key: string]: any;
 }
 
+// Unified EnhancedProviderDetails interface with both naming conventions
 interface EnhancedProviderDetails {
-  serviceproviderId: string;
-  firstName: string;
+  // React naming (from web)
+  serviceproviderid: string;
+  firstname: string;
+  lastname: string;
+  housekeepingrole: string;
   middleName?: string;
-  lastName: string;
   gender: string;
   dob: string;
   diet: string;
+  
+  // React Native naming (for compatibility with dialogs)
+  serviceproviderId: string;
+  firstName: string;
+  lastName: string;
   housekeepingRole: string;
+  
+  // Common properties
   selectedMorningTime: number | null;
   selectedEveningTime: number | null;
   matchedMorningSelection: string | null;
   matchedEveningSelection: string | null;
   startTime: string;
   endTime: string;
-  language?: string;
-  experience?: string;
+  languageknown?: string[];
+  experience?: number;
   otherServices?: string;
   availableTimeSlots?: string[];
+  rating?: number;
+  distance_km?: number;
+  bestMatch?: boolean;
+  monthlyAvailability?: {
+    fullyAvailable: boolean;
+    preferredTime?: string;
+  };
+  age?: number;
+  locality?: string;
 }
 
 interface ProviderDetailsProps {
-  housekeepingRole: string;
-  selectedProvider: (provider: any) => void;
-  serviceproviderId: string;
-  firstName: string;
+  // React naming
+  housekeepingrole: string;
+  serviceproviderid: string;
+  firstname: string;
   middleName?: string;
-  lastName: string;
+  lastname: string;
+  
+  // Common props
   gender: string;
   dob: string;
   diet: string;
-  language?: string;
-  experience?: string;
+  languageknown?: string[];
+  experience?: number;
   otherServices?: string;
   availableTimeSlots?: string[];
+  rating?: number;
+  distance_km?: number;
+  bestMatch?: boolean;
+  monthlyAvailability?: {
+    fullyAvailable: boolean;
+    preferredTime?: string;
+  };
+  age?: number;
+  locality?: string;
+  
+  // Callbacks
+  selectedProvider: (provider: any) => void;
+  sendDataToParent?: (data: string) => void;
 }
 
 const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
@@ -73,9 +107,9 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const [morningSelection, setMorningSelection] = useState<number | null>(null);
   const [eveningSelectionTime, setEveningSelectionTime] = useState<string | null>(null);
   const [morningSelectionTime, setMorningSelectionTime] = useState<string | null>(null);
-  const [loggedInUser, setLoggedInUser] = useState();
+  const [loggedInUser, setLoggedInUser] = useState<any>();
   const [open, setOpen] = useState(false);
-  const [engagementData, setEngagementData] = useState(null);
+  const [engagementData, setEngagementData] = useState<any>(null);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [missingTimeSlots, setMissingTimeSlots] = useState<string[]>([]);
   const [startTime, setStartTime] = useState("08:00");
@@ -89,11 +123,12 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
 
   const hasCheckedRef = useRef(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isMobile = windowWidth < 768;
   const isSmallScreen = windowWidth < 375;
   const isMediumScreen = windowWidth >= 375 && windowWidth < 768;
   const isLargeScreen = windowWidth >= 768;
 
-  const dietImages = {
+  const dietImages: {[key: string]: any} = {
     VEG: require("../../assets/images/veg.png"),
     NONVEG: require("../../assets/images/nonveg.png"),
     BOTH: require("../../assets/images/nonveg.png"),
@@ -122,6 +157,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     }
   };
 
+  // Clear selection
   const clearSelection = (isEvening: boolean) => {
     if (isEvening) {
       setEveningSelection(null);
@@ -136,12 +172,13 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     }
   };
 
-  // Toggle favorite status
-  const toggleFavorite = (event: any) => {
+  // Toggle favorite status with event simulation
+  const toggleFavorite = () => {
     setIsFavorite(!isFavorite);
-    console.log("Favorite toggled for provider:", props.serviceproviderId, "New status:", !isFavorite);
+    console.log("Favorite toggled for provider:", props.serviceproviderid, "New status:", !isFavorite);
   };
 
+  // Check missing time slots
   const checkMissingTimeSlots = () => {
     const expectedTimeSlots = [
       "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
@@ -152,12 +189,14 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     setMissingSlots(missing);
   };
 
+  // Toggle expand with async logic from React
   const toggleExpand = async () => {
-    setIsExpanded(!isExpanded);
+    const newExpandedState = !isExpanded;
+    setIsExpanded(newExpandedState);
 
-    if (!isExpanded) {
+    if (!newExpandedState) {
       try {
-        if (props.serviceproviderId === bookingType?.serviceproviderId) {
+        if (props.serviceproviderid === bookingType?.serviceproviderId) {
           setMatchedMorningSelection(bookingType?.morningSelection || null);
           setMatchedEveningSelection(bookingType?.eveningSelection || null);
         } else {
@@ -165,8 +204,9 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
           setMatchedEveningSelection(null);
         }
 
+        // Fetch engagement data (similar to React version)
         const response = await axiosInstance.get(
-          `/api/serviceproviders/get/engagement/by/serviceProvider/${props.serviceproviderId}`
+          `/api/serviceproviders/get/engagement/by/serviceProvider/${props.serviceproviderid}`
         );
 
         const engagementData = response.data.map((engagement: { id?: number; availableTimeSlots?: string[] }) => ({
@@ -194,7 +234,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
         ).sort() as string[];
 
         setUniqueMissingSlots(uniqueMissingSlots);
-        setAvailableTimeSlots(processedSlots.map((entry: any) => entry.uniqueAvailableTimeSlots));
+        setAvailableTimeSlots(processedSlots.flatMap((entry: any) => entry.uniqueAvailableTimeSlots));
       } catch (error) {
         console.error("Error fetching engagement data:", error);
         Alert.alert("Error", "Failed to fetch engagement data");
@@ -207,21 +247,35 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     return moment().diff(moment(dob), "years");
   };
 
+  // Get age from props or calculate from DOB
+  const getAge = () => {
+    // If age is directly provided in props, use it
+    if (props.age) {
+      return props.age;
+    }
+    
+    // Otherwise calculate from DOB
+    if (props.dob) {
+      return calculateAge(props.dob);
+    }
+    
+    return "";
+  };
+
   const handleBookNow = () => {
-    // Alert.alert("Booking", "Proceeding to book the service provider.");
     let booking: BookingType;
 
-    if (props.housekeepingRole !== "NANNY") {
+    if (props.housekeepingrole !== "NANNY") {
       booking = {
-        serviceproviderId: props.serviceproviderId,
+        serviceproviderId: props.serviceproviderid,
         eveningSelection: eveningSelectionTime,
         morningSelection: morningSelectionTime,
         ...bookingType
       };
     } else {
       booking = {
-        serviceproviderId: props.serviceproviderId,
-        timeRange: `${startTime} `,
+        serviceproviderId: props.serviceproviderid,
+        timeRange: `${startTime} - ${endTime}`,
         duration: getHoursDifference(startTime, endTime),
         ...bookingType
       };
@@ -238,12 +292,16 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
       selectedMorningTime: morningSelection,
       selectedEveningTime: eveningSelection
     };
-
-    // console.log("Props ==> , ",providerDetails)
-    // props.selectedProvider(providerDetails);
     
-    // CRITICAL FIX: Set open to true to show the dialog
-    setOpen(true);
+    // Call the selectedProvider callback
+    props.selectedProvider(providerDetails);
+    
+    // Handle login flow similar to React
+    if (!loggedInUser) {
+      handleLogin();
+    } else {
+      setOpen(true);
+    }
   };
 
   const getHoursDifference = (start: string, end: string) => {
@@ -254,6 +312,28 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     return (endTotalMinutes - startTotalMinutes) / 60;
   };
 
+  // Handle login (from React code)
+  const handleLogin = () => {
+    Alert.alert(
+      "Login Required",
+      "Please login to proceed with booking.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Login",
+          onPress: () => {
+            // You can navigate to login screen here
+            // navigation.navigate('Login');
+            setOpen(true);
+          }
+        }
+      ]
+    );
+  };
+
   const handleClose = () => {
     console.log('Closing service dialog');
     setOpen(false);
@@ -262,7 +342,10 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const handleBookingPage = (data: string) => {
     console.log('Data received from dialog:', data);
     setOpen(false);
-    // Handle navigation or other actions based on the data
+    
+    if (props.sendDataToParent) {
+      props.sendDataToParent(data);
+    }
   };
 
   const handleStartTimeChange = (newStartTime: string) => {
@@ -275,6 +358,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     validateTimeRange(startTime, newEndTime);
   };
 
+  // Validate time range
   const validateTimeRange = (start: string, end: string) => {
     const [startHours, startMinutes] = start.split(":").map(Number);
     const [endHours, endMinutes] = end.split(":").map(Number);
@@ -308,26 +392,71 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     (morningSelection !== null || eveningSelection !== null) || 
     (matchedMorningSelection !== null || matchedEveningSelection !== null);
 
+  // Create provider details data with both naming conventions
   const providerDetailsData: EnhancedProviderDetails = {
-    ...props,
+    // React naming (web)
+    serviceproviderid: props.serviceproviderid,
+    firstname: props.firstname,
+    lastname: props.lastname,
+    housekeepingrole: props.housekeepingrole,
+    middleName: props.middleName,
+    gender: props.gender,
+    dob: props.dob,
+    diet: props.diet,
+    
+    // React Native naming (dialogs)
+    serviceproviderId: props.serviceproviderid,
+    firstName: props.firstname,
+    lastName: props.lastname,
+    housekeepingRole: props.housekeepingrole,
+    
+    // Common properties
     selectedMorningTime: morningSelection,
     selectedEveningTime: eveningSelection,
     matchedMorningSelection,
     matchedEveningSelection,
     startTime,
-    endTime
+    endTime,
+    languageknown: props.languageknown,
+    experience: props.experience,
+    otherServices: props.otherServices,
+    rating: props.rating,
+    distance_km: props.distance_km,
+    bestMatch: props.bestMatch,
+    monthlyAvailability: props.monthlyAvailability,
+    age: getAge() as number,
+    locality: props.locality
   };
 
   const getGenderSymbol = (gender: string) => {
-    switch (gender) {
+    switch (gender?.toUpperCase()) {
       case 'FEMALE': return 'F';
       case 'MALE': return 'M';
       default: return 'O';
     }
   };
 
+  const getInitials = () => {
+    return `${props.firstname?.[0] || ''}${props.lastname?.[0] || ''}`.toUpperCase();
+  };
+
+  // Format time for display (e.g., "05:00" -> "05:00 AM")
+  const formatTimeForDisplay = (timeString: string | undefined) => {
+    if (!timeString) return "08:00 AM";
+    return moment(timeString, "HH:mm").format("hh:mm A");
+  };
+
+  // Get language display
+  const getLanguageDisplay = () => {
+    if (props.languageknown && props.languageknown.length > 0) {
+      return props.languageknown[0];
+    }
+    return "English";
+  };
+
+  // Render service dialog based on role
   const renderServiceDialog = () => {
-    switch (props.housekeepingRole) {
+    switch (props.housekeepingrole) {
       case "COOK":
         return (
           <DemoCook 
@@ -344,7 +473,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
           <MaidServiceDialog
             open={open}
             handleClose={handleClose}
-            providerDetails={providerDetailsData}
+            // providerDetails={providerDetailsData}
             sendDataToParent={handleBookingPage}
             user={user}
             bookingType={bookingType}        
@@ -355,7 +484,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
           <NannyServicesDialog 
             open={open}
             handleClose={handleClose}
-            providerDetails={providerDetailsData}
+            // providerDetails={providerDetailsData}
             sendDataToParent={handleBookingPage}
             user={user}
             bookingType={bookingType}
@@ -366,79 +495,259 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     }
   };
 
+  // Get age value
+  const age = getAge();
+  const genderSymbol = getGenderSymbol(props.gender);
+
   return (
     <>
       <View style={styles.container}>
         <View style={[
           styles.card,
+          isMobile && styles.cardMobile,
           isSmallScreen && styles.cardSmall,
           isMediumScreen && styles.cardMedium,
           isLargeScreen && styles.cardLarge
         ]}>
-          {/* Header with provider name and buttons */}
-          <View style={[
-            styles.headerContainer,
-            isSmallScreen && styles.headerContainerSmall
-          ]}>
-            {/* Provider Name */}
-            <View style={styles.providerNameContainer}>
+          {/* Best Match Ribbon - Similar to React */}
+          {props.bestMatch && (
+            <View style={[
+              styles.bestMatchRibbon,
+              isMobile && styles.bestMatchRibbonMobile
+            ]}>
+              <Icon name="local-fire-department" size={isMobile ? 14 : 16} color="white" />
               <Text style={[
-                styles.nameText,
-                isSmallScreen && styles.nameTextSmall,
-                isMediumScreen && styles.nameTextMedium
-              ]} numberOfLines={1}>
-                {props.firstName} {props.middleName} {props.lastName}
-              </Text>
-              <View style={styles.genderAgeContainer}>
-                <Text style={[
-                  styles.genderAgeText,
-                  isSmallScreen && styles.genderAgeTextSmall
+                styles.bestMatchRibbonText,
+                isMobile && styles.bestMatchRibbonTextMobile
+              ]}>Best Match</Text>
+            </View>
+          )}
+
+          {/* Main Container - Row on desktop, Column on mobile */}
+          <View style={[
+            styles.mainContainer,
+            isMobile && styles.mainContainerMobile
+          ]}>
+            {/* Center Section - Provider Details */}
+            <View style={[
+              styles.centerSection,
+              isMobile && styles.centerSectionMobile
+            ]}>
+              {/* Name and basic info */}
+              <View style={[
+                styles.nameContainer,
+                isMobile && styles.nameContainerMobile
+              ]}>
+                <View style={styles.nameRow}>
+                  <Text style={[
+                    styles.nameText,
+                    isMobile && styles.nameTextMobile,
+                    isSmallScreen && styles.nameTextSmall
+                  ]}>
+                    {props.firstname} {props.lastname}
+                  </Text>
+                  <View style={[
+                    styles.genderAgeChip,
+                    isMobile && styles.genderAgeChipMobile
+                  ]}>
+                    <Text style={[
+                      styles.genderAgeText,
+                      isMobile && styles.genderAgeTextMobile
+                    ]}>
+                      {genderSymbol}, {age}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Meta info row - similar to React */}
+                <View style={[
+                  styles.metaRow,
+                  isMobile && styles.metaRowMobile
                 ]}>
-                  ({getGenderSymbol(props.gender)} {calculateAge(props.dob)})
-                </Text>
-                <Image 
-                  source={dietImage} 
-                  style={[
-                    styles.dietIcon,
-                    isSmallScreen && styles.dietIconSmall
-                  ]}
-                  resizeMode="contain"
-                />
+                  <View style={styles.metaItem}>
+                    <Icon name="restaurant" size={isMobile ? 14 : 16} color="#666" />
+                    <Text style={[
+                      styles.metaText,
+                      isMobile && styles.metaTextMobile
+                    ]}>{props.diet}</Text>
+                  </View>
+
+                  {!isMobile && <View style={styles.verticalDivider} />}
+
+                  <View style={styles.metaItem}>
+                    <Icon name="language" size={isMobile ? 14 : 16} color="#666" />
+                    <Text style={[
+                      styles.metaText,
+                      isMobile && styles.metaTextMobile
+                    ]}>{getLanguageDisplay()}</Text>
+                  </View>
+
+                  {!isMobile && <View style={styles.verticalDivider} />}
+
+                  <View style={styles.metaItem}>
+                    <Icon name="location-on" size={isMobile ? 14 : 16} color="#666" />
+                    <Text style={[
+                      styles.metaText,
+                      isMobile && styles.metaTextMobile
+                    ]}>{props.locality || "Nearby"}</Text>
+                  </View>
+                </View>
+
+                {/* Availability section */}
+                <View style={[
+                  styles.availabilityContainer,
+                  isMobile && styles.availabilityContainerMobile
+                ]}>
+                  <Text style={[
+                    styles.availabilityLabel,
+                    isMobile && styles.availabilityLabelMobile
+                  ]}>Availability</Text>
+                  <View style={[
+                    styles.availabilityRow,
+                    isMobile && styles.availabilityRowMobile
+                  ]}>
+                    <Icon name="access-time" size={isMobile ? 14 : 16} color="#1976d2" />
+                    <Text style={[
+                      styles.availabilityText,
+                      isMobile && styles.availabilityTextMobile
+                    ]}>
+                      Available at {formatTimeForDisplay(props.monthlyAvailability?.preferredTime)}
+                    </Text>
+                    <View style={[
+                      styles.monthlyChip,
+                      isMobile && styles.monthlyChipMobile
+                    ]}>
+                      <Text style={[
+                        styles.monthlyChipText,
+                        isMobile && styles.monthlyChipTextMobile
+                      ]}>Monthly</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Other Services */}
+                {props.otherServices && (
+                  <View style={[
+                    styles.otherServicesContainer,
+                    isMobile && styles.otherServicesContainerMobile
+                  ]}>
+                    <Text style={[
+                      styles.otherServicesLabel,
+                      isMobile && styles.otherServicesLabelMobile
+                    ]}>Additional Services</Text>
+                    <Text style={[
+                      styles.otherServicesText,
+                      isMobile && styles.otherServicesTextMobile
+                    ]} numberOfLines={2}>
+                      {props.otherServices}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Metrics Section - Similar to React layout */}
+              <View style={[
+                styles.metricsContainer,
+                isMobile && styles.metricsContainerMobile
+              ]}>
+                <View style={[
+                  styles.metricBox,
+                  isMobile && styles.metricBoxMobile
+                ]}>
+                  <Text style={[
+                    styles.metricValue,
+                    isMobile && styles.metricValueMobile
+                  ]}>{props.distance_km || 0}</Text>
+                  <Text style={[
+                    styles.metricLabel,
+                    isMobile && styles.metricLabelMobile
+                  ]}>km away</Text>
+                </View>
+
+                <View style={[
+                  styles.metricBox,
+                  isMobile && styles.metricBoxMobile
+                ]}>
+                  <View style={styles.ratingContainer}>
+                    <Icon name="star" size={isMobile ? 14 : 16} color="#FFD700" />
+                    <Text style={[
+                      styles.metricValue,
+                      isMobile && styles.metricValueMobile
+                    ]}>{props.rating?.toFixed(1) || "5.0"}</Text>
+                  </View>
+                  <Text style={[
+                    styles.metricLabel,
+                    isMobile && styles.metricLabelMobile
+                  ]}>{props.rating || 5} reviews</Text>
+                </View>
+
+                <View style={[
+                  styles.metricBox,
+                  isMobile && styles.metricBoxMobile
+                ]}>
+                  <Text style={[
+                    styles.metricValue,
+                    styles.experienceValue,
+                    isMobile && styles.metricValueMobile
+                  ]}>{props.experience || 1}</Text>
+                  <Text style={[
+                    styles.metricLabel,
+                    isMobile && styles.metricLabelMobile
+                  ]}>yrs experience</Text>
+                </View>
               </View>
             </View>
 
-            {/* Action Buttons */}
+            {/* Right Section - Actions */}
             <View style={[
-              styles.headerButtons,
-              isSmallScreen && styles.headerButtonsSmall
+              styles.rightSection,
+              isMobile && styles.rightSectionMobile
             ]}>
+              {/* Role Chip */}
+              {props.housekeepingrole && (
+                <View style={[
+                  styles.roleChip,
+                  isMobile && styles.roleChipMobile
+                ]}>
+                  <Text style={[
+                    styles.roleChipText,
+                    isMobile && styles.roleChipTextMobile
+                  ]}>{props.housekeepingrole}</Text>
+                </View>
+              )}
+
+              {/* View Details Button */}
               <TouchableOpacity 
                 style={[
-                  styles.expandButton,
-                  isSmallScreen && styles.expandButtonSmall
+                  styles.detailsButton,
+                  isMobile && styles.detailsButtonMobile
                 ]}
                 onPress={toggleExpand}
               >
-                <Icon 
-                  name={isExpanded ? "remove" : "add"} 
-                  size={isSmallScreen ? 20 : 24} 
-                  color="#1976d2" 
-                />
+                <Icon name="info-outline" size={isMobile ? 16 : 18} color="#1976d2" />
+                <Text style={[
+                  styles.detailsButtonText,
+                  isMobile && styles.detailsButtonTextMobile
+                ]}>
+                  {isMobile ? "Details" : "View Details"}
+                </Text>
               </TouchableOpacity>
-              
+
+              {/* Book Now Button */}
               <TouchableOpacity 
                 style={[
                   styles.bookNowButton,
-                  isSmallScreen && styles.bookNowButtonSmall
+                  isMobile && styles.bookNowButtonMobile,
+                  (!isBookNowEnabled && props.housekeepingrole !== "NANNY") && styles.bookNowButtonDisabled
                 ]}
                 onPress={handleBookNow}
-                // disabled={!isBookNowEnabled}
+                disabled={!isBookNowEnabled && props.housekeepingrole !== "NANNY"}
               >
                 <Text style={[
-                  styles.bookNowText,
-                  isSmallScreen && styles.bookNowTextSmall
+                  styles.bookNowButtonText,
+                  isMobile && styles.bookNowButtonTextMobile
                 ]}>
-                  Book Now
+                  {isMobile ? "Book" : "Book Now"}
                 </Text>
               </TouchableOpacity>
 
@@ -446,14 +755,14 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
               <TouchableOpacity
                 style={[
                   styles.favoriteButton,
-                  isSmallScreen && styles.favoriteButtonSmall
+                  isMobile && styles.favoriteButtonMobile
                 ]}
                 onPress={toggleFavorite}
               >
                 <Icon 
                   name={isFavorite ? "favorite" : "favorite-border"} 
-                  size={isSmallScreen ? 20 : 24} 
-                  color={isFavorite ? 'red' : 'gray'} 
+                  size={isMobile ? 20 : 24} 
+                  color={isFavorite ? '#ff4081' : '#666'} 
                 />
               </TouchableOpacity>
             </View>
@@ -461,39 +770,10 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
 
           {/* Expanded Content */}
           {isExpanded && (
-            <View style={styles.expandedContent}>
-              <View style={[
-                styles.detailRow,
-                isSmallScreen && styles.detailRowSmall
-              ]}>
-                <Text style={[
-                  styles.detailLabel,
-                  isSmallScreen && styles.detailLabelSmall
-                ]}>Language: </Text>
-                <Text style={[
-                  styles.detailValue,
-                  isSmallScreen && styles.detailValueSmall
-                ]} numberOfLines={2}>
-                  {props.language || "English"}
-                </Text>
-              </View>
-
-              <View style={[
-                styles.detailRow,
-                isSmallScreen && styles.detailRowSmall
-              ]}>
-                <Text style={[
-                  styles.detailLabel,
-                  isSmallScreen && styles.detailLabelSmall
-                ]}>Experience: </Text>
-                <Text style={[
-                  styles.detailValue,
-                  isSmallScreen && styles.detailValueSmall
-                ]} numberOfLines={2}>
-                  {props.experience || "1 year"}
-                </Text>
-              </View>
-
+            <View style={[
+              styles.expandedContent,
+              isMobile && styles.expandedContentMobile
+            ]}>
               <View style={[
                 styles.detailRow,
                 isSmallScreen && styles.detailRowSmall
@@ -535,12 +815,12 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
-    padding: SCREEN_WIDTH < 375 ? 6 : 10,
+    padding: 10,
     backgroundColor: '#f5f5f5',
   },
   card: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 16,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: {
@@ -551,11 +831,18 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    position: 'relative',
+  },
+  cardMobile: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
   },
   cardSmall: {
-    padding: 12,
-    borderRadius: 6,
-    marginBottom: 8,
+    padding: 10,
+    borderRadius: 10,
   },
   cardMedium: {
     padding: 14,
@@ -563,119 +850,355 @@ const styles = StyleSheet.create({
   cardLarge: {
     padding: 16,
   },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  headerContainerSmall: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 8,
-  },
-  providerNameContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  headerButtons: {
+  bestMatchRibbon: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  headerButtonsSmall: {
-    gap: 6,
-    alignSelf: 'flex-end',
-  },
-  expandButton: {
-    borderWidth: 1,
-    borderColor: '#1976d2',
+    gap: 4,
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 4,
-    padding: 8,
-    minWidth: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
-  expandButtonSmall: {
-    padding: 6,
-    minWidth: 36,
+  bestMatchRibbonMobile: {
+    top: 6,
+    left: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
   },
-  bookNowButton: {
-    borderWidth: 1,
-    borderColor: '#1976d2',
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bookNowButtonSmall: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    minWidth: 70,
-  },
-  bookNowButtonDisabled: {
-    borderColor: '#ccc',
-    backgroundColor: '#f5f5f5',
-  },
-  bookNowText: {
-    color: '#1976d2',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  bookNowTextSmall: {
+  bestMatchRibbonText: {
+    color: 'white',
+    fontWeight: '700',
     fontSize: 12,
   },
-  bookNowTextDisabled: {
-    color: '#999',
+  bestMatchRibbonTextMobile: {
+    fontSize: 10,
   },
-  favoriteButton: {
-    padding: 8,
-    minWidth: 40,
+  mainContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  mainContainerMobile: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  centerSection: {
+    flex: 1,
+  },
+  centerSectionMobile: {
+    width: '100%',
+  },
+  nameContainer: {
+    marginBottom: 16,
+  },
+  nameContainerMobile: {
+    marginBottom: 12,
+  },
+  nameRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  favoriteButtonSmall: {
-    padding: 6,
-    minWidth: 36,
+    gap: 8,
+    marginBottom: 8,
+    flexWrap: 'wrap',
   },
   nameText: {
-    fontWeight: 'bold',
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: '600',
     color: '#333',
+  },
+  nameTextMobile: {
+    fontSize: 18,
   },
   nameTextSmall: {
     fontSize: 16,
   },
-  nameTextMedium: {
-    fontSize: 17,
+  genderAgeChip: {
+    borderWidth: 1,
+    borderColor: '#666',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
-  genderAgeContainer: {
+  genderAgeChipMobile: {
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  genderAgeText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  genderAgeTextMobile: {
+    fontSize: 11,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  metaRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  metaTextMobile: {
+    fontSize: 13,
+  },
+  verticalDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: '#e0e0e0',
+  },
+  availabilityContainer: {
+    marginBottom: 16,
+  },
+  availabilityContainerMobile: {
+    marginBottom: 12,
+  },
+  availabilityLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  availabilityLabelMobile: {
+    fontSize: 13,
+  },
+  availabilityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 4,
   },
-  genderAgeText: {
-    fontWeight: 'bold',
+  availabilityRowMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  availabilityText: {
     fontSize: 16,
+    fontWeight: '500',
     color: '#333',
   },
-  genderAgeTextSmall: {
+  availabilityTextMobile: {
     fontSize: 14,
   },
-  dietIcon: {
-    width: 20,
-    height: 20,
+  monthlyChip: {
+    borderWidth: 1,
+    borderColor: '#1976d2',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
-  dietIconSmall: {
-    width: 18,
-    height: 18,
+  monthlyChipMobile: {
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  monthlyChipText: {
+    fontSize: 12,
+    color: '#1976d2',
+  },
+  monthlyChipTextMobile: {
+    fontSize: 11,
+  },
+  otherServicesContainer: {
+    marginBottom: 16,
+  },
+  otherServicesContainerMobile: {
+    marginBottom: 12,
+  },
+  otherServicesLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  otherServicesLabelMobile: {
+    fontSize: 13,
+  },
+  otherServicesText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  otherServicesTextMobile: {
+    fontSize: 13,
+  },
+  metricsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  metricsContainerMobile: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  metricBox: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  metricBoxMobile: {
+    padding: 8,
+    minWidth: 70,
+  },
+  metricValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  metricValueMobile: {
+    fontSize: 16,
+  },
+  experienceValue: {
+    color: '#2e7d32',
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  metricLabelMobile: {
+    fontSize: 11,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  rightSection: {
+    width: 140,
+    flexDirection: 'column',
+    gap: 12,
+    alignItems: 'stretch',
+  },
+  rightSectionMobile: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 12,
+    marginTop: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  roleChip: {
+    backgroundColor: '#1976d2',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  roleChipMobile: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  roleChipText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  roleChipTextMobile: {
+    fontSize: 11,
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#1976d2',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  detailsButtonMobile: {
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minHeight: 36,
+  },
+  detailsButtonText: {
+    color: '#1976d2',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  detailsButtonTextMobile: {
+    fontSize: 13,
+  },
+  bookNowButton: {
+    backgroundColor: '#1976d2',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  bookNowButtonMobile: {
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    minHeight: 36,
+  },
+  bookNowButtonDisabled: {
+    backgroundColor: '#b0b0b0',
+  },
+  bookNowButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bookNowButtonTextMobile: {
+    fontSize: 13,
+  },
+  favoriteButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+  },
+  favoriteButtonMobile: {
+    padding: 6,
   },
   expandedContent: {
-    marginTop: 8,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 12,
+  },
+  expandedContentMobile: {
+    marginTop: 12,
+    paddingTop: 8,
   },
   detailRow: {
     flexDirection: 'row',
