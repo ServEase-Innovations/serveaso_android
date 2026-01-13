@@ -243,7 +243,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       console.log('🔄 Trying alternative search method...');
       
       // Alternative API call structure similar to React code
-      const response = await axios.post('https://providers-08ug.onrender.com/api/service-providers/nearby-monthly', {
+      const response = await axiosInstance.post('https://providers-08ug.onrender.com/api/service-providers/nearby-monthly', {
         lat: latitude.toString(),
         lng: longitude.toString(),
         radius: 10,

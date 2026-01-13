@@ -8,10 +8,12 @@ import {
   Alert,
   Dimensions,
   useWindowDimensions,
-  ScrollView
+  ScrollView,
+  Modal
 } from "react-native";
 import moment from "moment";
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useDispatch, useSelector } from "react-redux";
 import { add, update } from "../features/bookingTypeSlice";
 import DemoCook from "../ServiceDialogs/CookServiceDialog";
@@ -19,6 +21,8 @@ import MaidServiceDialog from "../ServiceDialogs/MaidServiceDialog";
 import NannyServicesDialog from "../ServiceDialogs/NannyServiceDialog";
 import axiosInstance from "../services/axiosInstance";
 import { useAppUser } from "../context/AppUserContext";
+import { ServiceProviderDTO, EnhancedProviderDetails } from "../types/ProviderDetailsType";
+import ProviderAvailabilityDrawer from "./ProviderAvailabilityDrawer";
 
 // Enhanced types based on React code
 interface BookingType {
@@ -30,74 +34,9 @@ interface BookingType {
   [key: string]: any;
 }
 
-// Unified EnhancedProviderDetails interface with both naming conventions
-interface EnhancedProviderDetails {
-  // React naming (from web)
-  serviceproviderid: string;
-  firstname: string;
-  lastname: string;
-  housekeepingrole: string;
-  middleName?: string;
-  gender: string;
-  dob: string;
-  diet: string;
-  
-  // React Native naming (for compatibility with dialogs)
-  serviceproviderId: string;
-  firstName: string;
-  lastName: string;
-  housekeepingRole: string;
-  
-  // Common properties
-  selectedMorningTime: number | null;
-  selectedEveningTime: number | null;
-  matchedMorningSelection: string | null;
-  matchedEveningSelection: string | null;
-  startTime: string;
-  endTime: string;
-  languageknown?: string[];
-  experience?: number;
-  otherServices?: string;
+interface ProviderDetailsProps extends ServiceProviderDTO {
+  selectedProvider: (provider: ServiceProviderDTO) => void;
   availableTimeSlots?: string[];
-  rating?: number;
-  distance_km?: number;
-  bestMatch?: boolean;
-  monthlyAvailability?: {
-    fullyAvailable: boolean;
-    preferredTime?: string;
-  };
-  age?: number;
-  locality?: string;
-}
-
-interface ProviderDetailsProps {
-  // React naming
-  housekeepingrole: string;
-  serviceproviderid: string;
-  firstname: string;
-  middleName?: string;
-  lastname: string;
-  
-  // Common props
-  gender: string;
-  dob: string;
-  diet: string;
-  languageknown?: string[];
-  experience?: number;
-  otherServices?: string;
-  availableTimeSlots?: string[];
-  rating?: number;
-  distance_km?: number;
-  bestMatch?: boolean;
-  monthlyAvailability?: {
-    fullyAvailable: boolean;
-    preferredTime?: string;
-  };
-  age?: number;
-  locality?: string;
-  
-  // Callbacks
-  selectedProvider: (provider: any) => void;
   sendDataToParent?: (data: string) => void;
 }
 
@@ -120,6 +59,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const [matchedMorningSelection, setMatchedMorningSelection] = useState<string | null>(null);
   const [matchedEveningSelection, setMatchedEveningSelection] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const hasCheckedRef = useRef(false);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -334,6 +274,16 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     );
   };
 
+  // New function to handle drawer open
+  const handleViewDetails = () => {
+    setDrawerOpen(true);
+  };
+
+  // New function to handle drawer close
+  const handleDrawerClose = () => {
+    setDrawerOpen(false);
+  };
+
   const handleClose = () => {
     console.log('Closing service dialog');
     setOpen(false);
@@ -392,42 +342,76 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     (morningSelection !== null || eveningSelection !== null) || 
     (matchedMorningSelection !== null || matchedEveningSelection !== null);
 
-  // Create provider details data with both naming conventions
+  // Helper function to convert languageknown array to string
+  const getLanguageString = (languageKnown: string[] | null): string | undefined => {
+    if (!languageKnown || languageKnown.length === 0) return undefined;
+    return languageKnown.join(", ");
+  };
+
+  // Create EnhancedProviderDetails object with proper type conversions
+  // Using only properties that exist in EnhancedProviderDetails
   const providerDetailsData: EnhancedProviderDetails = {
-    // React naming (web)
-    serviceproviderid: props.serviceproviderid,
-    firstname: props.firstname,
-    lastname: props.lastname,
-    housekeepingrole: props.housekeepingrole,
+    // Map ServiceProviderDTO properties to EnhancedProviderDetails properties
+    serviceproviderId: props.serviceproviderid, // Map serviceproviderid to serviceproviderId
+    
+    firstName: props.firstname,
+    lastName: props.lastname,
+    
+    // Use optional properties with null checks
     middleName: props.middleName,
+    housekeepingRole: props.housekeepingrole,
+    
+    // Map all ServiceProviderDTO properties with proper type conversions
     gender: props.gender,
     dob: props.dob,
     diet: props.diet,
+    language: getLanguageString(props.languageknown), // Convert array to string
+    experience: props.experience?.toString() || "", // Convert number to string
+    otherServices: props.otherServices || undefined, // Convert null to undefined
+    availableTimeSlots: props.availableTimeSlots,
     
-    // React Native naming (dialogs)
-    serviceproviderId: props.serviceproviderid,
-    firstName: props.firstname,
-    lastName: props.lastname,
-    housekeepingRole: props.housekeepingrole,
-    
-    // Common properties
+    // Time selection properties (from React version)
     selectedMorningTime: morningSelection,
     selectedEveningTime: eveningSelection,
-    matchedMorningSelection,
-    matchedEveningSelection,
-    startTime,
-    endTime,
-    languageknown: props.languageknown,
-    experience: props.experience,
-    otherServices: props.otherServices,
-    rating: props.rating,
-    distance_km: props.distance_km,
-    bestMatch: props.bestMatch,
-    monthlyAvailability: props.monthlyAvailability,
-    age: getAge() as number,
-    locality: props.locality
+    matchedMorningSelection: matchedMorningSelection,
+    matchedEveningSelection: matchedEveningSelection,
+    startTime: startTime,
+    endTime: endTime
   };
 
+  // Format time for display (e.g., "05:00" -> "05:00 AM")
+  const formatTimeForDisplay = (timeString: string | undefined) => {
+    if (!timeString) return "08:00 AM";
+    return moment(timeString, "HH:mm").format("hh:mm A");
+  };
+
+  // Get availability status for the chip
+  const getAvailabilityStatus = () => {
+    if (!props.monthlyAvailability) return "Available";
+    
+    if (props.monthlyAvailability.fullyAvailable) {
+      return "Fully Available";
+    } else {
+      const exceptions = props.monthlyAvailability.exceptions?.length || 0;
+      if (exceptions > 0) {
+        return `Partially Available (${exceptions} exception${exceptions > 1 ? 's' : ''})`;
+      }
+      return "Available";
+    }
+  };
+
+  // Get availability chip style
+  const getAvailabilityStyle = () => {
+    if (!props.monthlyAvailability) return styles.availabilityChipAvailable;
+    
+    if (props.monthlyAvailability.fullyAvailable) {
+      return styles.availabilityChipFullyAvailable;
+    } else {
+      return styles.availabilityChipPartial;
+    }
+  };
+
+  // Get gender symbol
   const getGenderSymbol = (gender: string) => {
     switch (gender?.toUpperCase()) {
       case 'FEMALE': return 'F';
@@ -436,14 +420,20 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     }
   };
 
-  const getInitials = () => {
-    return `${props.firstname?.[0] || ''}${props.lastname?.[0] || ''}`.toUpperCase();
+  // Get best match message
+  const getBestMatchMessage = () => {
+    if (props.bestMatch) {
+      return "This provider is our best match for your requirements!";
+    } else {
+      if (props.monthlyAvailability?.fullyAvailable === false) {
+        return "This provider has some schedule variations. Check availability details below.";
+      }
+      return "This provider matches most of your requirements.";
+    }
   };
 
-  // Format time for display (e.g., "05:00" -> "05:00 AM")
-  const formatTimeForDisplay = (timeString: string | undefined) => {
-    if (!timeString) return "08:00 AM";
-    return moment(timeString, "HH:mm").format("hh:mm A");
+  const getInitials = () => {
+    return `${props.firstname?.[0] || ''}${props.lastname?.[0] || ''}`.toUpperCase();
   };
 
   // Get language display
@@ -473,7 +463,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
           <MaidServiceDialog
             open={open}
             handleClose={handleClose}
-            // providerDetails={providerDetailsData}
+            providerDetails={providerDetailsData}
             sendDataToParent={handleBookingPage}
             user={user}
             bookingType={bookingType}        
@@ -484,7 +474,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
           <NannyServicesDialog 
             open={open}
             handleClose={handleClose}
-            // providerDetails={providerDetailsData}
+            providerDetails={providerDetailsData}
             sendDataToParent={handleBookingPage}
             user={user}
             bookingType={bookingType}
@@ -515,7 +505,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
               styles.bestMatchRibbon,
               isMobile && styles.bestMatchRibbonMobile
             ]}>
-              <Icon name="local-fire-department" size={isMobile ? 14 : 16} color="white" />
+              <MaterialCommunityIcons name="fire" size={isMobile ? 14 : 16} color="white" />
               <Text style={[
                 styles.bestMatchRibbonText,
                 isMobile && styles.bestMatchRibbonTextMobile
@@ -598,10 +588,23 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
                   styles.availabilityContainer,
                   isMobile && styles.availabilityContainerMobile
                 ]}>
-                  <Text style={[
-                    styles.availabilityLabel,
-                    isMobile && styles.availabilityLabelMobile
-                  ]}>Availability</Text>
+                  <View style={styles.availabilityHeader}>
+                    <Text style={[
+                      styles.availabilityLabel,
+                      isMobile && styles.availabilityLabelMobile
+                    ]}>Availability</Text>
+                    <View style={[
+                      styles.availabilityChip,
+                      getAvailabilityStyle(),
+                      isMobile && styles.availabilityChipMobile
+                    ]}>
+                      <Text style={[
+                        styles.availabilityChipText,
+                        isMobile && styles.availabilityChipTextMobile
+                      ]}>{getAvailabilityStatus()}</Text>
+                    </View>
+                  </View>
+                  
                   <View style={[
                     styles.availabilityRow,
                     isMobile && styles.availabilityRowMobile
@@ -623,6 +626,26 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
                       ]}>Monthly</Text>
                     </View>
                   </View>
+
+                  {/* Show exceptions count if any */}
+                  {props.monthlyAvailability?.exceptions && props.monthlyAvailability.exceptions.length > 0 && (
+                    <Text style={[
+                      styles.exceptionText,
+                      isMobile && styles.exceptionTextMobile
+                    ]}>
+                      ⚠️ {props.monthlyAvailability.exceptions.length} schedule exception(s) this month
+                    </Text>
+                  )}
+
+                  {/* Show fully available message */}
+                  {props.monthlyAvailability?.fullyAvailable && (
+                    <Text style={[
+                      styles.fullyAvailableText,
+                      isMobile && styles.fullyAvailableTextMobile
+                    ]}>
+                      ✓ Fully available all month
+                    </Text>
+                  )}
                 </View>
 
                 {/* Other Services */}
@@ -722,7 +745,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
                   styles.detailsButton,
                   isMobile && styles.detailsButtonMobile
                 ]}
-                onPress={toggleExpand}
+                onPress={handleViewDetails}
               >
                 <Icon name="info-outline" size={isMobile ? 16 : 18} color="#1976d2" />
                 <Text style={[
@@ -767,44 +790,15 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Expanded Content */}
-          {isExpanded && (
-            <View style={[
-              styles.expandedContent,
-              isMobile && styles.expandedContentMobile
-            ]}>
-              <View style={[
-                styles.detailRow,
-                isSmallScreen && styles.detailRowSmall
-              ]}>
-                <Text style={[
-                  styles.detailLabel,
-                  isSmallScreen && styles.detailLabelSmall
-                ]}>Other Services: </Text>
-                <Text style={[
-                  styles.detailValue,
-                  isSmallScreen && styles.detailValueSmall
-                ]} numberOfLines={3}>
-                  {props.otherServices || "N/A"}
-                </Text>
-              </View>
-
-              {warning ? (
-                <View style={[
-                  styles.warningContainer,
-                  isSmallScreen && styles.warningContainerSmall
-                ]}>
-                  <Text style={[
-                    styles.warningText,
-                    isSmallScreen && styles.warningTextSmall
-                  ]}>{warning}</Text>
-                </View>
-              ) : null}
-            </View>
-          )}
         </View>
       </View>
+
+      {/* Availability Drawer */}
+      <ProviderAvailabilityDrawer
+        open={drawerOpen}
+        onClose={handleDrawerClose}
+        provider={props}
+      />
 
       {renderServiceDialog()}
     </>
@@ -975,18 +969,50 @@ const styles = StyleSheet.create({
   availabilityContainerMobile: {
     marginBottom: 12,
   },
+  availabilityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
   availabilityLabel: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 4,
   },
   availabilityLabelMobile: {
     fontSize: 13,
+  },
+  availabilityChip: {
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  availabilityChipMobile: {
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  availabilityChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  availabilityChipAvailable: {
+    backgroundColor: '#e8f5e9',
+  },
+  availabilityChipFullyAvailable: {
+    backgroundColor: '#4caf50',
+  },
+  availabilityChipPartial: {
+    backgroundColor: '#fff3e0',
+  },
+  availabilityChipTextMobile: {
+    fontSize: 10,
   },
   availabilityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 4,
   },
   availabilityRowMobile: {
     flexDirection: 'row',
@@ -1019,6 +1045,24 @@ const styles = StyleSheet.create({
     color: '#1976d2',
   },
   monthlyChipTextMobile: {
+    fontSize: 11,
+  },
+  exceptionText: {
+    fontSize: 12,
+    color: '#ff9800',
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  exceptionTextMobile: {
+    fontSize: 11,
+  },
+  fullyAvailableText: {
+    fontSize: 12,
+    color: '#4caf50',
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  fullyAvailableTextMobile: {
     fontSize: 11,
   },
   otherServicesContainer: {
@@ -1189,64 +1233,6 @@ const styles = StyleSheet.create({
   },
   favoriteButtonMobile: {
     padding: 6,
-  },
-  expandedContent: {
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 12,
-  },
-  expandedContentMobile: {
-    marginTop: 12,
-    paddingTop: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-    gap: 4,
-  },
-  detailRowSmall: {
-    marginBottom: 6,
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-  },
-  detailLabel: {
-    fontWeight: 'bold',
-    fontSize: 14,
-    color: '#333',
-    minWidth: 100,
-  },
-  detailLabelSmall: {
-    fontSize: 13,
-    minWidth: 'auto',
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#666',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  detailValueSmall: {
-    fontSize: 13,
-  },
-  warningContainer: {
-    backgroundColor: '#ffebee',
-    padding: 8,
-    borderRadius: 4,
-    marginTop: 8,
-  },
-  warningContainerSmall: {
-    padding: 6,
-    marginTop: 6,
-  },
-  warningText: {
-    color: '#d32f2f',
-    fontSize: 12,
-  },
-  warningTextSmall: {
-    fontSize: 11,
   },
 });
 
