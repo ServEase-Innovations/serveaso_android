@@ -1,3 +1,4 @@
+// App.tsx - Updated with proper NavigationFooter handlers
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -13,11 +14,13 @@ import {
   Modal,
   AppStateStatus,
   Platform,
+  Dimensions,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Auth0Provider } from "react-native-auth0";
 import config from "./auth0-configuration";
 import Head from "./src/Header/Header";
+import NavigationFooter from "./src/NavigationFooter/NavigationFooter";
 import HomePage from "./src/HomePage/HomePage";
 import DetailsView from "./src/DetailsView/DetailsView";
 import Footer from "./src/Footer/Footer";
@@ -37,6 +40,8 @@ import { useDispatch } from "react-redux";
 import { add } from "./src/features/pricingSlice";
 import MobileNumberDialog from "./src/UserProfile/MobileNumberDialog";
 import axiosInstance from "./src/services/axiosInstance";
+import WalletDialog from "./src/UserProfile/WalletDialog";
+import NotificationsDialog from "./src/Notifications/NotificationsPage";
 
 interface Engagement {
   engagement_id: number;
@@ -52,10 +57,6 @@ interface Engagement {
   status?: string;
 }
 
-interface SocketEngagementData {
-  engagement: Engagement;
-}
-
 const MainApp = () => {
   const [chatbotOpen, setChatbotOpen] = useState(false);
   const [currentView, setCurrentView] = useState("HOME");
@@ -64,11 +65,12 @@ const MainApp = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [isFirstLaunch, setIsFirstLaunch] = useState(true);
   const [activeToast, setActiveToast] = useState<Engagement | null>(null);
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [showNotificationClient, setShowNotificationClient] = useState(false);
   const [shouldShowMobileDialog, setShouldShowMobileDialog] = useState(false);
   const [hasCheckedMobileNumber, setHasCheckedMobileNumber] = useState(false);
   const [customerData, setCustomerData] = useState<any>(null);
+  const [isWalletOpen, setIsWalletOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const socketRef = useRef<Socket | null>(null);
@@ -76,6 +78,10 @@ const MainApp = () => {
 
   const dispatch = useDispatch();
   const { appUser } = useAppUser();
+
+  // Get screen dimensions
+  const { height, width } = Dimensions.get('window');
+  const isMobile = width < 768;
 
   useEffect(() => {
     console.log("🔄 AppUser changed:", appUser ? `Logged in as ${appUser.role}` : "Logged out");
@@ -88,6 +94,8 @@ const MainApp = () => {
       setShouldShowMobileDialog(false);
       setHasCheckedMobileNumber(false);
       setCustomerData(null);
+      setIsWalletOpen(false);
+      setShowNotifications(false);
     }
   }, [appUser]);
 
@@ -156,21 +164,6 @@ const MainApp = () => {
     setShouldShowMobileDialog(false);
     setCustomerData(null);
   }, [appUser?.customerid]);
-
-  useEffect(() => {
-    console.log("🔍 Mobile Dialog State:", {
-      shouldShowMobileDialog,
-      hasCheckedMobileNumber,
-      customerData: customerData ? "Exists" : "No data",
-      appUser: appUser
-        ? {
-            role: appUser.role,
-            customerid: appUser.customerid,
-            hasCustomerId: !!appUser.customerid,
-          }
-        : "No user",
-    });
-  }, [shouldShowMobileDialog, hasCheckedMobileNumber, appUser, customerData]);
 
   useEffect(() => {
     getPricingData();
@@ -323,10 +316,48 @@ const MainApp = () => {
   const handleDashboardProfilePress = () => setShowProfileFromDashboard(true);
   const handleBackToDashboard = () => setShowProfileFromDashboard(false);
   const handleNotificationButtonPress = () => setShowNotificationClient(true);
-  const forceShowMobileDialog = () => {
-    setShouldShowMobileDialog(true);
-    setHasCheckedMobileNumber(false);
+
+  const handleHomeClick = () => {
+    setCurrentView("HOME");
+    setShowProfileFromDashboard(false);
   };
+
+  const handleServicesClick = (service: string) => {
+    console.log(`Service selected: ${service}`);
+    if (service === "Home Cook" || service === "Cleaning Help" || service === "Caregiver") {
+      setSelectedBookingType(service);
+      // Navigate to details view with selected service
+      setCurrentView("DETAILS");
+    }
+  };
+
+  const handleBookingsClick = () => {
+    handleViewChange(BOOKINGS);
+  };
+
+  const handleDashboardClick = () => {
+    handleViewChange(DASHBOARD);
+  };
+
+  const handleAboutClick = () => {
+    Alert.alert("About Us", "ServEaso - Your trusted service provider");
+  };
+
+  const handleContactClick = () => {
+    Alert.alert("Contact Us", "Contact ServEaso support");
+  };
+
+  // const handleNotificationClick = () => {
+  //   setShowNotifications(true);
+  // };
+
+  // const handleWalletClick = () => {
+  //   setIsWalletOpen(true);
+  // };
+
+  // const handleCloseNotifications = () => {
+  //   setShowNotifications(false);
+  // };
 
   const renderContent = () => {
     if (appUser && appUser.role?.toUpperCase() === "SERVICE_PROVIDER" && currentView === "HOME") {
@@ -342,11 +373,6 @@ const MainApp = () => {
         return (
           <View style={styles.homeContainer}>
             <HomePage sendDataToParent={handleViewChange} bookingType={() => {}} />
-            {/* {__DEV__ && appUser?.role?.toUpperCase() === "CUSTOMER" && (
-              <TouchableOpacity style={styles.testButton} onPress={forceShowMobileDialog}>
-                <Text style={styles.testButtonText}>Test Mobile Dialog</Text>
-              </TouchableOpacity>
-            )} */}
           </View>
         );
       case BOOKINGS:
@@ -378,23 +404,29 @@ const MainApp = () => {
 
   return (
     <SafeAreaProvider>
-      {/* ✅ FIXED STATUS BAR SECTION */}
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        {/* Fixed Header */}
         <View style={styles.headerWrapper}>
-          <Head sendDataToParent={handleViewChange} />
+          <Head 
+            sendDataToParent={handleViewChange} 
+            bookingType={selectedBookingType}
+            onAboutClick={handleAboutClick}
+            onContactClick={handleContactClick}
+            onLogoClick={handleHomeClick}
+          />
         </View>
-        
 
+        {/* Notification Button for Service Providers */}
         {appUser && appUser.role?.toUpperCase() === "SERVICE_PROVIDER" && (
           <View style={styles.notificationButtonContainer}>
             <NotificationButton onPress={handleNotificationButtonPress} />
           </View>
         )}
 
+        {/* Scrollable Content Area */}
         <View style={styles.contentContainer}>
-          {currentView === PROFILE ||
-          (currentView === DASHBOARD && showProfileFromDashboard) ? (
+          {currentView === PROFILE || (currentView === DASHBOARD && showProfileFromDashboard) ? (
             <ScrollView style={styles.profileScrollView} contentContainerStyle={styles.profileScrollContent}>
               {renderContent()}
             </ScrollView>
@@ -415,6 +447,32 @@ const MainApp = () => {
           )}
         </View>
 
+        {/* Fixed Navigation Footer for Mobile */}
+        {isMobile && (
+          <View style={styles.navigationFooterContainer}>
+            <NavigationFooter
+              onHomeClick={handleHomeClick}
+              onBookingsClick={handleBookingsClick}
+              onDashboardClick={handleDashboardClick}
+              onAboutClick={handleAboutClick}
+              onContactClick={handleContactClick}
+              auth0User={appUser}
+              appUser={appUser}
+              bookingType={selectedBookingType}
+              // onNotificationClick={handleNotificationClick}
+              // onWalletClick={handleWalletClick}
+            />
+          </View>
+        )}
+
+        {/* Chat Button - Positioned above Navigation Footer */}
+        {!chatbotOpen && isMobile && (
+          <TouchableOpacity style={styles.chatButton} onPress={() => setChatbotOpen(true)}>
+            <Icon name="chat" size={28} color="#fff" />
+          </TouchableOpacity>
+        )}
+
+        {/* Modals and Dialogs */}
         {shouldShowMobileDialog && (
           <MobileNumberDialog 
             open={shouldShowMobileDialog}
@@ -422,6 +480,18 @@ const MainApp = () => {
             onSuccess={handleMobileDialogSuccess}
           />
         )}
+
+        {/* Wallet Dialog */}
+        {/* <WalletDialog
+          open={isWalletOpen}
+          onClose={() => setIsWalletOpen(false)}
+        /> */}
+
+        {/* Notifications Dialog */}
+        {/* <NotificationsDialog 
+          visible={showNotifications} 
+          onClose={handleCloseNotifications} 
+        /> */}
 
         <Modal
           visible={showNotificationClient}
@@ -440,14 +510,6 @@ const MainApp = () => {
         </Modal>
 
         <Chatbot open={chatbotOpen} onClose={() => setChatbotOpen(false)} />
-
-        {!chatbotOpen && (
-          <View style={styles.chatButtonContainer}>
-            <TouchableOpacity style={styles.chatButton} onPress={() => setChatbotOpen(true)}>
-              <Icon name="chat" size={28} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        )}
 
         {activeToast && (
           <BookingRequestToast
@@ -478,17 +540,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  splashImage: { width: "80%", height: "80%" },
+  splashImage: { 
+    width: "80%", 
+    height: "80%" 
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: "#0a2a66", // ✅ blue background for status bar area
+    backgroundColor: "#0a2a66",
   },
   headerWrapper: {
     width: "100%",
     backgroundColor: "#0a2a66ff",
     zIndex: 50,
   },
-  homeContainer: { flex: 1 },
+  homeContainer: { 
+    flex: 1 
+  },
   notificationButtonContainer: {
     position: "absolute",
     top: 80,
@@ -503,30 +570,70 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
   },
-  contentContainer: { flex: 1, marginTop: 50, backgroundColor: "#fff" },
-  mainScrollView: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: "space-between", minHeight: "100%" },
-  fullScreenScrollContent: { paddingBottom: 0 },
-  profileScrollView: { flex: 1 },
-  profileScrollContent: { flexGrow: 1 },
-  modalContainer: { flex: 1, backgroundColor: "#fff" },
+  contentContainer: { 
+    flex: 1, 
+    marginTop: 50, // Header height + some padding
+    backgroundColor: "#fff",
+    paddingBottom: 50, // Space for navigation footer
+  },
+  mainScrollView: { 
+    flex: 1 
+  },
+  scrollContent: { 
+    flexGrow: 1, 
+    justifyContent: "space-between", 
+    minHeight: "100%",
+  },
+  fullScreenScrollContent: { 
+    paddingBottom: 0 
+  },
+  profileScrollView: { 
+    flex: 1 
+  },
+  profileScrollContent: { 
+    flexGrow: 1 
+  },
+  modalContainer: { 
+    flex: 1, 
+    backgroundColor: "#fff" 
+  },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'ios' ? 50 : 16,
   },
-  closeButton: { padding: 4 },
-  modalTitle: { fontSize: 18, fontWeight: "bold", marginLeft: 16, color: "#333" },
-  chatButtonContainer: {
+  closeButton: { 
+    padding: 4 
+  },
+  modalTitle: { 
+    fontSize: 18, 
+    fontWeight: "bold", 
+    marginLeft: 16, 
+    color: "#333" 
+  },
+  navigationFooterContainer: {
     position: "absolute",
-    bottom: 20,
-    right: 20,
-    zIndex: 2000,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#0a2a66",
+    zIndex: 100,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.1)",
+    minHeight: 60,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 10,
   },
   chatButton: {
+    position: "absolute",
+    bottom: 80, // Above the navigation footer
+    right: 20,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -538,17 +645,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+    zIndex: 2000,
   },
-  // testButton: {
-  //   position: "absolute",
-  //   bottom: 20,
-  //   left: 20,
-  //   backgroundColor: "#ff6b6b",
-  //   padding: 10,
-  //   borderRadius: 8,
-  //   zIndex: 1000,
-  // },
-  // testButtonText: { color: "white", fontSize: 12, fontWeight: "bold" },
 });
 
 export default App;
