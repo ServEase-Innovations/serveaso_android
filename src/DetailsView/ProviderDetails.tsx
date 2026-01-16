@@ -358,7 +358,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     lastName: props.lastname,
     
     // Use optional properties with null checks
-    middleName: props.middleName,
+    // middleName: props.middleName,
     housekeepingRole: props.housekeepingrole,
     
     // Map all ServiceProviderDTO properties with proper type conversions

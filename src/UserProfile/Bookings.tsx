@@ -146,6 +146,7 @@ interface Booking {
   address: string;
   customerName: string;
   serviceProviderName: string;
+  providerRating: number; // ADDED: Provider rating field
   taskStatus: string;
   bookingDate: string;
   engagements: string;
@@ -159,6 +160,7 @@ interface Booking {
   responsibilities: Responsibilities;
   customerHolidays?: CustomerHoliday[];
   hasVacation?: boolean;
+  assignmentStatus: string; // ADDED: Assignment status field
   vacationDetails?: {
     leave_type?: string;
     total_days?: number;
@@ -515,23 +517,55 @@ const Booking: React.FC = () => {
     }
   };
 
-  // Improved mapBookingData function with modifications support
+  // UPDATED: Improved mapBookingData function with provider info and base_amount
   const mapBookingData = (data: any[]) => {
     return Array.isArray(data)
       ? data.map((item) => {
+          console.log("Mapping booking item:", item); // Debug log
           const hasVacation = item?.vacation?.leave_days > 0;
           const serviceType = item.service_type?.toLowerCase() || item.serviceType?.toLowerCase() || 'other';
           const modifications = item.modifications || [];
           const hasModifications = modifications.length > 0;
 
+          // Get provider information from the provider object (from web code)
+          let serviceProviderName = "Not Assigned";
+          let providerRating = 0;
+          
+          // Check multiple possible locations for provider info
+          if (item.provider && item.provider.firstname && item.provider.lastname) {
+            serviceProviderName = `${item.provider.firstname} ${item.provider.lastname}`;
+            providerRating = item.provider.rating || 0;
+          } else if (item.service_provider && item.service_provider.firstname && item.service_provider.lastname) {
+            serviceProviderName = `${item.service_provider.firstname} ${item.service_provider.lastname}`;
+            providerRating = item.service_provider.rating || 0;
+          } else if (item.assignment_status === "UNASSIGNED") {
+            serviceProviderName = "Awaiting Assignment";
+          } else if (item.serviceProviderName && item.serviceProviderName !== "undefined undefined") {
+            serviceProviderName = item.serviceProviderName;
+          } else if (item.provider_name) {
+            serviceProviderName = item.provider_name;
+          }
+
+          // Debug: Log provider information
+          console.log("Provider info for booking", item.engagement_id, {
+            provider: item.provider,
+            service_provider: item.service_provider,
+            serviceProviderName: item.serviceProviderName,
+            provider_name: item.provider_name,
+            finalName: serviceProviderName
+          });
+
           // Use the current dates from API (which should reflect modifications)
           const effectiveStartDate = item.start_date;
           const effectiveEndDate = item.end_date;
 
+          // Get amount - check multiple possible fields
+          const amount = item.base_amount || item.monthlyAmount || item.total_amount || 0;
+
           return {
             id: item.engagement_id,
             customerId: item.customerId,
-            serviceProviderId: item.serviceProviderId,
+            serviceProviderId: item.serviceproviderid || item.serviceProviderId,
             name: item.customerName,
             timeSlot: item.start_time,
             date: effectiveStartDate,
@@ -540,11 +574,12 @@ const Booking: React.FC = () => {
             start_time: item.start_time,
             end_time: item.end_time,
             bookingType: item.booking_type,
-            monthlyAmount: item.monthlyAmount,
+            monthlyAmount: amount, // UPDATED: Use amount with fallbacks
             paymentMode: item.paymentMode,
             address: item.address || 'No address specified',
             customerName: item.customerName,
-            serviceProviderName: item.serviceProviderName === "undefined undefined" ? "Not Assigned" : item.serviceProviderName,
+            serviceProviderName: serviceProviderName, // UPDATED: Use provider logic from web code
+            providerRating: providerRating, // ADDED: Provider rating
             taskStatus: item.task_status,
             engagements: item.engagements,
             bookingDate: item.created_at,
@@ -560,6 +595,7 @@ const Booking: React.FC = () => {
             responsibilities: item.responsibilities,
             customerHolidays: item.customerHolidays || [],
             hasVacation: hasVacation,
+            assignmentStatus: item.assignment_status || "ASSIGNED", // ADDED: Assignment status
             vacationDetails: hasVacation && item.vacation?.leave_days > 0 
               ? {
                   ...item.vacation,
@@ -1118,7 +1154,7 @@ const Booking: React.FC = () => {
     { value: 'CANCELLED', label: 'Cancelled', count: upcomingBookings.filter(b => b.taskStatus === 'CANCELLED').length },
   ];
 
-  // UPDATED: Improved renderBookingItem with new structured layout
+  // UPDATED: Improved renderBookingItem with new structured layout including provider info
   const renderBookingItem = ({ item }: { item: Booking }) => {
     const serviceType = item.serviceType || item.service_type;
     const hasModifications = item.modifications && item.modifications.length > 0;
@@ -1144,6 +1180,12 @@ const Booking: React.FC = () => {
           <View style={styles.statusBadgesContainer}>
             {getBookingTypeBadge(item.bookingType)}
             {getStatusBadge(item.taskStatus)}
+            {item.assignmentStatus === "UNASSIGNED" && (
+              <Badge style={styles.awaitingBadge}>
+                <Icon name="clock" size={14} color="#ca8a04" />
+                <Text style={styles.awaitingBadgeText}>Awaiting</Text>
+              </Badge>
+            )}
           </View>
         </View>
 
@@ -1173,19 +1215,21 @@ const Booking: React.FC = () => {
           </View>
         </View>
 
-        {/* Fourth Line: Provider Rating, Responsibilities, and Amount */}
+        {/* Fourth Line: Provider Rating, Responsibilities, and Amount - UPDATED */}
         <View style={styles.fourthLineContainer}>
           <View style={styles.providerRatingContainer}>
             <View style={styles.ratingRow}>
               <Icon name="account" size={16} color="#6b7280" />
               <Text style={styles.providerNameText} numberOfLines={1}>
-                {item.serviceProviderName}
+                {item.assignmentStatus === "UNASSIGNED" ? "Awaiting Assignment" : `ServiceProvider: ${item.serviceProviderName}`}
               </Text>
             </View>
-            <View style={styles.ratingRow}>
-              <Icon name="star" size={16} color="#f59e0b" />
-              <Text style={styles.ratingText}>4.5</Text>
-            </View>
+            {item.providerRating > 0 && (
+              <View style={styles.ratingRow}>
+                <Icon name="star" size={16} color="#f59e0b" />
+                <Text style={styles.ratingText}>{item.providerRating.toFixed(1)}</Text>
+              </View>
+            )}
           </View>
 
         {item.responsibilities && (
@@ -1723,17 +1767,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // First Line: Service Title and Status Badges
+  // First Line: Service Title and Status Badges - UPDATED for better layout
   firstLineContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
+    flexWrap: 'wrap',
   },
   serviceTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: '50%',
   },
   serviceIcon: {
     marginRight: 8,
@@ -1746,6 +1792,10 @@ const styles = StyleSheet.create({
   statusBadgesContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    flex: 1,
+    minWidth: '50%',
   },
 
   // Second Line: Booking ID and Booking Date
@@ -1811,7 +1861,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // Fourth Line: Provider Rating, Responsibilities, and Amount
+  // Fourth Line: Provider Rating, Responsibilities, and Amount - UPDATED
   fourthLineContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2260,6 +2310,16 @@ const styles = StyleSheet.create({
   modifiedBadgeText: {
     color: '#ca8a04',
     fontSize: 12,
+  },
+  // ADDED: Awaiting badge style
+  awaitingBadge: {
+    backgroundColor: 'rgba(234, 179, 8, 0.1)',
+    borderColor: 'rgba(234, 179, 8, 0.2)',
+  },
+  awaitingBadgeText: {
+    color: '#ca8a04',
+    fontSize: 12,
+    marginLeft: 4,
   },
 
   // Snackbar

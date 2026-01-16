@@ -27,6 +27,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { add } from "../features/userSlice";
 import { addLocation } from "../features/geoLocationSlice";
 import { useAppUser } from "../context/AppUserContext";
+import LinearGradient from "react-native-linear-gradient";
 
 Geocoder.init(keys.api_key);
 
@@ -1022,7 +1023,13 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         onShow={fetchLocationWithChecks}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+           <LinearGradient
+                                          colors={["#0a2a66ff", "#004aadff"]}
+                                          start={{ x: 0, y: 0 }}
+                                          end={{ x: 1, y: 0 }}
+                                          style={styles.modalHeader}
+                                        >
+          {/* <View style={styles.modalHeader}> */}
             <Text style={styles.modalTitle}>Select Your Location</Text>
             <TouchableOpacity onPress={() => {
               setOpen(false);
@@ -1032,9 +1039,10 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
               setSearchResults([]);
               setShowSearchResults(false);
             }}>
-              <Icon name="close" size={24} color="#000" />
+              <Icon name="close" size={24} color="#ffffff" />
             </TouchableOpacity>
-          </View>
+          {/* </View> */}
+          </LinearGradient>
 
           {renderLocationModalContent()}
         </View>
@@ -1178,6 +1186,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "bold",
+      color: "#f1f5f9"
   },
   modalContent: {
     flex: 1,
