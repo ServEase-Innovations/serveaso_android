@@ -57,37 +57,47 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     }
   };
 
-  // NEW: Enhanced useEffect to include all dependencies from React code
   useEffect(() => {
     console.log('🔄 DetailsView useEffect triggered');
     console.log('📅 Booking type:', bookingType);
     console.log('📍 Location:', location);
     
     performSearch();
-  }, [selectedProviderType, location, bookingType]); // Added bookingType dependency
+  }, [selectedProviderType, location, bookingType]);
 
-  // NEW: Handle selected prop changes
   useEffect(() => {
     console.log('Selected ...', selected);
     setSelectedProviderType(selected || '');
 
-    // Only fetch if we have a selected provider type
     if (selected) {
       fetchServiceProvidersByRole(selected);
     }
   }, [selected]);
 
-  // NEW: Fetch service providers by role
   const fetchServiceProvidersByRole = async (role: string) => {
     try {
       setLoading(true);
+      console.log(`🔍 Fetching service providers by role: ${role.toUpperCase()}`);
+      
       const response = await axiosInstance.get(
         'api/serviceproviders/role?role=' + role.toUpperCase()
       );
+      
+      console.log(`✅ Fetched ${response?.data?.length || 0} service providers by role`);
+      console.log('📋 Service providers data structure:', {
+        isArray: Array.isArray(response?.data),
+        length: response?.data?.length,
+        firstItem: response?.data?.[0]
+      });
+      
       setServiceProvidersData(response?.data);
       dispatch(add(response?.data));
-    } catch (err) {
-      console.error('There was a problem with the fetch operation:', err);
+    } catch (err: any) {
+      console.error('❌ Error fetching service providers by role:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
       Alert.alert('Error', 'Failed to fetch service providers');
     } finally {
       setLoading(false);
@@ -103,42 +113,86 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   };
 
   const handleSearchResults = (data: any[]) => {
+    console.log('📥 Handle search results:', {
+      dataLength: data?.length,
+      dataStructure: Array.isArray(data) ? 'Array' : typeof data,
+      firstItem: data?.[0]
+    });
     setSearchResults(data);
     toggleDrawer(false);
   };
 
   const handleSelectedProvider = (provider: any) => {
+    console.log('👤 Handle selected provider:', {
+      providerId: provider.serviceproviderId || provider.id,
+      name: `${provider.firstname} ${provider.lastname}`,
+      role: provider.housekeepingrole,
+      dataStructure: Object.keys(provider)
+    });
+    
     if (selectedProvider) {
       selectedProvider(provider);
     }
     sendDataToParent(CONFIRMATION);
   };
 
-  // NEW: Enhanced handleSearch method from React code
   const handleSearch = (formData: { serviceType: string; startTime: string; endTime: string }) => {
-    console.log('Search data received in MainComponent:', formData);
+    console.log('🔍 Search data received:', formData);
     setSearchData(formData);
-    // Could trigger a new search based on form data
   };
 
-  // NEW: Format date only method from React code
   const formatDateOnly = (dateString?: string) => {
     if (!dateString) return '';
     return dateString.split('T')[0];
   };
 
-  // UPDATED: performSearch method to match React code structure
+  const logProviderDetails = (providers: any[], source: string) => {
+    console.log(`\n📊 =========== PROVIDER DETAILS FROM ${source} ===========`);
+    console.log(`📦 Total providers: ${providers.length}`);
+    
+    providers.forEach((provider, index) => {
+      console.log(`\n👤 Provider ${index + 1}:`);
+      console.log('   ID:', provider.serviceproviderId || provider.id);
+      console.log('   Name:', `${provider.firstname} ${provider.lastname}`);
+      console.log('   Role:', provider.housekeepingrole);
+      console.log('   Rating:', provider.rating);
+      console.log('   Experience:', provider.experience, 'years');
+      console.log('   Distance:', provider.distance_km, 'km');
+      console.log('   Locality:', provider.locality);
+      console.log('   Gender:', provider.gender);
+      console.log('   Diet:', provider.diet);
+      console.log('   Languages:', provider.languageknown);
+      console.log('   Available Time Slots:', provider.availableTimeSlots);
+      console.log('   Monthly Availability:', provider.monthlyAvailability);
+      console.log('   Other Services:', provider.otherServices);
+      console.log('   Best Match:', provider.bestMatch);
+      
+      // Log all available properties
+      const extraProps = Object.keys(provider).filter(key => 
+        !['serviceproviderId', 'id', 'firstname', 'lastname', 'housekeepingrole', 'rating', 
+          'experience', 'distance_km', 'locality', 'gender', 'diet', 'languageknown', 
+          'availableTimeSlots', 'monthlyAvailability', 'otherServices', 'bestMatch'].includes(key)
+      );
+      
+      if (extraProps.length > 0) {
+        console.log('   Additional Properties:', extraProps);
+      }
+    });
+    
+    console.log(`=========== END PROVIDER DETAILS FROM ${source} ===========\n`);
+  };
+
   const performSearch = async () => {
     try {
+      console.log('\n🚀 =========== STARTING NEW SEARCH ===========');
       setLoading(true);
 
-      console.log('📋 Booking Type in performSearch:', bookingType);
-      console.log('📍 Location object:', location?.geometry?.location);
+      console.log('📋 Booking Type:', bookingType);
+      console.log('📍 Location object:', location);
 
       let latitude = 0;
       let longitude = 0;
 
-      // Extract coordinates based on location structure
       if (location?.geometry?.location) {
         latitude = location?.geometry?.location?.lat;
         longitude = location?.geometry?.location?.lng;
@@ -147,32 +201,29 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
         longitude = location?.lng;
       }
 
-      console.log('📌 Extracted coordinates - Latitude:', latitude, 'Longitude:', longitude);
+      console.log('📌 Extracted coordinates:', { latitude, longitude });
 
-      // Use bookingType from pricing filter service
       const startDate = formatDateOnly(bookingType?.startDate) || '2025-04-01';
       const endDate = formatDateOnly(bookingType?.endDate) || '2025-04-30';
       const timeslot = bookingType?.timeRange || '16:37-16:37';
       const housekeepingRole = bookingType?.housekeepingRole || 'COOK';
 
-      console.log('🔍 SEARCH PARAMETERS:');
-      console.log('   Start Date:', startDate);
-      console.log('   End Date:', endDate);
-      console.log('   Timeslot:', timeslot);
-      console.log('   Role:', housekeepingRole);
-      console.log('   Latitude:', latitude);
-      console.log('   Longitude:', longitude);
+      console.log('🔍 Search Parameters:', {
+        startDate,
+        endDate,
+        timeslot,
+        housekeepingRole,
+        latitude,
+        longitude
+      });
 
-      // NEW: Check if we have valid coordinates
       if (latitude === 0 && longitude === 0) {
-        console.warn('⚠️ No valid coordinates found, using default search');
+        console.warn('⚠️ No valid coordinates found');
         Alert.alert('Location Required', 'Please enable location services to find providers near you');
         return;
       }
 
-      // UPDATED: Using the new API endpoint from React code
       try {
-        // Option 1: Using the original endpoint
         const queryParams = new URLSearchParams({
           startDate: startDate,
           endDate: endDate,
@@ -182,28 +233,24 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
           longitude: longitude.toString(),
         });
 
-        console.log('🌐 Calling API with query params:', queryParams.toString());
+        console.log('🌐 API Request:', `/api/serviceproviders/search?${queryParams.toString()}`);
 
         const response = await axiosInstance.get(
           `/api/serviceproviders/search?${queryParams.toString()}`
         );
 
         console.log('✅ API Response received');
-        console.log('📊 Response data structure:', typeof response.data);
+        console.log('📦 Raw response data:', response.data);
 
         if (response.data && Array.isArray(response.data)) {
-          if (response.data.length === 0) {
-            console.log('❌ No providers found with current filters');
-            setServiceProviderData([]);
-          } else {
-            console.log(`🎉 Found ${response.data.length} providers`);
-            setServiceProviderData(response.data);
-          }
+          console.log(`🎉 Found ${response.data.length} providers directly in array`);
+          logProviderDetails(response.data, 'DIRECT ARRAY RESPONSE');
+          setServiceProviderData(response.data);
         } else if (response.data && response.data.providers) {
-          // Handle response with providers object (from new API)
           const providers = response.data.providers;
           if (Array.isArray(providers) && providers.length > 0) {
-            console.log(`🎉 Found ${providers.length} providers in providers array`);
+            console.log(`🎉 Found ${providers.length} providers in providers object`);
+            logProviderDetails(providers, 'PROVIDERS OBJECT RESPONSE');
             setServiceProviderData(providers);
           } else {
             console.log('❌ No providers found in providers array');
@@ -211,27 +258,32 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
           }
         } else {
           console.log('❌ Unexpected response format');
+          console.log('Response structure:', {
+            isArray: Array.isArray(response.data),
+            hasProviders: !!response.data?.providers,
+            keys: Object.keys(response.data || {})
+          });
           setServiceProviderData([]);
         }
       } catch (apiError: any) {
-        console.error('❌ API Error:', apiError);
-        console.log('💡 Error response:', apiError.response?.data);
+        console.error('❌ API Error:', apiError.message);
+        console.log('💡 Error details:', apiError.response?.data);
         
-        // Fallback to alternative search method
         await performAlternativeSearch(startDate, endDate, housekeepingRole, latitude, longitude);
       }
     } catch (error: any) {
-      console.error('❌ Geolocation or API error:', error.message || error);
-      console.log('💡 Error details:', error.response?.data || error);
+      console.error('❌ Search failed:', {
+        message: error.message,
+        stack: error.stack
+      });
       Alert.alert('Error', 'Failed to search for providers');
       setServiceProviderData([]);
     } finally {
       setLoading(false);
-      console.log('🏁 Search completed, loading state set to false');
+      console.log('🏁 Search completed');
     }
   };
 
-  // NEW: Alternative search method from React code
   const performAlternativeSearch = async (
     startDate: string, 
     endDate: string, 
@@ -240,9 +292,8 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     longitude: number
   ) => {
     try {
-      console.log('🔄 Trying alternative search method...');
+      console.log('\n🔄 =========== TRYING ALTERNATIVE SEARCH ===========');
       
-      // Alternative API call structure similar to React code
       const response = await axiosInstance.post('https://providers-08ug.onrender.com/api/service-providers/nearby-monthly', {
         lat: latitude.toString(),
         lng: longitude.toString(),
@@ -254,12 +305,17 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
         serviceDurationMinutes: 60
       });
 
-      console.log('✅ Alternative API Response:', response.data);
+      console.log('✅ Alternative API Response structure:', {
+        hasData: !!response.data,
+        hasProviders: !!response.data?.providers,
+        providersCount: response.data?.providers?.length || 0
+      });
 
       if (response.data && response.data.providers) {
         const providers = response.data.providers;
         if (Array.isArray(providers) && providers.length > 0) {
           console.log(`🎉 Found ${providers.length} providers via alternative search`);
+          logProviderDetails(providers, 'ALTERNATIVE SEARCH');
           setServiceProviderData(providers);
         } else {
           console.log('❌ No providers found via alternative search');
@@ -267,19 +323,31 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
         }
       } else {
         console.log('❌ No providers data in alternative response');
+        console.log('Response data:', response.data);
         setServiceProviderData([]);
       }
     } catch (error: any) {
-      console.error('❌ Alternative search failed:', error);
+      console.error('❌ Alternative search failed:', {
+        message: error.message,
+        response: error.response?.data
+      });
       setServiceProviderData([]);
     }
   };
 
-  // NEW: Handle service provider selection from ProviderDetails
   const handleProviderSelection = (provider: any) => {
-    console.log('Provider selected:', provider);
+    console.log('\n🎯 =========== PROVIDER SELECTED ===========');
+    console.log('Provider selected from ProviderDetails:', {
+      id: provider.serviceproviderId || provider.id,
+      name: `${provider.firstname} ${provider.lastname}`,
+      role: provider.housekeepingrole,
+      morningSelection: provider.morningSelectionTime,
+      eveningSelection: provider.eveningSelectionTime,
+      selectedMorningTime: provider.selectedMorningTime,
+      selectedEveningTime: provider.selectedEveningTime,
+      fullData: provider
+    });
     
-    // Dispatch to Redux if needed
     const bookingData = {
       serviceproviderId: provider.serviceproviderId || provider.id,
       eveningSelection: provider.eveningSelectionTime,
@@ -287,22 +355,42 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       ...bookingType
     };
     
-    // Call parent callback if provided
+    console.log('📋 Booking data prepared:', bookingData);
+    
     if (selectedProvider) {
       selectedProvider(provider);
     }
     
-    // Navigate to confirmation
     sendDataToParent(CONFIRMATION);
   };
 
-  console.log('📦 Service Providers Data:', serviceProviderData);
-  console.log('🔄 Current loading state:', loading);
-  console.log('🎯 Selected provider type:', selectedProviderType);
+  // Log whenever serviceProviderData changes
+  useEffect(() => {
+    if (serviceProviderData.length > 0) {
+      console.log('\n📈 ServiceProviderData updated:', {
+        count: serviceProviderData.length,
+        providers: serviceProviderData.map(p => ({
+          id: p.serviceproviderId || p.id,
+          name: `${p.firstname} ${p.lastname}`,
+          role: p.housekeepingrole
+        }))
+      });
+    }
+  }, [serviceProviderData]);
+
+  console.log('📊 Current state:', {
+    serviceProviderDataLength: serviceProviderData?.length || 0,
+    loading,
+    selectedProviderType
+  });
 
   const renderContent = () => {
     console.log('🎨 Rendering content...');
-    console.log('📊 Service provider data length:', serviceProviderData?.length || 0);
+    console.log('📊 Service provider data:', {
+      length: serviceProviderData?.length || 0,
+      isArray: Array.isArray(serviceProviderData),
+      isEmpty: serviceProviderData?.length === 0
+    });
     console.log('⏳ Loading state:', loading);
 
     if (loading) {
@@ -318,7 +406,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
         </View>
       );
     } else if (Array.isArray(serviceProviderData) && serviceProviderData.length > 0) {
-      console.log('✅ Rendering providers list, count:', serviceProviderData.length);
+      console.log('✅ Rendering providers list');
       return (
         <>
           <Text style={styles.resultsCount}>

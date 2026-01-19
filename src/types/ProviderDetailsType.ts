@@ -59,8 +59,8 @@ export interface ServiceProviderDTO {
   serviceproviderid: string;
 
   // Basic info
-  firstname: string;
-  lastname: string;
+  firstName: string;
+  lastName: string;
   gender: "MALE" | "FEMALE" | "OTHER";
   experience: number; // years
   rating: number;

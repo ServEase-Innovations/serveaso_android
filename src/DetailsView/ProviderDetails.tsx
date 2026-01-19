@@ -78,6 +78,20 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const bookingType = useSelector((state: any) => state.bookingType?.value);
   const user = useSelector((state: any) => state.user?.value);
 
+  // Add useEffect to debug props
+  useEffect(() => {
+    console.log("=== PROVIDER DETAILS PROPS DEBUG ===");
+    console.log("All props keys:", Object.keys(props));
+    console.log("First name properties:");
+    console.log("  - props.firstName:", props.firstName);
+    
+    console.log("Last name properties:");
+    console.log("  - props.lastName:", props.lastName);
+   
+    console.log("Full props object:", props);
+    console.log("=== END DEBUG ===");
+  }, [props]);
+
   // Handle selection for morning or evening availability
   const handleSelection = (hour: number, isEvening: boolean, time: number) => {
     const startTime = moment({ hour: time, minute: 0 }).format("HH:mm");
@@ -354,8 +368,8 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     // Map ServiceProviderDTO properties to EnhancedProviderDetails properties
     serviceproviderId: props.serviceproviderid, // Map serviceproviderid to serviceproviderId
     
-    firstName: props.firstname,
-    lastName: props.lastname,
+    firstName: props.firstName,
+    lastName: props.lastName,
     
     // Use optional properties with null checks
     // middleName: props.middleName,
@@ -411,13 +425,23 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     }
   };
 
-  // Get gender symbol
+  // Get gender symbol - Updated to match image format (M, F)
   const getGenderSymbol = (gender: string) => {
     switch (gender?.toUpperCase()) {
       case 'FEMALE': return 'F';
       case 'MALE': return 'M';
-      default: return 'O';
+      default: return '';
     }
+  };
+
+  // Get first name - handle both camelCase and lowercase
+  const getFirstName = () => {
+    return props.firstName ;
+  };
+
+  // Get last name - handle both camelCase and lowercase
+  const getLastName = () => {
+    return props.lastName ;
   };
 
   // Get best match message
@@ -433,7 +457,9 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   };
 
   const getInitials = () => {
-    return `${props.firstname?.[0] || ''}${props.lastname?.[0] || ''}`.toUpperCase();
+    const firstName = getFirstName();
+    const lastName = getLastName();
+    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
   };
 
   // Get language display
@@ -488,6 +514,8 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   // Get age value
   const age = getAge();
   const genderSymbol = getGenderSymbol(props.gender);
+  const firstName = getFirstName();
+  const lastName = getLastName();
 
   return (
     <>
@@ -523,22 +551,26 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
               styles.centerSection,
               isMobile && styles.centerSectionMobile
             ]}>
-              {/* Name and basic info */}
+              {/* Name and basic info - Updated to match image format */}
               <View style={[
                 styles.nameContainer,
                 isMobile && styles.nameContainerMobile
               ]}>
-                <View style={styles.nameRow}>
+                {/* Name row with gender and age - Updated format */}
+                <View style={[
+                  styles.nameRow,
+                  isMobile && styles.nameRowMobile
+                ]}>
                   <Text style={[
                     styles.nameText,
                     isMobile && styles.nameTextMobile,
                     isSmallScreen && styles.nameTextSmall
                   ]}>
-                    {props.firstname} {props.lastname}
+                    {firstName} {lastName}
                   </Text>
                   <View style={[
-                    styles.genderAgeChip,
-                    isMobile && styles.genderAgeChipMobile
+                    styles.genderAgeContainer,
+                    isMobile && styles.genderAgeContainerMobile
                   ]}>
                     <Text style={[
                       styles.genderAgeText,
@@ -701,7 +733,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
                   <Text style={[
                     styles.metricLabel,
                     isMobile && styles.metricLabelMobile
-                  ]}>{props.rating || 5} reviews</Text>
+                  ]}>{props.reviewCount || 5} reviews</Text>
                 </View>
 
                 <View style={[
@@ -726,7 +758,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
               styles.rightSection,
               isMobile && styles.rightSectionMobile
             ]}>
-              {/* Role Chip */}
+              {/* Role Chip - Updated to match image [COOK] format */}
               {props.housekeepingrole && (
                 <View style={[
                   styles.roleChip,
@@ -735,7 +767,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
                   <Text style={[
                     styles.roleChipText,
                     isMobile && styles.roleChipTextMobile
-                  ]}>{props.housekeepingrole}</Text>
+                  ]}>[{props.housekeepingrole}]</Text>
                 </View>
               )}
 
@@ -900,14 +932,20 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 8,
     flexWrap: 'wrap',
   },
+  nameRowMobile: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   nameText: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#333',
+    flex: 1,
   },
   nameTextMobile: {
     fontSize: 18,
@@ -915,24 +953,19 @@ const styles = StyleSheet.create({
   nameTextSmall: {
     fontSize: 16,
   },
-  genderAgeChip: {
-    borderWidth: 1,
-    borderColor: '#666',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+  genderAgeContainer: {
+    marginLeft: 8,
   },
-  genderAgeChipMobile: {
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+  genderAgeContainerMobile: {
+    marginLeft: 6,
   },
   genderAgeText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
+    fontWeight: '500',
   },
   genderAgeTextMobile: {
-    fontSize: 11,
+    fontSize: 13,
   },
   metaRow: {
     flexDirection: 'row',
@@ -1155,18 +1188,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#1976d2',
     borderRadius: 16,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     alignSelf: 'flex-start',
   },
   roleChipMobile: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
   },
   roleChipText: {
     color: 'white',
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   roleChipTextMobile: {
     fontSize: 11,
