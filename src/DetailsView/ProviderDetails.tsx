@@ -352,9 +352,11 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   }, []);
 
   const dietImage = dietImages[props.diet as keyof typeof dietImages];
-  const isBookNowEnabled = 
-    (morningSelection !== null || eveningSelection !== null) || 
-    (matchedMorningSelection !== null || matchedEveningSelection !== null);
+  // const isBookNowEnabled = 
+  //   (morningSelection !== null || eveningSelection !== null) || 
+  //   (matchedMorningSelection !== null || matchedEveningSelection !== null);
+const isBookNowEnabled = true;
+
 
   // Helper function to convert languageknown array to string
   const getLanguageString = (languageKnown: string[] | null): string | undefined => {
@@ -442,6 +444,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   // Get last name - handle both camelCase and lowercase
   const getLastName = () => {
     return props.lastName ;
+
   };
 
   // Get best match message

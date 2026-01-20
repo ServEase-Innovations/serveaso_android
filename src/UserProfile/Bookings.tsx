@@ -38,6 +38,137 @@ import { useAppUser } from '../context/AppUserContext';
 // Add this import at the top with other dialog imports
 import ServicesDialog from '../ServiceDialogs/ServicesDialog';
 
+// Helper function to log ALL booking data in detail
+const logBookingData = (data: any, source: string) => {
+  console.log(`\n\n📋 ===== BOOKING DATA DEBUG - ${source} =====`);
+  console.log(`📊 Data Type: ${Array.isArray(data) ? 'Array' : typeof data}`);
+  console.log(`📊 Data Length: ${Array.isArray(data) ? data.length : 'N/A (not array)'}`);
+  
+  if (Array.isArray(data) && data.length > 0) {
+    console.log(`\n🔍 First Item Structure:`);
+    console.log(JSON.stringify(data[0], null, 2));
+    
+    console.log(`\n🔍 All Items Provider Info:`);
+    data.forEach((item, index) => {
+      console.log(`\n--- Item ${index + 1} ---`);
+      console.log(`📌 ID: ${item.engagement_id || item.id || 'N/A'}`);
+      console.log(`📌 Service Type: ${item.service_type || item.serviceType || 'N/A'}`);
+      
+      // Log provider object details
+      console.log(`👤 Provider Object Keys:`, item.provider ? Object.keys(item.provider) : 'No provider object');
+      
+      if (item.provider) {
+        console.log(`👤 Provider Details:`);
+        console.log(`   - firstName: ${item.provider.firstName}`);
+        console.log(`   - firstname: ${item.provider.firstname}`);
+        console.log(`   - FirstName: ${item.provider.FirstName}`);
+        console.log(`   - lastName: ${item.provider.lastName}`);
+        console.log(`   - lastname: ${item.provider.lastname}`);
+        console.log(`   - LastName: ${item.provider.LastName}`);
+        console.log(`   - rating: ${item.provider.rating}`);
+        console.log(`   - Full provider object:`, JSON.stringify(item.provider, null, 2));
+      }
+      
+      // Log service_provider object details
+      if (item.service_provider) {
+        console.log(`👤 Service Provider Object:`);
+        console.log(`   - firstName: ${item.service_provider.firstName}`);
+        console.log(`   - firstname: ${item.service_provider.firstname}`);
+        console.log(`   - Full service_provider object:`, JSON.stringify(item.service_provider, null, 2));
+      }
+      
+      // Log other important fields
+      console.log(`📌 assignment_status: ${item.assignment_status}`);
+      console.log(`📌 serviceProviderName: ${item.serviceProviderName}`);
+      console.log(`📌 provider_name: ${item.provider_name}`);
+      console.log(`📌 task_status: ${item.task_status}`);
+      console.log(`📌 booking_type: ${item.booking_type}`);
+      console.log(`📌 start_date: ${item.start_date}`);
+      console.log(`📌 end_date: ${item.end_date}`);
+      console.log(`📌 start_time: ${item.start_time}`);
+      console.log(`📌 end_time: ${item.end_time}`);
+      
+      // Log vacation details
+      if (item.vacation) {
+        console.log(`🏖️ Vacation Details:`, JSON.stringify(item.vacation, null, 2));
+      }
+      
+      // Log modifications
+      if (item.modifications && item.modifications.length > 0) {
+        console.log(`🔄 Modifications:`, JSON.stringify(item.modifications, null, 2));
+      }
+      
+      // Log responsibilities
+      if (item.responsibilities) {
+        console.log(`📋 Responsibilities:`, JSON.stringify(item.responsibilities, null, 2));
+      }
+    });
+  } else if (data && typeof data === 'object') {
+    console.log(`\n🔍 Single Object Structure:`);
+    console.log(JSON.stringify(data, null, 2));
+  } else {
+    console.log(`\n⚠️ No data to display`);
+  }
+  
+  console.log(`\n📋 ===== END DEBUG =====\n\n`);
+};
+
+// Helper function to log the final mapped booking data
+const logMappedBooking = (booking: any, index: number) => {
+  console.log(`\n🎯 ===== MAPPED BOOKING ${index + 1} =====`);
+  console.log(`📌 Final ID: ${booking.id}`);
+  console.log(`📌 Final Service Provider Name: "${booking.serviceProviderName}"`);
+  console.log(`📌 Provider Rating: ${booking.providerRating}`);
+  console.log(`📌 Assignment Status: ${booking.assignmentStatus}`);
+  console.log(`📌 Task Status: ${booking.taskStatus}`);
+  console.log(`📌 Booking Type: ${booking.bookingType}`);
+  console.log(`📌 Service Type: ${booking.serviceType}`);
+  console.log(`📌 Amount: ${booking.monthlyAmount}`);
+  console.log(`📌 Address: ${booking.address}`);
+  console.log(`📌 Start Date: ${booking.startDate}`);
+  console.log(`📌 End Date: ${booking.endDate}`);
+  console.log(`📌 Start Time: ${booking.start_time}`);
+  console.log(`📌 End Time: ${booking.end_time}`);
+  console.log(`📌 Has Vacation: ${booking.hasVacation}`);
+  if (booking.vacationDetails) {
+    console.log(`🏖️ Vacation Details:`, booking.vacationDetails);
+  }
+  if (booking.modifications && booking.modifications.length > 0) {
+    console.log(`🔄 Modification Count: ${booking.modifications.length}`);
+  }
+  console.log(`🎯 ===== END MAPPED BOOKING =====\n`);
+};
+
+// Helper function to get first name from provider object
+const getProviderFirstName = (provider: any): string => {
+  if (!provider) return '';
+  console.log(`🔍 getProviderFirstName called with:`, provider);
+  const firstName = provider.firstName || provider.firstname || provider.FirstName || '';
+  console.log(`🔍 Found firstName: "${firstName}"`);
+  return firstName;
+};
+
+// Helper function to get last name from provider object
+const getProviderLastName = (provider: any): string => {
+  if (!provider) return '';
+  console.log(`🔍 getProviderLastName called with:`, provider);
+  const lastName = provider.lastName || provider.lastname || provider.LastName || '';
+  console.log(`🔍 Found lastName: "${lastName}"`);
+  return lastName;
+};
+
+// Helper function to get full provider name
+const getProviderFullName = (provider: any): string => {
+  if (!provider) {
+    console.log(`🔍 getProviderFullName: No provider object`);
+    return '';
+  }
+  const firstName = getProviderFirstName(provider);
+  const lastName = getProviderLastName(provider);
+  const fullName = `${firstName} ${lastName}`.trim();
+  console.log(`🔍 getProviderFullName result: "${fullName}"`);
+  return fullName;
+};
 
 // Implement Card component
 const Card: React.FC<{ children: React.ReactNode; style?: StyleProp<ViewStyle> }> = ({ children, style }) => {
@@ -481,10 +612,12 @@ const Booking: React.FC = () => {
   // DATA FETCHING FUNCTIONS
   useEffect(() => {
     if (isAuthenticated && appUser?.customerid) {
+      console.log('🔑 User authenticated with customerid:', appUser.customerid);
       setIsLoading(true);
       setCustomerId(appUser.customerid);
       fetchBookings(appUser.customerid);
     } else {
+      console.log('🔑 User not authenticated or no customerid');
       setIsLoading(false);
     }
   }, [appUser, isAuthenticated]);
@@ -493,17 +626,46 @@ const Booking: React.FC = () => {
   const refreshBookings = async (id?: string) => {
     const effectiveId = id || customerId;
     if (effectiveId !== null && effectiveId !== undefined) {
-      console.log("Fetching bookings for customerId:", effectiveId);
+      console.log("🔄 Fetching bookings for customerId:", effectiveId);
 
-      const response = await PaymentInstance.get(
-        `/api/customers/${effectiveId}/engagements`
-      );
+      try {
+        const response = await PaymentInstance.get(
+          `/api/customers/${effectiveId}/engagements`
+        );
 
-      const { past = [], ongoing = [], upcoming = [], cancelled = [] } = response.data || {};
+        console.log('📡 API Response Status:', response.status);
+        console.log('📡 API Response Headers:', response.headers);
+        
+        const responseData = response.data || {};
+        console.log('📡 Raw API Response Data Structure:', Object.keys(responseData));
+        
+        const { past = [], ongoing = [], upcoming = [], cancelled = [] } = responseData;
+        
+        console.log(`📊 Booking Counts - Past: ${past.length}, Ongoing: ${ongoing.length}, Upcoming: ${upcoming.length}, Cancelled: ${cancelled.length}`);
+        
+        // Log detailed data for each category
+        if (past.length > 0) {
+          logBookingData(past, 'PAST BOOKINGS');
+        }
+        if (ongoing.length > 0) {
+          logBookingData(ongoing, 'ONGOING BOOKINGS');
+        }
+        if (upcoming.length > 0) {
+          logBookingData(upcoming, 'UPCOMING BOOKINGS');
+        }
+        if (cancelled.length > 0) {
+          logBookingData(cancelled, 'CANCELLED BOOKINGS');
+        }
 
-      setPastBookings(mapBookingData(past));
-      setCurrentBookings(mapBookingData(ongoing));
-      setFutureBookings(mapBookingData(upcoming));
+        setPastBookings(mapBookingData(past));
+        setCurrentBookings(mapBookingData(ongoing));
+        setFutureBookings(mapBookingData(upcoming));
+        
+      } catch (error: any) {
+        console.error('❌ Error fetching bookings:', error);
+        console.error('❌ Error response:', error.response?.data);
+        console.error('❌ Error status:', error.response?.status);
+      }
     }
   };
 
@@ -511,7 +673,7 @@ const Booking: React.FC = () => {
     try {
       await refreshBookings(id);
     } catch (error) {
-      console.error("Error fetching booking details:", error);
+      console.error("❌ Error fetching booking details:", error);
     } finally {
       setIsLoading(false);
     }
@@ -519,41 +681,54 @@ const Booking: React.FC = () => {
 
   // UPDATED: Improved mapBookingData function with provider info and base_amount
   const mapBookingData = (data: any[]) => {
-    return Array.isArray(data)
-      ? data.map((item) => {
-          console.log("Mapping booking item:", item); // Debug log
+    console.log(`\n🗺️ ===== MAPPING BOOKING DATA =====`);
+    console.log(`📊 Input data length: ${data.length}`);
+    
+    const result = Array.isArray(data)
+      ? data.map((item, index) => {
+          console.log(`\n📦 Processing item ${index + 1}:`);
+          console.log(`📌 Raw item keys:`, Object.keys(item));
+          
           const hasVacation = item?.vacation?.leave_days > 0;
           const serviceType = item.service_type?.toLowerCase() || item.serviceType?.toLowerCase() || 'other';
           const modifications = item.modifications || [];
           const hasModifications = modifications.length > 0;
 
-          // Get provider information from the provider object (from web code)
+          // Get provider information from the provider object
           let serviceProviderName = "Not Assigned";
           let providerRating = 0;
           
-          // Check multiple possible locations for provider info
-          if (item.provider && item.provider.firstname && item.provider.lastname) {
-            serviceProviderName = `${item.provider.firstname} ${item.provider.lastname}`;
-            providerRating = item.provider.rating || 0;
-          } else if (item.service_provider && item.service_provider.firstname && item.service_provider.lastname) {
-            serviceProviderName = `${item.service_provider.firstname} ${item.service_provider.lastname}`;
-            providerRating = item.service_provider.rating || 0;
+          console.log(`🔍 Looking for provider name...`);
+          
+          // Check multiple possible locations for provider info with correct property names
+          if (item.provider) {
+            console.log(`✅ Found provider object:`, item.provider);
+            const fullName = getProviderFullName(item.provider);
+            if (fullName) {
+              serviceProviderName = fullName;
+              providerRating = item.provider.rating || 0;
+              console.log(`✅ Using provider object name: "${serviceProviderName}"`);
+            }
+          } else if (item.service_provider) {
+            console.log(`✅ Found service_provider object:`, item.service_provider);
+            const fullName = getProviderFullName(item.service_provider);
+            if (fullName) {
+              serviceProviderName = fullName;
+              providerRating = item.service_provider.rating || 0;
+              console.log(`✅ Using service_provider object name: "${serviceProviderName}"`);
+            }
           } else if (item.assignment_status === "UNASSIGNED") {
             serviceProviderName = "Awaiting Assignment";
+            console.log(`✅ Using "Awaiting Assignment" (UNASSIGNED status)`);
           } else if (item.serviceProviderName && item.serviceProviderName !== "undefined undefined") {
             serviceProviderName = item.serviceProviderName;
+            console.log(`✅ Using serviceProviderName field: "${serviceProviderName}"`);
           } else if (item.provider_name) {
             serviceProviderName = item.provider_name;
+            console.log(`✅ Using provider_name field: "${serviceProviderName}"`);
+          } else {
+            console.log(`❌ No provider name found in any field`);
           }
-
-          // Debug: Log provider information
-          console.log("Provider info for booking", item.engagement_id, {
-            provider: item.provider,
-            service_provider: item.service_provider,
-            serviceProviderName: item.serviceProviderName,
-            provider_name: item.provider_name,
-            finalName: serviceProviderName
-          });
 
           // Use the current dates from API (which should reflect modifications)
           const effectiveStartDate = item.start_date;
@@ -562,7 +737,7 @@ const Booking: React.FC = () => {
           // Get amount - check multiple possible fields
           const amount = item.base_amount || item.monthlyAmount || item.total_amount || 0;
 
-          return {
+          const mappedBooking = {
             id: item.engagement_id,
             customerId: item.customerId,
             serviceProviderId: item.serviceproviderid || item.serviceProviderId,
@@ -574,12 +749,12 @@ const Booking: React.FC = () => {
             start_time: item.start_time,
             end_time: item.end_time,
             bookingType: item.booking_type,
-            monthlyAmount: amount, // UPDATED: Use amount with fallbacks
+            monthlyAmount: amount,
             paymentMode: item.paymentMode,
             address: item.address || 'No address specified',
             customerName: item.customerName,
-            serviceProviderName: serviceProviderName, // UPDATED: Use provider logic from web code
-            providerRating: providerRating, // ADDED: Provider rating
+            serviceProviderName: serviceProviderName,
+            providerRating: providerRating,
             taskStatus: item.task_status,
             engagements: item.engagements,
             bookingDate: item.created_at,
@@ -595,7 +770,7 @@ const Booking: React.FC = () => {
             responsibilities: item.responsibilities,
             customerHolidays: item.customerHolidays || [],
             hasVacation: hasVacation,
-            assignmentStatus: item.assignment_status || "ASSIGNED", // ADDED: Assignment status
+            assignmentStatus: item.assignment_status || "ASSIGNED",
             vacationDetails: hasVacation && item.vacation?.leave_days > 0 
               ? {
                   ...item.vacation,
@@ -606,8 +781,18 @@ const Booking: React.FC = () => {
             modifications: modifications,
             today_service: item.today_service
           };
+
+          // Log the mapped booking
+          logMappedBooking(mappedBooking, index);
+          
+          return mappedBooking;
         })
       : [];
+    
+    console.log(`\n🗺️ ===== MAPPING COMPLETE =====`);
+    console.log(`📊 Mapped ${result.length} bookings`);
+    
+    return result;
   };
 
   // FILTER & SORT FUNCTIONS
@@ -639,13 +824,14 @@ const Booking: React.FC = () => {
 
   // Improved refresh function
   const onRefresh = async () => {
+    console.log('🔄 Manual refresh triggered');
     setIsRefreshing(true);
     try {
       if (customerId !== null) {
         await refreshBookings();
       }
     } catch (error) {
-      console.error("Error refreshing bookings:", error);
+      console.error("❌ Error refreshing bookings:", error);
     } finally {
       setIsRefreshing(false);
     }
@@ -653,12 +839,14 @@ const Booking: React.FC = () => {
 
   // NEW: Vacation success handler from React code
   const handleVacationSuccess = async () => {
+    console.log('✅ Vacation applied successfully');
     setOpenSnackbar(true);
     await refreshBookings();
   };
 
   // NEW: Handle modify vacation click from React code
   const handleModifyVacationClick = (booking: Booking) => {
+    console.log('📅 Modify vacation clicked for booking:', booking.id);
     setSelectedBookingForVacationManagement(booking);
     setVacationManagementDialogOpen(true);
   };
@@ -671,6 +859,7 @@ const Booking: React.FC = () => {
     message: string,
     severity: 'info' | 'warning' | 'error' | 'success' = 'info'
   ) => {
+    console.log(`⚠️ Showing confirmation dialog: ${title}`);
     setConfirmationDialog({
       open: true,
       type,
@@ -685,6 +874,7 @@ const Booking: React.FC = () => {
     const { type, booking } = confirmationDialog;
     if (!booking) return;
 
+    console.log(`✅ Confirming action: ${type} for booking ${booking.id}`);
     setActionLoading(true);
 
     try {
@@ -702,7 +892,7 @@ const Booking: React.FC = () => {
           break;
       }
     } catch (error) {
-      console.error("Error performing action:", error);
+      console.error("❌ Error performing action:", error);
     } finally {
       setActionLoading(false);
       setConfirmationDialog(prev => ({ ...prev, open: false }));
@@ -711,6 +901,7 @@ const Booking: React.FC = () => {
 
   // ACTION HANDLERS - BUTTON CLICKS
   const handleCancelClick = (booking: Booking) => {
+    console.log(`❌ Cancel clicked for booking ${booking.id}`);
     showConfirmation(
       'cancel',
       booking,
@@ -721,16 +912,19 @@ const Booking: React.FC = () => {
   };
 
   const handleLeaveReviewClick = (booking: Booking) => {
+    console.log(`⭐ Leave review clicked for booking ${booking.id}`);
     setSelectedReviewBooking(booking);
     setReviewDialogVisible(true);
   };
 
   const closeReviewDialog = () => {
+    console.log(`❌ Closing review dialog`);
     setReviewDialogVisible(false);
     setSelectedReviewBooking(null);
   };
 
   const handleReviewSubmitted = (bookingId: number) => {
+    console.log(`✅ Review submitted for booking ${bookingId}`);
     setReviewedBookings(prev => [...prev, bookingId]);
     if (customerId !== null) {
       onRefresh();
@@ -742,22 +936,26 @@ const Booking: React.FC = () => {
   };
 
   const handleModifyClick = (booking: Booking) => {
+    console.log(`✏️ Modify clicked for booking ${booking.id}`);
     setSelectedBooking(booking);
     setModifyDialogOpen(true);
   };
 
   const handleVacationClick = (booking: Booking) => {
+    console.log(`🏖️ Vacation clicked for booking ${booking.id}`);
     setSelectedBookingForLeave(booking);
     setHolidayDialogOpen(true);
   };
 
   const handleApplyLeaveClick = (booking: Booking) => {
+    console.log(`📅 Apply leave clicked for booking ${booking.id}`);
     setSelectedBookingForLeave(booking);
     setHolidayDialogOpen(true);
   };
 
   // Improved cancel booking with PaymentInstance
   const handleCancelBooking = async (booking: Booking) => {
+    console.log(`🚫 Cancelling booking ${booking.id}`);
     try {
       setActionLoading(true);
       
@@ -773,12 +971,14 @@ const Booking: React.FC = () => {
         }
       );
 
+      console.log(`✅ Booking ${booking.id} cancelled successfully`);
+      
       // Refresh bookings after cancellation
       await refreshBookings();
       setOpenSnackbar(true);
       
     } catch (error: any) {
-      console.error("Error cancelling engagement:", error);
+      console.error("❌ Error cancelling engagement:", error);
       // Fallback update local state
       setCurrentBookings((prev) =>
         prev.map((b) =>
@@ -801,15 +1001,19 @@ const Booking: React.FC = () => {
     endDate: string;
     timeSlot: string;
   }) => {
+    console.log(`💾 Saving modified booking:`, updatedData);
     setModifyDialogOpen(false);
   };
 
   // Improved leave submit with PaymentInstance
   const handleLeaveSubmit = async (startDate: string, endDate: string, service_type: string): Promise<void> => {
     if (!selectedBookingForLeave || !customerId) {
+      console.error('❌ Missing required information for leave application');
       throw new Error("Missing required information for leave application");
     }
 
+    console.log(`📅 Applying leave for booking ${selectedBookingForLeave.id}: ${startDate} to ${endDate}`);
+    
     try {
       setIsRefreshing(true);
       
@@ -830,7 +1034,7 @@ const Booking: React.FC = () => {
       setOpenSnackbar(true);
       setHolidayDialogOpen(false);
     } catch (error) {
-      console.error("Error applying leave:", error);
+      console.error("❌ Error applying leave:", error);
       throw error;
     } finally {
       setIsRefreshing(false);
@@ -839,9 +1043,13 @@ const Booking: React.FC = () => {
 
   // NEW: renderScheduledMessage function from React code - MOVED INSIDE COMPONENT
   const renderScheduledMessage = (booking: Booking) => {
-    if (!booking.today_service) return null;
+    if (!booking.today_service) {
+      console.log(`📅 No today_service for booking ${booking.id}`);
+      return null;
+    }
 
     const { status, can_generate_otp, otp_active } = booking.today_service;
+    console.log(`📅 Today service status for booking ${booking.id}: ${status}`);
 
     switch (status) {
       case "SCHEDULED":
@@ -889,7 +1097,10 @@ const Booking: React.FC = () => {
               <View style={styles.otpButtonContainer}>
                 <Button
                   style={[styles.otpButton, otp_active && styles.otpButtonDisabled]}
-                  onPress={() => {/* Handle OTP generation */}}
+                  onPress={() => {
+                    console.log(`🔑 Generating OTP for booking ${booking.id}`);
+                    /* Handle OTP generation */
+                  }}
                   disabled={otp_active}
                 >
                   <Icon name="check-circle" size={16} color="#fff" />
@@ -914,6 +1125,7 @@ const Booking: React.FC = () => {
                     <Button
                       style={styles.copyOtpButton}
                       onPress={() => {
+                        console.log(`📋 Copying OTP for booking ${booking.id}`);
                         // Copy OTP to clipboard
                         // navigator.clipboard.writeText("123456");
                         Alert.alert("Success", "OTP copied to clipboard!");
@@ -972,6 +1184,7 @@ const Booking: React.FC = () => {
         );
 
       default:
+        console.log(`📅 Unknown status for booking ${booking.id}: ${status}`);
         return null;
     }
   };
@@ -982,16 +1195,21 @@ const Booking: React.FC = () => {
     const modificationTooltip = getModificationTooltip(booking);
     const hasExistingVacation = hasVacation(booking);
 
+    console.log(`🔘 Rendering action buttons for booking ${booking.id}:`);
+    console.log(`   - Status: ${booking.taskStatus}`);
+    console.log(`   - Modification disabled: ${modificationDisabled}`);
+    console.log(`   - Has vacation: ${hasExistingVacation}`);
+
     switch (booking.taskStatus) {
       case 'NOT_STARTED':
         return (
           <>
-            <Button style={styles.actionButton} onPress={() => {}}>
+            <Button style={styles.actionButton} onPress={() => console.log(`📞 Call provider for booking ${booking.id}`)}>
               <Icon name="phone" size={16} color="#000" />
               <Text>Call Provider</Text>
             </Button>
 
-            <Button style={styles.actionButton} onPress={() => {}}>
+            <Button style={styles.actionButton} onPress={() => console.log(`💬 Message provider for booking ${booking.id}`)}>
               <Icon name="message-text" size={16} color="#000" />
               <Text>Message</Text>
             </Button>
@@ -1044,12 +1262,12 @@ const Booking: React.FC = () => {
       case 'IN_PROGRESS':
         return (
           <>
-            <Button style={styles.actionButton} onPress={() => {}}>
+            <Button style={styles.actionButton} onPress={() => console.log(`📞 Call provider for booking ${booking.id}`)}>
               <Icon name="phone" size={16} color="#000" />
               <Text>Call Provider</Text>
             </Button>
 
-            <Button style={styles.actionButton} onPress={() => {}}>
+            <Button style={styles.actionButton} onPress={() => console.log(`💬 Message provider for booking ${booking.id}`)}>
               <Icon name="message-text" size={16} color="#000" />
               <Text>Message</Text>
             </Button>
@@ -1109,7 +1327,7 @@ const Booking: React.FC = () => {
               </Button>
             )}
 
-            <Button style={styles.actionButton} onPress={() => {}}>
+            <Button style={styles.actionButton} onPress={() => console.log(`📅 Book again for service ${booking.serviceType}`)}>
               <Text>Book Again</Text>
             </Button>
           </>
@@ -1117,12 +1335,13 @@ const Booking: React.FC = () => {
 
       case 'CANCELLED':
         return (
-          <Button style={styles.actionButton} onPress={() => {}}>
+          <Button style={styles.actionButton} onPress={() => console.log(`📅 Book again for cancelled service ${booking.serviceType}`)}>
             <Text>Book Again</Text>
           </Button>
         );
 
       default:
+        console.log(`🔘 Unknown task status for booking ${booking.id}: ${booking.taskStatus}`);
         return null;
     }
   };
@@ -1134,6 +1353,22 @@ const Booking: React.FC = () => {
     : upcomingBookings.filter(booking => booking.taskStatus === statusFilter);
   const filteredUpcomingBookings = filterBookings(filteredByStatus, searchTerm);
   const filteredPastBookings = filterBookings(pastBookings, searchTerm);
+
+  // Log final state
+  useEffect(() => {
+    console.log('\n📊 ===== FINAL BOOKING STATE =====');
+    console.log(`📌 Current Bookings: ${currentBookings.length}`);
+    console.log(`📌 Future Bookings: ${futureBookings.length}`);
+    console.log(`📌 Past Bookings: ${pastBookings.length}`);
+    console.log(`📌 Upcoming Bookings: ${upcomingBookings.length}`);
+    console.log(`📌 Filtered Upcoming: ${filteredUpcomingBookings.length}`);
+    console.log(`📌 Filtered Past: ${filteredPastBookings.length}`);
+    console.log(`📌 Status Filter: ${statusFilter}`);
+    console.log(`📌 Search Term: "${searchTerm}"`);
+    console.log(`📌 Customer ID: ${customerId}`);
+    console.log(`📌 Loading: ${isLoading}, Refreshing: ${isRefreshing}`);
+    console.log('📊 ===== END STATE =====\n');
+  }, [currentBookings, futureBookings, pastBookings, upcomingBookings, filteredUpcomingBookings, filteredPastBookings, statusFilter, searchTerm, customerId, isLoading, isRefreshing]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -1159,6 +1394,12 @@ const Booking: React.FC = () => {
     const serviceType = item.serviceType || item.service_type;
     const hasModifications = item.modifications && item.modifications.length > 0;
     const modificationDetails = getModificationDetails(item);
+    
+    console.log(`\n🖼️ Rendering booking item ${item.id}:`);
+    console.log(`   - Service Provider: "${item.serviceProviderName}"`);
+    console.log(`   - Assignment Status: ${item.assignmentStatus}`);
+    console.log(`   - Task Status: ${item.taskStatus}`);
+    console.log(`   - Has Modifications: ${hasModifications}`);
     
     return (
       <Card style={styles.bookingCard}>
@@ -1320,6 +1561,7 @@ const Booking: React.FC = () => {
   };
 
   if (isLoading) {
+    console.log('⏳ Loading state active');
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#3b82f6" />
@@ -1352,12 +1594,18 @@ const Booking: React.FC = () => {
               placeholder="Search bookings..."
               placeholderTextColor="#9ca3af"
               value={searchTerm}
-              onChangeText={setSearchTerm}
+              onChangeText={(text) => {
+                console.log(`🔍 Search term changed: "${text}"`);
+                setSearchTerm(text);
+              }}
             />
             {searchTerm && (
               <TouchableOpacity 
                 style={styles.clearSearchButton}
-                onPress={() => setSearchTerm('')}
+                onPress={() => {
+                  console.log('❌ Clearing search term');
+                  setSearchTerm('');
+                }}
               >
                 <Icon name="close-circle" size={20} color="#9ca3af" />
               </TouchableOpacity>
@@ -1365,7 +1613,10 @@ const Booking: React.FC = () => {
           </View>
           <TouchableOpacity 
             style={styles.walletButton}
-            onPress={() => setWalletDialogOpen(true)}
+            onPress={() => {
+              console.log('💰 Opening wallet dialog');
+              setWalletDialogOpen(true);
+            }}
           >
             <Icon name="wallet" size={24} color="#fff" />
             <Text style={styles.walletText}>Wallet</Text>
@@ -1406,7 +1657,10 @@ const Booking: React.FC = () => {
                     styles.statusTab,
                     statusFilter === tab.value && styles.statusTabActive
                   ]}
-                  onPress={() => setStatusFilter(tab.value)}
+                  onPress={() => {
+                    console.log(`📊 Status filter changed to: ${tab.value}`);
+                    setStatusFilter(tab.value);
+                  }}
                 >
                   <Text style={[
                     styles.statusTabText,
@@ -1437,7 +1691,10 @@ const Booking: React.FC = () => {
               {/* Update the empty state button in the upcoming bookings section */}
               <Button 
                 style={styles.emptyStateButton}
-                onPress={() => setServicesDialogOpen(true)}
+                onPress={() => {
+                  console.log('📅 Opening services dialog from empty state');
+                  setServicesDialogOpen(true);
+                }}
               >
                 <Text>Book a Service</Text>
               </Button>
@@ -1480,7 +1737,10 @@ const Booking: React.FC = () => {
       {/* Dialogs */}
       <UserHoliday 
         open={holidayDialogOpen}
-        onClose={() => setHolidayDialogOpen(false)}
+        onClose={() => {
+          console.log('❌ Closing holiday dialog');
+          setHolidayDialogOpen(false);
+        }}
         booking={convertBookingForChildComponents(selectedBookingForLeave)}
         onLeaveSubmit={handleLeaveSubmit}
       />
@@ -1488,6 +1748,7 @@ const Booking: React.FC = () => {
       <VacationManagementDialog
         open={vacationManagementDialogOpen}
         onClose={() => {
+          console.log('❌ Closing vacation management dialog');
           setVacationManagementDialogOpen(false);
           setSelectedBookingForVacationManagement(null);
         }}
@@ -1498,7 +1759,10 @@ const Booking: React.FC = () => {
 
       <ModifyBookingDialog
         open={modifyDialogOpen}
-        onClose={() => setModifyDialogOpen(false)}
+        onClose={() => {
+          console.log('❌ Closing modify dialog');
+          setModifyDialogOpen(false);
+        }}
         booking={convertBookingForChildComponents(selectedBooking)}
         timeSlots={timeSlots}
         onSave={handleSaveModifiedBooking}
@@ -1509,7 +1773,10 @@ const Booking: React.FC = () => {
 
       <ConfirmationDialog
         open={confirmationDialog.open}
-        onClose={() => setConfirmationDialog(prev => ({ ...prev, open: false }))}
+        onClose={() => {
+          console.log('❌ Closing confirmation dialog');
+          setConfirmationDialog(prev => ({ ...prev, open: false }));
+        }}
         onConfirm={handleConfirmAction}
         title={confirmationDialog.title}
         message={confirmationDialog.message}
@@ -1527,17 +1794,22 @@ const Booking: React.FC = () => {
 
       <WalletDialog 
         open={walletDialogOpen}
-        onClose={() => setWalletDialogOpen(false)}
+        onClose={() => {
+          console.log('❌ Closing wallet dialog');
+          setWalletDialogOpen(false);
+        }}
       />
 
       {/* Add the ServicesDialog component with other dialog components at the bottom */}
       <ServicesDialog
         open={servicesDialogOpen}
-        onClose={() => setServicesDialogOpen(false)}
+        onClose={() => {
+          console.log('❌ Closing services dialog');
+          setServicesDialogOpen(false);
+        }}
         onServiceSelect={(serviceType) => {
+          console.log('✅ Service selected:', serviceType);
           // Handle service selection
-          console.log('Selected service type:', serviceType);
-          // You can navigate to booking form or handle the selection
           // Example: navigation.navigate('BookingForm', { serviceType });
         }}
       />
@@ -1546,7 +1818,10 @@ const Booking: React.FC = () => {
       {openSnackbar && (
         <View style={styles.snackbar}>
           <Text style={styles.snackbarText}>Operation completed successfully!</Text>
-          <TouchableOpacity onPress={() => setOpenSnackbar(false)}>
+          <TouchableOpacity onPress={() => {
+            console.log('❌ Closing snackbar');
+            setOpenSnackbar(false);
+          }}>
             <Icon name="close" size={20} color="#fff" />
           </TouchableOpacity>
         </View>

@@ -1,4 +1,4 @@
-// Head.tsx - UPDATED: Removed Notification and Bookings buttons from header
+// Head.tsx - UPDATED: With closeDropdowns prop
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -45,6 +45,7 @@ interface ChildComponentProps {
   onAboutClick: () => void;
   onContactClick: () => void;
   onLogoClick: () => void;
+  closeDropdowns?: boolean; // CHANGED: Prop to trigger dropdown closing (boolean instead of number)
 }
 
 // Location data interface
@@ -66,7 +67,8 @@ const Head: React.FC<ChildComponentProps> = ({
   bookingType,
   onAboutClick,
   onContactClick,
-  onLogoClick
+  onLogoClick,
+  closeDropdowns = false // CHANGED: Default value changed to false
 }) => {
   const {
     authorize,
@@ -89,6 +91,15 @@ const Head: React.FC<ChildComponentProps> = ({
   const [showBookings, setShowBookings] = useState(false);
   const [selectedService, setSelectedService] = useState("");
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
+
+  // NEW: Close dropdowns when parent triggers it
+  useEffect(() => {
+    if (closeDropdowns) {
+      setMenuVisible(false);
+      // Note: We can't directly control LocationSelector's dropdown
+      // It should handle its own closing on outside clicks
+    }
+  }, [closeDropdowns]);
 
   // Snackbar helper functions
   const showSuccessSnackbar = (message: string) => {
@@ -417,9 +428,6 @@ const Head: React.FC<ChildComponentProps> = ({
   // Export function to get location data
   const getLocationData = () => currentLocation;
 
-  // REMOVED: Conditional rendering for Notification and Bookings icons in header
-  // They are now only available in the menu dropdown
-
   // Render menu items based on user authentication and role
   const renderMenuItems = () => {
     // Not logged in
@@ -635,9 +643,10 @@ const Head: React.FC<ChildComponentProps> = ({
 
   return (
     <View style={{ position: "relative" }}>
+      {/* Overlay when menu is visible - covers entire screen */}
       {menuVisible && (
         <TouchableWithoutFeedback onPress={handleOverlayPress}>
-          <View style={styles.overlay} />
+          <View style={[styles.overlay, StyleSheet.absoluteFillObject]} />
         </TouchableWithoutFeedback>
       )}
 
@@ -668,9 +677,6 @@ const Head: React.FC<ChildComponentProps> = ({
 
         {/* Right Actions - ONLY User Menu Icon now */}
         <View style={styles.rightActionsContainer}>
-          {/* REMOVED: Notification and Bookings icons from header */}
-          {/* They are now only available in the menu dropdown */}
-          
           {/* User Menu Icon */}
           <TouchableOpacity 
             style={[styles.iconButton, styles.userMenuButton]}
@@ -835,7 +841,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
-    maxWidth: 150, // Reduced max width since we only have user menu now
+    maxWidth: 150,
   },
   iconButton: {
     justifyContent: "center",
@@ -878,12 +884,8 @@ const styles = StyleSheet.create({
     maxWidth: 60,
   },
   overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: "transparent",
+    zIndex: 999,
   },
   menuDropdown: {
     position: "absolute",

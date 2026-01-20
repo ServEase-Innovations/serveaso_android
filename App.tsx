@@ -15,6 +15,7 @@ import {
   AppStateStatus,
   Platform,
   Dimensions,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Auth0Provider } from "react-native-auth0";
@@ -76,12 +77,23 @@ const MainApp = () => {
   const socketRef = useRef<Socket | null>(null);
   const SOCKET_URL = "https://payments-j5id.onrender.com";
 
+  // Add this state in MainApp component
+  const [closeDropdowns, setCloseDropdowns] = useState(false);
+
+  // Add this ref for handling clicks
+  const contentRef = useRef<ScrollView>(null);
+
   const dispatch = useDispatch();
   const { appUser } = useAppUser();
 
   // Get screen dimensions
   const { height, width } = Dimensions.get('window');
   const isMobile = width < 768;
+
+  // Add this function to close all dropdowns
+  const handleContentPress = () => {
+    setCloseDropdowns(prev => !prev); // Toggle to trigger useEffect in Head
+  };
 
   useEffect(() => {
     console.log("🔄 AppUser changed:", appUser ? `Logged in as ${appUser.role}` : "Logged out");
@@ -414,6 +426,7 @@ const MainApp = () => {
             onAboutClick={handleAboutClick}
             onContactClick={handleContactClick}
             onLogoClick={handleHomeClick}
+            closeDropdowns={closeDropdowns}
           />
         </View>
 
@@ -432,6 +445,7 @@ const MainApp = () => {
             </ScrollView>
           ) : (
             <ScrollView
+              ref={contentRef}
               style={styles.mainScrollView}
               contentContainerStyle={[
                 styles.scrollContent,
@@ -439,10 +453,15 @@ const MainApp = () => {
                   styles.fullScreenScrollContent,
               ]}
               contentInsetAdjustmentBehavior="automatic"
+              onScrollBeginDrag={handleContentPress} // Close dropdowns on scroll
             >
-              {renderContent()}
-              {currentView === "HOME" &&
-                (!appUser || appUser?.role?.toUpperCase() === "CUSTOMER") && <Footer />}
+              <TouchableWithoutFeedback onPress={handleContentPress}>
+                <View>
+                  {renderContent()}
+                  {currentView === "HOME" &&
+                    (!appUser || appUser?.role?.toUpperCase() === "CUSTOMER") && <Footer />}
+                </View>
+              </TouchableWithoutFeedback>
             </ScrollView>
           )}
         </View>
