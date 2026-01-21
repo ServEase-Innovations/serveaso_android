@@ -56,7 +56,7 @@ export interface MonthlyAvailabilityDTO {
 
 /** Service Provider DTO (Frontend) */
 export interface ServiceProviderDTO {
-  serviceproviderid: string;
+  serviceproviderId: string;
 
   // Basic info
   firstName: string;
@@ -68,7 +68,7 @@ export interface ServiceProviderDTO {
   age: number;
   otherServices: string | null;
 
-  housekeepingrole: string;
+  housekeepingRole: string;
 
   // Preferences
   diet: "VEG" | "NON_VEG" | "BOTH";

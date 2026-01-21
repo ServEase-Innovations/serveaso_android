@@ -23,8 +23,8 @@ import axiosInstance from "../services/axiosInstance";
 import { useAppUser } from "../context/AppUserContext";
 import { ServiceProviderDTO, EnhancedProviderDetails } from "../types/ProviderDetailsType";
 import ProviderAvailabilityDrawer from "./ProviderAvailabilityDrawer";
+import { CONFIRMATION } from "../Constants/pagesConstants";
 
-// Enhanced types based on React code
 interface BookingType {
   serviceproviderId: string;
   eveningSelection: string | null;
@@ -78,21 +78,132 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
   const bookingType = useSelector((state: any) => state.bookingType?.value);
   const user = useSelector((state: any) => state.user?.value);
 
-  // Add useEffect to debug props
-  useEffect(() => {
-    console.log("=== PROVIDER DETAILS PROPS DEBUG ===");
-    console.log("All props keys:", Object.keys(props));
-    console.log("First name properties:");
-    console.log("  - props.firstName:", props.firstName);
-    
-    console.log("Last name properties:");
-    console.log("  - props.lastName:", props.lastName);
-   
-    console.log("Full props object:", props);
-    console.log("=== END DEBUG ===");
-  }, [props]);
+  // Helper functions from React code
+  const calculateAge = (dob: string) => {
+    if (!dob) return "";
+    return moment().diff(moment(dob), "years");
+  };
 
-  // Handle selection for morning or evening availability
+  const getAge = () => {
+    if (props.age) {
+      return props.age;
+    }
+    
+    if (props.dob) {
+      return calculateAge(props.dob);
+    }
+    
+    return "";
+  };
+
+  const getHoursDifference = (start: string, end: string) => {
+    const [startHours, startMinutes] = start.split(":").map(Number);
+    const [endHours, endMinutes] = end.split(":").map(Number);
+    const startTotalMinutes = startHours * 60 + startMinutes;
+    const endTotalMinutes = endHours * 60 + endMinutes;
+    return (endTotalMinutes - startTotalMinutes) / 60;
+  };
+
+  const formatTimeForDisplay = (timeString: string | undefined) => {
+    if (!timeString) return "05:00 AM";
+    return moment(timeString, "HH:mm").format("hh:mm A");
+  };
+
+  // Get availability status for the chip
+  const getAvailabilityStatus = () => {
+    if (!props.monthlyAvailability) return "Available";
+    
+    if (props.monthlyAvailability.fullyAvailable) {
+      return "Fully Available";
+    } else {
+      const exceptions = props.monthlyAvailability.exceptions?.length || 0;
+      if (exceptions > 0) {
+        return `Partially Available (${exceptions} exception${exceptions > 1 ? 's' : ''})`;
+      }
+      return "Partially Available";
+    }
+  };
+
+  // Get availability chip style
+  const getAvailabilityStyle = () => {
+    if (!props.monthlyAvailability) return styles.availabilityChipAvailable;
+    
+    if (props.monthlyAvailability.fullyAvailable) {
+      return styles.availabilityChipFullyAvailable;
+    } else {
+      return styles.availabilityChipPartial;
+    }
+  };
+
+  // Get availability message (similar to React)
+  const getAvailabilityMessage = () => {
+    if (!props.monthlyAvailability) {
+      return "Availability not specified";
+    }
+    
+    if (props.monthlyAvailability.fullyAvailable) {
+      return `Available at ${formatTimeForDisplay(props.monthlyAvailability.preferredTime)}`;
+    }
+    
+    const exceptions = props.monthlyAvailability.exceptions?.length || 0;
+    
+    if (exceptions > 20) {
+      return "Very limited availability";
+    } else if (exceptions > 10) {
+      return "Limited availability this month";
+    } else if (exceptions > 0) {
+      return `Usually available at ${formatTimeForDisplay(props.monthlyAvailability.preferredTime)}`;
+    }
+    
+    return `Available at ${formatTimeForDisplay(props.monthlyAvailability.preferredTime)}`;
+  };
+
+  // Get time icon color based on availability
+  const getTimeIconColor = () => {
+    if (!props.monthlyAvailability) return "#757575";
+    
+    if (props.monthlyAvailability.fullyAvailable) {
+      return "#4caf50";
+    }
+    
+    const exceptions = props.monthlyAvailability.exceptions?.length || 0;
+    
+    if (exceptions > 10) {
+      return "#ff9800";
+    } else if (exceptions > 0) {
+      return "#1976d2";
+    }
+    
+    return "#1976d2";
+  };
+
+  // Check if it's monthly or short term based on daysAtPreferredTime
+  const getAvailabilityDuration = () => {
+    if (!props.monthlyAvailability) return "Short Term";
+    
+    if (props.monthlyAvailability.summary?.daysAtPreferredTime >= 30) {
+      return "Monthly";
+    } else {
+      return "Short Term";
+    }
+  };
+
+  // Get gender symbol - Updated to match image format (M, F)
+  const getGenderSymbol = (gender: string) => {
+    if (!gender) return "";
+    switch (gender.toUpperCase()) {
+      case 'FEMALE': 
+      case 'F': 
+        return 'F';
+      case 'MALE': 
+      case 'M': 
+        return 'M';
+      default: 
+        return gender.charAt(0).toUpperCase();
+    }
+  };
+
+  // Handle selection
   const handleSelection = (hour: number, isEvening: boolean, time: number) => {
     const startTime = moment({ hour: time, minute: 0 }).format("HH:mm");
     const endTime = moment({ hour: time + 1, minute: 0 }).format("HH:mm");
@@ -126,115 +237,58 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     }
   };
 
-  // Toggle favorite status with event simulation
+  // Toggle favorite
   const toggleFavorite = () => {
     setIsFavorite(!isFavorite);
-    console.log("Favorite toggled for provider:", props.serviceproviderid, "New status:", !isFavorite);
   };
 
-  // Check missing time slots
-  const checkMissingTimeSlots = () => {
-    const expectedTimeSlots = [
-      "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
-      "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"
-    ];
-
-    const missing = expectedTimeSlots.filter(slot => !props.availableTimeSlots?.includes(slot));
-    setMissingSlots(missing);
+  // Get provider ID - handle both lowercase and uppercase variations
+  const getProviderId = () => {
+    // Check both property name variations
+    const id = props.serviceproviderid || props.serviceproviderId || props.id;
+    console.log("Provider ID check:", {
+      lowercase: props.serviceproviderid,
+      uppercase: props.serviceproviderId,
+      id: props.id,
+      selected: id
+    });
+    return id ? String(id) : undefined;
   };
 
-  // Toggle expand with async logic from React
-  const toggleExpand = async () => {
-    const newExpandedState = !isExpanded;
-    setIsExpanded(newExpandedState);
-
-    if (!newExpandedState) {
-      try {
-        if (props.serviceproviderid === bookingType?.serviceproviderId) {
-          setMatchedMorningSelection(bookingType?.morningSelection || null);
-          setMatchedEveningSelection(bookingType?.eveningSelection || null);
-        } else {
-          setMatchedMorningSelection(null);
-          setMatchedEveningSelection(null);
-        }
-
-        // Fetch engagement data (similar to React version)
-        const response = await axiosInstance.get(
-          `/api/serviceproviders/get/engagement/by/serviceProvider/${props.serviceproviderid}`
-        );
-
-        const engagementData = response.data.map((engagement: { id?: number; availableTimeSlots?: string[] }) => ({
-          id: engagement.id ?? Math.random(),
-          availableTimeSlots: engagement.availableTimeSlots || [],
-        }));
-
-        const fullTimeSlots: string[] = Array.from({ length: 24 }, (_, i) =>
-          `${i.toString().padStart(2, "0")}:00`
-        );
-
-        const processedSlots = engagementData.map((entry: any) => {
-          const uniqueAvailableTimeSlots = Array.from(new Set(entry.availableTimeSlots)).sort();
-          const missingTimeSlots = fullTimeSlots.filter(slot => !uniqueAvailableTimeSlots.includes(slot));
-
-          return {
-            id: entry.id,
-            uniqueAvailableTimeSlots,
-            missingTimeSlots,
-          };
-        });
-
-        const uniqueMissingSlots: string[] = Array.from(
-          new Set(processedSlots.flatMap((slot: any) => slot.missingTimeSlots))
-        ).sort() as string[];
-
-        setUniqueMissingSlots(uniqueMissingSlots);
-        setAvailableTimeSlots(processedSlots.flatMap((entry: any) => entry.uniqueAvailableTimeSlots));
-      } catch (error) {
-        console.error("Error fetching engagement data:", error);
-        Alert.alert("Error", "Failed to fetch engagement data");
-      }
-    }
-  };
-
-  const calculateAge = (dob: string) => {
-    if (!dob) return "";
-    return moment().diff(moment(dob), "years");
-  };
-
-  // Get age from props or calculate from DOB
-  const getAge = () => {
-    // If age is directly provided in props, use it
-    if (props.age) {
-      return props.age;
-    }
-    
-    // Otherwise calculate from DOB
-    if (props.dob) {
-      return calculateAge(props.dob);
-    }
-    
-    return "";
-  };
-
+  // Handle Book Now - FIXED VERSION
   const handleBookNow = () => {
+    const providerId = getProviderId();
+    console.log("Book Now clicked for provider ID:", providerId);
+    
+    if (!providerId) {
+      console.error("No provider ID found!");
+      Alert.alert("Error", "Provider ID not found");
+      return;
+    }
+
+    // FIXED: Check for both lowercase and uppercase property names
+    const housekeepingRole = props.housekeepingrole || props.housekeepingRole;
+    
     let booking: BookingType;
 
-    if (props.housekeepingrole !== "NANNY") {
+    if (housekeepingRole !== "NANNY") {
       booking = {
-        serviceproviderId: props.serviceproviderid,
+        serviceproviderId: providerId,
         eveningSelection: eveningSelectionTime,
         morningSelection: morningSelectionTime,
         ...bookingType
       };
     } else {
       booking = {
-        serviceproviderId: props.serviceproviderid,
+        serviceproviderId: providerId,
         timeRange: `${startTime} - ${endTime}`,
         duration: getHoursDifference(startTime, endTime),
         ...bookingType
       };
     }
 
+    console.log("Dispatching booking:", booking);
+    
     if (bookingType) {
       dispatch(update(booking));
     } else {
@@ -247,95 +301,41 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
       selectedEveningTime: eveningSelection
     };
     
-    // Call the selectedProvider callback
     props.selectedProvider(providerDetails);
     
-    // Handle login flow similar to React
-    if (!loggedInUser) {
-      handleLogin();
-    } else {
-      setOpen(true);
+    // FIXED: Directly open the dialog (matching web behavior)
+    setOpen(true);
+    console.log("Dialog opened state:", true);
+  };
+
+  // Handle login - Simplified version
+  const handleLogin = () => {
+    setOpen(true);
+  };
+
+  // Handle booking page
+  const handleBookingPage = (data: string) => {
+    setOpen(false);
+    
+    if (data === CONFIRMATION && props.sendDataToParent) {
+      props.sendDataToParent(data);
     }
   };
 
-  const getHoursDifference = (start: string, end: string) => {
-    const [startHours, startMinutes] = start.split(":").map(Number);
-    const [endHours, endMinutes] = end.split(":").map(Number);
-    const startTotalMinutes = startHours * 60 + startMinutes;
-    const endTotalMinutes = endHours * 60 + endMinutes;
-    return (endTotalMinutes - startTotalMinutes) / 60;
-  };
-
-  // Handle login (from React code)
-  const handleLogin = () => {
-    Alert.alert(
-      "Login Required",
-      "Please login to proceed with booking.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Login",
-          onPress: () => {
-            // You can navigate to login screen here
-            // navigation.navigate('Login');
-            setOpen(true);
-          }
-        }
-      ]
-    );
-  };
-
-  // New function to handle drawer open
+  // Handle view details
   const handleViewDetails = () => {
     setDrawerOpen(true);
   };
 
-  // New function to handle drawer close
+  // Handle drawer close
   const handleDrawerClose = () => {
     setDrawerOpen(false);
   };
 
   const handleClose = () => {
-    console.log('Closing service dialog');
     setOpen(false);
   };
 
-  const handleBookingPage = (data: string) => {
-    console.log('Data received from dialog:', data);
-    setOpen(false);
-    
-    if (props.sendDataToParent) {
-      props.sendDataToParent(data);
-    }
-  };
-
-  const handleStartTimeChange = (newStartTime: string) => {
-    setStartTime(newStartTime);
-    validateTimeRange(newStartTime, endTime);
-  };
-
-  const handleEndTimeChange = (newEndTime: string) => {
-    setEndTime(newEndTime);
-    validateTimeRange(startTime, newEndTime);
-  };
-
-  // Validate time range
-  const validateTimeRange = (start: string, end: string) => {
-    const [startHours, startMinutes] = start.split(":").map(Number);
-    const [endHours, endMinutes] = end.split(":").map(Number);
-    const startTotalMinutes = startHours * 60 + startMinutes;
-    const endTotalMinutes = endHours * 60 + endMinutes;
-    
-    if (endTotalMinutes - startTotalMinutes < 240) {
-      setWarning("The time range must be at least 4 hours.");
-    } else {
-      setWarning("");
-    }
-  };
-  
   const { appUser } = useAppUser();
 
   useEffect(() => {
@@ -344,125 +344,11 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     }
   }, [appUser]);
 
-  useEffect(() => {
-    if (!hasCheckedRef.current) {
-      checkMissingTimeSlots();
-      hasCheckedRef.current = true;
-    }
-  }, []);
-
-  const dietImage = dietImages[props.diet as keyof typeof dietImages];
-  // const isBookNowEnabled = 
-  //   (morningSelection !== null || eveningSelection !== null) || 
-  //   (matchedMorningSelection !== null || matchedEveningSelection !== null);
-const isBookNowEnabled = true;
-
-
-  // Helper function to convert languageknown array to string
-  const getLanguageString = (languageKnown: string[] | null): string | undefined => {
-    if (!languageKnown || languageKnown.length === 0) return undefined;
-    return languageKnown.join(", ");
-  };
-
-  // Create EnhancedProviderDetails object with proper type conversions
-  // Using only properties that exist in EnhancedProviderDetails
-  const providerDetailsData: EnhancedProviderDetails = {
-    // Map ServiceProviderDTO properties to EnhancedProviderDetails properties
-    serviceproviderId: props.serviceproviderid, // Map serviceproviderid to serviceproviderId
-    
-    firstName: props.firstName,
-    lastName: props.lastName,
-    
-    // Use optional properties with null checks
-    // middleName: props.middleName,
-    housekeepingRole: props.housekeepingrole,
-    
-    // Map all ServiceProviderDTO properties with proper type conversions
-    gender: props.gender,
-    dob: props.dob,
-    diet: props.diet,
-    language: getLanguageString(props.languageknown), // Convert array to string
-    experience: props.experience?.toString() || "", // Convert number to string
-    otherServices: props.otherServices || undefined, // Convert null to undefined
-    availableTimeSlots: props.availableTimeSlots,
-    
-    // Time selection properties (from React version)
-    selectedMorningTime: morningSelection,
-    selectedEveningTime: eveningSelection,
-    matchedMorningSelection: matchedMorningSelection,
-    matchedEveningSelection: matchedEveningSelection,
-    startTime: startTime,
-    endTime: endTime
-  };
-
-  // Format time for display (e.g., "05:00" -> "05:00 AM")
-  const formatTimeForDisplay = (timeString: string | undefined) => {
-    if (!timeString) return "08:00 AM";
-    return moment(timeString, "HH:mm").format("hh:mm A");
-  };
-
-  // Get availability status for the chip
-  const getAvailabilityStatus = () => {
-    if (!props.monthlyAvailability) return "Available";
-    
-    if (props.monthlyAvailability.fullyAvailable) {
-      return "Fully Available";
-    } else {
-      const exceptions = props.monthlyAvailability.exceptions?.length || 0;
-      if (exceptions > 0) {
-        return `Partially Available (${exceptions} exception${exceptions > 1 ? 's' : ''})`;
-      }
-      return "Available";
-    }
-  };
-
-  // Get availability chip style
-  const getAvailabilityStyle = () => {
-    if (!props.monthlyAvailability) return styles.availabilityChipAvailable;
-    
-    if (props.monthlyAvailability.fullyAvailable) {
-      return styles.availabilityChipFullyAvailable;
-    } else {
-      return styles.availabilityChipPartial;
-    }
-  };
-
-  // Get gender symbol - Updated to match image format (M, F)
-  const getGenderSymbol = (gender: string) => {
-    switch (gender?.toUpperCase()) {
-      case 'FEMALE': return 'F';
-      case 'MALE': return 'M';
-      default: return '';
-    }
-  };
-
-  // Get first name - handle both camelCase and lowercase
-  const getFirstName = () => {
-    return props.firstName ;
-  };
-
-  // Get last name - handle both camelCase and lowercase
-  const getLastName = () => {
-    return props.lastName ;
-
-  };
-
-  // Get best match message
-  const getBestMatchMessage = () => {
-    if (props.bestMatch) {
-      return "This provider is our best match for your requirements!";
-    } else {
-      if (props.monthlyAvailability?.fullyAvailable === false) {
-        return "This provider has some schedule variations. Check availability details below.";
-      }
-      return "This provider matches most of your requirements.";
-    }
-  };
-
+  // Get initials for avatar
   const getInitials = () => {
-    const firstName = getFirstName();
-    const lastName = getLastName();
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
+    const firstName = props.firstName || props.firstName || '';
+    const lastName = props.lastName || props.lastName || '';
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
   // Get language display
@@ -473,10 +359,84 @@ const isBookNowEnabled = true;
     return "English";
   };
 
-  // Render service dialog based on role
+  // Get rating display
+  const getRatingDisplay = () => {
+    return props.rating?.toFixed(1) || "0.0";
+  };
+
+  // Get review count display
+  const getReviewCount = () => {
+    return props.rating || 0;
+  };
+
+  // Get distance display
+  const getDistanceDisplay = () => {
+    return props.distance_km || 0;
+  };
+
+  // Get experience display
+  const getExperienceDisplay = () => {
+    return props.experience || 1;
+  };
+
+  // Get housekeeping role - handle both lowercase and uppercase property names
+  const getHousekeepingRole = () => {
+    return props.housekeepingrole || props.housekeepingRole || "UNKNOWN";
+  };
+
+  // Render service dialog - FIXED VERSION
   const renderServiceDialog = () => {
-    switch (props.housekeepingrole) {
+    const providerId = getProviderId();
+    const housekeepingRole = getHousekeepingRole();
+    
+    console.log("Rendering service dialog, open:", open);
+    console.log("Provider role:", housekeepingRole);
+    console.log("Provider ID:", providerId);
+    console.log("All props keys:", Object.keys(props));
+    
+    // FIXED: Use correct property names from your ServiceProviderDTO
+    const providerDetailsData: EnhancedProviderDetails = {
+      // Support both property name conventions for ID
+      serviceproviderid: providerId,
+      serviceproviderId: providerId,
+      
+      // Basic info
+      firstName: props.firstName || '',
+      lastName: props.lastName || '',
+      housekeepingrole: housekeepingRole,
+      housekeepingRole: housekeepingRole,
+      gender: props.gender,
+      dob: props.dob,
+      diet: props.diet,
+      languageknown: props.languageknown || [],
+      experience: props.experience?.toString() || "",
+      otherServices: props.otherServices || "",
+      availableTimeSlots: props.availableTimeSlots || [],
+      
+      // Time selections
+      selectedMorningTime: morningSelection,
+      selectedEveningTime: eveningSelection,
+      matchedMorningSelection: matchedMorningSelection,
+      matchedEveningSelection: matchedEveningSelection,
+      startTime: startTime,
+      endTime: endTime,
+      
+      // Additional properties
+      rating: props.rating,
+      distance_km: props.distance_km,
+      bestMatch: props.bestMatch,
+      monthlyAvailability: props.monthlyAvailability,
+      age: props.age,
+      locality: props.locality
+    };
+
+    console.log("Dialog data prepared:", providerDetailsData);
+    console.log("Role for switch statement:", housekeepingRole);
+
+    // FIXED: Use the variable that handles both property name variations
+    switch (housekeepingRole) {
       case "COOK":
+        console.log("Rendering COOK dialog");
         return (
           <DemoCook 
             visible={open}
@@ -488,6 +448,7 @@ const isBookNowEnabled = true;
           />
         );
       case "MAID":
+        console.log("Rendering MAID dialog");
         return (
           <MaidServiceDialog
             open={open}
@@ -499,6 +460,7 @@ const isBookNowEnabled = true;
           />
         );
       case "NANNY":
+        console.log("Rendering NANNY dialog");
         return (
           <NannyServicesDialog 
             open={open}
@@ -510,341 +472,327 @@ const isBookNowEnabled = true;
           />
         );
       default:
+        console.log("No dialog for role:", housekeepingRole);
+        console.log("Available props:", Object.keys(props));
         return null;
     }
   };
 
-  // Get age value
   const age = getAge();
   const genderSymbol = getGenderSymbol(props.gender);
-  const firstName = getFirstName();
-  const lastName = getLastName();
+  const firstName = props.firstName || '';
+  const lastName = props.lastName || '';
+  const fullName = `${firstName} ${lastName}`.trim();
+  const housekeepingRole = getHousekeepingRole();
+  const providerId = getProviderId();
 
   return (
-    <>
-      <View style={styles.container}>
-        <View style={[
-          styles.card,
-          isMobile && styles.cardMobile,
-          isSmallScreen && styles.cardSmall,
-          isMediumScreen && styles.cardMedium,
-          isLargeScreen && styles.cardLarge
-        ]}>
-          {/* Best Match Ribbon - Similar to React */}
-          {props.bestMatch && (
-            <View style={[
-              styles.bestMatchRibbon,
-              isMobile && styles.bestMatchRibbonMobile
-            ]}>
-              <MaterialCommunityIcons name="fire" size={isMobile ? 14 : 16} color="white" />
-              <Text style={[
-                styles.bestMatchRibbonText,
-                isMobile && styles.bestMatchRibbonTextMobile
-              ]}>Best Match</Text>
-            </View>
-          )}
-
-          {/* Main Container - Row on desktop, Column on mobile */}
+    <View style={styles.container}>
+      <View style={[
+        styles.card,
+        isMobile && styles.cardMobile,
+        isSmallScreen && styles.cardSmall,
+      ]}>
+        {/* Best Match Ribbon */}
+        {props.bestMatch && (
           <View style={[
-            styles.mainContainer,
-            isMobile && styles.mainContainerMobile
+            styles.bestMatchRibbon,
+            isMobile && styles.bestMatchRibbonMobile
           ]}>
-            {/* Center Section - Provider Details */}
-            <View style={[
-              styles.centerSection,
-              isMobile && styles.centerSectionMobile
-            ]}>
-              {/* Name and basic info - Updated to match image format */}
-              <View style={[
-                styles.nameContainer,
-                isMobile && styles.nameContainerMobile
+            <MaterialCommunityIcons name="fire" size={14} color="white" />
+            <Text style={[
+              styles.bestMatchRibbonText,
+              isMobile && styles.bestMatchRibbonTextMobile
+            ]}>Best Match</Text>
+          </View>
+        )}
+
+        {/* Main Content */}
+        <View style={[
+          styles.mainContent,
+          isMobile && styles.mainContentMobile
+        ]}>
+          {/* Left Section - Provider Info */}
+          <View style={[
+            styles.leftSection,
+            isMobile && styles.leftSectionMobile
+          ]}>
+            {/* Name and Basic Info */}
+            <View style={styles.nameRow}>
+              <Text style={[
+                styles.nameText,
+                isMobile && styles.nameTextMobile
               ]}>
-                {/* Name row with gender and age - Updated format */}
-                <View style={[
-                  styles.nameRow,
-                  isMobile && styles.nameRowMobile
+                {fullName}
+              </Text>
+              <View style={styles.genderAgeChip}>
+                <Text style={[
+                  styles.genderAgeText,
+                  isMobile && styles.genderAgeTextMobile
                 ]}>
-                  <Text style={[
-                    styles.nameText,
-                    isMobile && styles.nameTextMobile,
-                    isSmallScreen && styles.nameTextSmall
-                  ]}>
-                    {firstName} {lastName}
-                  </Text>
-                  <View style={[
-                    styles.genderAgeContainer,
-                    isMobile && styles.genderAgeContainerMobile
-                  ]}>
-                    <Text style={[
-                      styles.genderAgeText,
-                      isMobile && styles.genderAgeTextMobile
-                    ]}>
-                      {genderSymbol}, {age}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Meta info row - similar to React */}
-                <View style={[
-                  styles.metaRow,
-                  isMobile && styles.metaRowMobile
-                ]}>
-                  <View style={styles.metaItem}>
-                    <Icon name="restaurant" size={isMobile ? 14 : 16} color="#666" />
-                    <Text style={[
-                      styles.metaText,
-                      isMobile && styles.metaTextMobile
-                    ]}>{props.diet}</Text>
-                  </View>
-
-                  {!isMobile && <View style={styles.verticalDivider} />}
-
-                  <View style={styles.metaItem}>
-                    <Icon name="language" size={isMobile ? 14 : 16} color="#666" />
-                    <Text style={[
-                      styles.metaText,
-                      isMobile && styles.metaTextMobile
-                    ]}>{getLanguageDisplay()}</Text>
-                  </View>
-
-                  {!isMobile && <View style={styles.verticalDivider} />}
-
-                  <View style={styles.metaItem}>
-                    <Icon name="location-on" size={isMobile ? 14 : 16} color="#666" />
-                    <Text style={[
-                      styles.metaText,
-                      isMobile && styles.metaTextMobile
-                    ]}>{props.locality || "Nearby"}</Text>
-                  </View>
-                </View>
-
-                {/* Availability section */}
-                <View style={[
-                  styles.availabilityContainer,
-                  isMobile && styles.availabilityContainerMobile
-                ]}>
-                  <View style={styles.availabilityHeader}>
-                    <Text style={[
-                      styles.availabilityLabel,
-                      isMobile && styles.availabilityLabelMobile
-                    ]}>Availability</Text>
-                    <View style={[
-                      styles.availabilityChip,
-                      getAvailabilityStyle(),
-                      isMobile && styles.availabilityChipMobile
-                    ]}>
-                      <Text style={[
-                        styles.availabilityChipText,
-                        isMobile && styles.availabilityChipTextMobile
-                      ]}>{getAvailabilityStatus()}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={[
-                    styles.availabilityRow,
-                    isMobile && styles.availabilityRowMobile
-                  ]}>
-                    <Icon name="access-time" size={isMobile ? 14 : 16} color="#1976d2" />
-                    <Text style={[
-                      styles.availabilityText,
-                      isMobile && styles.availabilityTextMobile
-                    ]}>
-                      Available at {formatTimeForDisplay(props.monthlyAvailability?.preferredTime)}
-                    </Text>
-                    <View style={[
-                      styles.monthlyChip,
-                      isMobile && styles.monthlyChipMobile
-                    ]}>
-                      <Text style={[
-                        styles.monthlyChipText,
-                        isMobile && styles.monthlyChipTextMobile
-                      ]}>Monthly</Text>
-                    </View>
-                  </View>
-
-                  {/* Show exceptions count if any */}
-                  {props.monthlyAvailability?.exceptions && props.monthlyAvailability.exceptions.length > 0 && (
-                    <Text style={[
-                      styles.exceptionText,
-                      isMobile && styles.exceptionTextMobile
-                    ]}>
-                      ⚠️ {props.monthlyAvailability.exceptions.length} schedule exception(s) this month
-                    </Text>
-                  )}
-
-                  {/* Show fully available message */}
-                  {props.monthlyAvailability?.fullyAvailable && (
-                    <Text style={[
-                      styles.fullyAvailableText,
-                      isMobile && styles.fullyAvailableTextMobile
-                    ]}>
-                      ✓ Fully available all month
-                    </Text>
-                  )}
-                </View>
-
-                {/* Other Services */}
-                {props.otherServices && (
-                  <View style={[
-                    styles.otherServicesContainer,
-                    isMobile && styles.otherServicesContainerMobile
-                  ]}>
-                    <Text style={[
-                      styles.otherServicesLabel,
-                      isMobile && styles.otherServicesLabelMobile
-                    ]}>Additional Services</Text>
-                    <Text style={[
-                      styles.otherServicesText,
-                      isMobile && styles.otherServicesTextMobile
-                    ]} numberOfLines={2}>
-                      {props.otherServices}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Metrics Section - Similar to React layout */}
-              <View style={[
-                styles.metricsContainer,
-                isMobile && styles.metricsContainerMobile
-              ]}>
-                <View style={[
-                  styles.metricBox,
-                  isMobile && styles.metricBoxMobile
-                ]}>
-                  <Text style={[
-                    styles.metricValue,
-                    isMobile && styles.metricValueMobile
-                  ]}>{props.distance_km || 0}</Text>
-                  <Text style={[
-                    styles.metricLabel,
-                    isMobile && styles.metricLabelMobile
-                  ]}>km away</Text>
-                </View>
-
-                <View style={[
-                  styles.metricBox,
-                  isMobile && styles.metricBoxMobile
-                ]}>
-                  <View style={styles.ratingContainer}>
-                    <Icon name="star" size={isMobile ? 14 : 16} color="#FFD700" />
-                    <Text style={[
-                      styles.metricValue,
-                      isMobile && styles.metricValueMobile
-                    ]}>{props.rating?.toFixed(1) || "5.0"}</Text>
-                  </View>
-                  <Text style={[
-                    styles.metricLabel,
-                    isMobile && styles.metricLabelMobile
-                  ]}>{props.reviewCount || 5} reviews</Text>
-                </View>
-
-                <View style={[
-                  styles.metricBox,
-                  isMobile && styles.metricBoxMobile
-                ]}>
-                  <Text style={[
-                    styles.metricValue,
-                    styles.experienceValue,
-                    isMobile && styles.metricValueMobile
-                  ]}>{props.experience || 1}</Text>
-                  <Text style={[
-                    styles.metricLabel,
-                    isMobile && styles.metricLabelMobile
-                  ]}>yrs experience</Text>
-                </View>
+                  {genderSymbol}. {age}
+                </Text>
               </View>
             </View>
 
-            {/* Right Section - Actions */}
+            {/* Meta Info Row */}
             <View style={[
-              styles.rightSection,
-              isMobile && styles.rightSectionMobile
+              styles.metaRow,
+              isMobile && styles.metaRowMobile
             ]}>
-              {/* Role Chip - Updated to match image [COOK] format */}
-              {props.housekeepingrole && (
+              <View style={styles.metaItem}>
+                <Icon name="restaurant" size={14} color="#666" />
+                <Text style={[
+                  styles.metaText,
+                  isMobile && styles.metaTextMobile
+                ]}>{props.diet || "NONVEG"}</Text>
+              </View>
+
+              <View style={styles.metaDivider} />
+
+              <View style={styles.metaItem}>
+                <Icon name="language" size={14} color="#666" />
+                <Text style={[
+                  styles.metaText,
+                  isMobile && styles.metaTextMobile
+                ]}>{getLanguageDisplay()}</Text>
+              </View>
+
+              <View style={styles.metaDivider} />
+
+              <View style={styles.metaItem}>
+                <Icon name="location-on" size={14} color="#666" />
+                <Text style={[
+                  styles.metaText,
+                  isMobile && styles.metaTextMobile
+                ]}>{props.locality || "sukna forest"}</Text>
+              </View>
+            </View>
+
+            {/* Availability Section */}
+            <View style={[
+              styles.availabilitySection,
+              isMobile && styles.availabilitySectionMobile
+            ]}>
+              <Text style={[
+                styles.availabilityLabel,
+                isMobile && styles.availabilityLabelMobile
+              ]}>Availability</Text>
+              
+              {/* Availability Info Row */}
+              <View style={[
+                styles.availabilityInfoRow,
+                isMobile && styles.availabilityInfoRowMobile
+              ]}>
+                <Icon name="access-time" size={16} color={getTimeIconColor()} />
+                <Text style={[
+                  styles.availabilityMessage,
+                  isMobile && styles.availabilityMessageMobile
+                ]}>
+                  {getAvailabilityMessage()}
+                </Text>
+              </View>
+
+              {/* Availability Chips Row */}
+              <View style={[
+                styles.availabilityChipsRow,
+                isMobile && styles.availabilityChipsRowMobile
+              ]}>
                 <View style={[
-                  styles.roleChip,
-                  isMobile && styles.roleChipMobile
+                  styles.durationChip,
+                  isMobile && styles.durationChipMobile
                 ]}>
                   <Text style={[
-                    styles.roleChipText,
-                    isMobile && styles.roleChipTextMobile
-                  ]}>[{props.housekeepingrole}]</Text>
+                    styles.durationChipText,
+                    isMobile && styles.durationChipTextMobile
+                  ]}>
+                    {getAvailabilityDuration()}
+                  </Text>
                 </View>
+
+                <View style={[
+                  styles.availabilityChipContainer,
+                  getAvailabilityStyle(),
+                  isMobile && styles.availabilityChipContainerMobile
+                ]}>
+                  <Text style={[
+                    styles.availabilityChipText,
+                    isMobile && styles.availabilityChipTextMobile
+                  ]}>
+                    {getAvailabilityStatus()}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Additional Availability Info */}
+              {props.monthlyAvailability?.exceptions && props.monthlyAvailability.exceptions.length > 0 && (
+                <Text style={[
+                  styles.exceptionText,
+                  isMobile && styles.exceptionTextMobile
+                ]}>
+                  ▲ {props.monthlyAvailability.exceptions.length} schedule exceptions this month
+                </Text>
               )}
 
-              {/* View Details Button */}
-              <TouchableOpacity 
-                style={[
-                  styles.detailsButton,
-                  isMobile && styles.detailsButtonMobile
-                ]}
-                onPress={handleViewDetails}
-              >
-                <Icon name="info-outline" size={isMobile ? 16 : 18} color="#1976d2" />
+              {props.monthlyAvailability?.fullyAvailable && (
                 <Text style={[
-                  styles.detailsButtonText,
-                  isMobile && styles.detailsButtonTextMobile
+                  styles.fullyAvailableText,
+                  isMobile && styles.fullyAvailableTextMobile
                 ]}>
-                  {isMobile ? "Details" : "View Details"}
+                  ✓ Fully available all month
                 </Text>
-              </TouchableOpacity>
+              )}
 
-              {/* Book Now Button */}
-              <TouchableOpacity 
-                style={[
-                  styles.bookNowButton,
-                  isMobile && styles.bookNowButtonMobile,
-                  (!isBookNowEnabled && props.housekeepingrole !== "NANNY") && styles.bookNowButtonDisabled
-                ]}
-                onPress={handleBookNow}
-                disabled={!isBookNowEnabled && props.housekeepingrole !== "NANNY"}
-              >
+              {props.monthlyAvailability && !props.monthlyAvailability.fullyAvailable && 
+               (!props.monthlyAvailability.exceptions || props.monthlyAvailability.exceptions.length === 0) && (
                 <Text style={[
-                  styles.bookNowButtonText,
-                  isMobile && styles.bookNowButtonTextMobile
+                  styles.partiallyAvailableText,
+                  isMobile && styles.partiallyAvailableTextMobile
                 ]}>
-                  {isMobile ? "Book" : "Book Now"}
+                  ⚠️ Partially available this month
                 </Text>
-              </TouchableOpacity>
-
-              {/* Favorite Button */}
-              <TouchableOpacity
-                style={[
-                  styles.favoriteButton,
-                  isMobile && styles.favoriteButtonMobile
-                ]}
-                onPress={toggleFavorite}
-              >
-                <Icon 
-                  name={isFavorite ? "favorite" : "favorite-border"} 
-                  size={isMobile ? 20 : 24} 
-                  color={isFavorite ? '#ff4081' : '#666'} 
-                />
-              </TouchableOpacity>
+              )}
             </View>
+          </View>
+
+          {/* Metrics Section - Center */}
+          <View style={[
+            styles.metricsSection,
+            isMobile && styles.metricsSectionMobile
+          ]}>
+            <View style={[
+              styles.metricBox,
+              isMobile && styles.metricBoxMobile
+            ]}>
+              <Text style={[
+                styles.metricValue,
+                isMobile && styles.metricValueMobile
+              ]}>{getDistanceDisplay()}</Text>
+              <Text style={[
+                styles.metricLabel,
+                isMobile && styles.metricLabelMobile
+              ]}>km away</Text>
+            </View>
+
+            <View style={[
+              styles.metricBox,
+              isMobile && styles.metricBoxMobile
+            ]}>
+              <View style={styles.ratingRow}>
+                <Icon name="star" size={14} color="#FFD700" />
+                <Text style={[
+                  styles.metricValue,
+                  isMobile && styles.metricValueMobile
+                ]}>{getRatingDisplay()}</Text>
+              </View>
+              <Text style={[
+                styles.metricLabel,
+                isMobile && styles.metricLabelMobile
+              ]}>{getReviewCount()} reviews</Text>
+            </View>
+
+            <View style={[
+              styles.metricBox,
+              isMobile && styles.metricBoxMobile
+            ]}>
+              <Text style={[
+                styles.metricValue,
+                styles.experienceValue,
+                isMobile && styles.metricValueMobile
+              ]}>{getExperienceDisplay()}</Text>
+              <Text style={[
+                styles.metricLabel,
+                isMobile && styles.metricLabelMobile
+              ]}>yrs experience</Text>
+            </View>
+          </View>
+
+          {/* Right Section - Actions */}
+          <View style={[
+            styles.rightSection,
+            isMobile && styles.rightSectionMobile
+          ]}>
+            {/* Role Chip - FIXED: Use the function that handles both property names */}
+            {housekeepingRole && housekeepingRole !== "UNKNOWN" && (
+              <View style={[
+                styles.roleChip,
+                isMobile && styles.roleChipMobile
+              ]}>
+                <Text style={[
+                  styles.roleChipText,
+                  isMobile && styles.roleChipTextMobile
+                ]}>
+                  {housekeepingRole}
+                </Text>
+              </View>
+            )}
+
+            {/* View Details Button */}
+            <TouchableOpacity 
+              style={[
+                styles.detailsButton,
+                isMobile && styles.detailsButtonMobile
+              ]}
+              onPress={handleViewDetails}
+            >
+              <Icon name="info-outline" size={16} color="#1976d2" />
+              <Text style={[
+                styles.detailsButtonText,
+                isMobile && styles.detailsButtonTextMobile
+              ]}>
+                Details
+              </Text>
+            </TouchableOpacity>
+
+            {/* Book Now Button */}
+            <TouchableOpacity 
+              style={[
+                styles.bookNowButton,
+                isMobile && styles.bookNowButtonMobile
+              ]}
+              onPress={handleBookNow}
+            >
+              <Text style={[
+                styles.bookNowButtonText,
+                isMobile && styles.bookNowButtonTextMobile
+              ]}>
+                Book
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* Availability Drawer */}
+      {/* Drawer and Dialogs */}
       <ProviderAvailabilityDrawer
         open={drawerOpen}
         onClose={handleDrawerClose}
         provider={props}
       />
 
+      {/* Render the dialog */}
       {renderServiceDialog()}
-    </>
+      
+      {/* Debug overlay */}
+      {/* {__DEV__ && (
+        <View style={styles.debugOverlay}>
+          <Text style={styles.debugText}>Dialog Open: {open.toString()}</Text>
+          <Text style={styles.debugText}>Provider ID: {providerId}</Text>
+          <Text style={styles.debugText}>Role: {housekeepingRole}</Text>
+          <Text style={styles.debugText}>ID lower: {props.serviceproviderid}</Text>
+          <Text style={styles.debugText}>ID upper: {props.serviceproviderId}</Text>
+          <Text style={styles.debugText}>All props: {JSON.stringify(Object.keys(props))}</Text>
+        </View>
+      )} */}
+    </View>
   );
 };
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
-    padding: 10,
+    padding: 12,
     backgroundColor: '#f5f5f5',
   },
   card: {
@@ -852,14 +800,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    marginBottom: 10,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
     position: 'relative',
@@ -867,17 +812,11 @@ const styles = StyleSheet.create({
   cardMobile: {
     borderRadius: 12,
     padding: 12,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   cardSmall: {
     padding: 10,
     borderRadius: 10,
-  },
-  cardMedium: {
-    padding: 14,
-  },
-  cardLarge: {
-    padding: 16,
   },
   bestMatchRibbon: {
     position: 'absolute',
@@ -911,183 +850,175 @@ const styles = StyleSheet.create({
   bestMatchRibbonTextMobile: {
     fontSize: 10,
   },
-  mainContainer: {
+  mainContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 20,
+  },
+  mainContentMobile: {
+    flexDirection: 'column',
     gap: 16,
   },
-  mainContainerMobile: {
-    flexDirection: 'column',
-    gap: 12,
-  },
-  centerSection: {
+  leftSection: {
     flex: 1,
   },
-  centerSectionMobile: {
+  leftSectionMobile: {
     width: '100%',
-  },
-  nameContainer: {
-    marginBottom: 16,
-  },
-  nameContainerMobile: {
-    marginBottom: 12,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 8,
     flexWrap: 'wrap',
   },
-  nameRowMobile: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   nameText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#333',
-    flex: 1,
+    marginRight: 8,
   },
   nameTextMobile: {
-    fontSize: 18,
-  },
-  nameTextSmall: {
     fontSize: 16,
   },
-  genderAgeContainer: {
-    marginLeft: 8,
-  },
-  genderAgeContainerMobile: {
-    marginLeft: 6,
+  genderAgeChip: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#666',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   genderAgeText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     fontWeight: '500',
   },
   genderAgeTextMobile: {
-    fontSize: 13,
+    fontSize: 11,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
+    marginBottom: 16,
     flexWrap: 'wrap',
   },
   metaRowMobile: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 6,
+    marginBottom: 12,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    marginRight: 8,
   },
   metaText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
+    marginLeft: 4,
   },
   metaTextMobile: {
-    fontSize: 13,
+    fontSize: 12,
   },
-  verticalDivider: {
+  metaDivider: {
     width: 1,
-    height: 16,
+    height: 12,
     backgroundColor: '#e0e0e0',
+    marginRight: 8,
   },
-  availabilityContainer: {
+  availabilitySection: {
     marginBottom: 16,
   },
-  availabilityContainerMobile: {
+  availabilitySectionMobile: {
     marginBottom: 12,
-  },
-  availabilityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
   },
   availabilityLabel: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 8,
   },
   availabilityLabelMobile: {
     fontSize: 13,
   },
-  availabilityChip: {
-    borderRadius: 12,
+  availabilityInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  availabilityInfoRowMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  availabilityMessage: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#333',
+    marginLeft: 6,
+  },
+  availabilityMessageMobile: {
+    fontSize: 14,
+  },
+  availabilityChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  availabilityChipsRowMobile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  durationChip: {
+    borderWidth: 1,
+    borderColor: '#1976d2',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  durationChipMobile: {
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  durationChipText: {
+    fontSize: 11,
+    color: '#1976d2',
+    fontWeight: '500',
+  },
+  durationChipTextMobile: {
+    fontSize: 10,
+  },
+  availabilityChipContainer: {
+    borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  availabilityChipMobile: {
-    borderRadius: 10,
+  availabilityChipContainerMobile: {
+    borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 3,
-  },
-  availabilityChipText: {
-    fontSize: 11,
-    fontWeight: '600',
   },
   availabilityChipAvailable: {
     backgroundColor: '#e8f5e9',
   },
   availabilityChipFullyAvailable: {
-    backgroundColor: '#4caf50',
+    backgroundColor: '#e8f5e9',
   },
   availabilityChipPartial: {
     backgroundColor: '#fff3e0',
   },
+  availabilityChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   availabilityChipTextMobile: {
     fontSize: 10,
-  },
-  availabilityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  availabilityRowMobile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  availabilityText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  availabilityTextMobile: {
-    fontSize: 14,
-  },
-  monthlyChip: {
-    borderWidth: 1,
-    borderColor: '#1976d2',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  monthlyChipMobile: {
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  monthlyChipText: {
-    fontSize: 12,
-    color: '#1976d2',
-  },
-  monthlyChipTextMobile: {
-    fontSize: 11,
   },
   exceptionText: {
     fontSize: 12,
     color: '#ff9800',
     fontWeight: '500',
-    marginTop: 4,
+    marginTop: 2,
   },
   exceptionTextMobile: {
     fontSize: 11,
@@ -1096,96 +1027,86 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4caf50',
     fontWeight: '500',
-    marginTop: 4,
+    marginTop: 2,
   },
   fullyAvailableTextMobile: {
     fontSize: 11,
   },
-  otherServicesContainer: {
-    marginBottom: 16,
+  partiallyAvailableText: {
+    fontSize: 12,
+    color: '#ff9800',
+    fontWeight: '500',
+    marginTop: 2,
   },
-  otherServicesContainerMobile: {
-    marginBottom: 12,
+  partiallyAvailableTextMobile: {
+    fontSize: 11,
   },
-  otherServicesLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  otherServicesLabelMobile: {
-    fontSize: 13,
-  },
-  otherServicesText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  otherServicesTextMobile: {
-    fontSize: 13,
-  },
-  metricsContainer: {
+  metricsSection: {
     flexDirection: 'row',
     gap: 12,
+    alignItems: 'center',
     justifyContent: 'space-between',
+    minWidth: 240,
   },
-  metricsContainerMobile: {
-    flexDirection: 'row',
-    gap: 8,
+  metricsSectionMobile: {
     width: '100%',
+    gap: 8,
   },
   metricBox: {
-    flex: 1,
     backgroundColor: '#f8f9fa',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
     alignItems: 'center',
-    minWidth: 80,
-  },
-  metricBoxMobile: {
-    padding: 8,
     minWidth: 70,
   },
+  metricBoxMobile: {
+    padding: 10,
+    minWidth: 65,
+  },
   metricValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
+    textAlign: 'center',
   },
   metricValueMobile: {
-    fontSize: 16,
+    fontSize: 15,
   },
   experienceValue: {
     color: '#2e7d32',
   },
   metricLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#666',
-    marginTop: 4,
+    marginTop: 2,
+    textAlign: 'center',
   },
   metricLabelMobile: {
-    fontSize: 11,
+    fontSize: 10,
   },
-  ratingContainer: {
+  ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
   rightSection: {
-    width: 140,
     flexDirection: 'column',
     gap: 12,
     alignItems: 'stretch',
+    minWidth: 100,
   },
   rightSectionMobile: {
     width: '100%',
     flexDirection: 'row',
     gap: 8,
+    justifyContent: 'space-between',
+    alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
     paddingTop: 12,
     marginTop: 12,
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   roleChip: {
     backgroundColor: '#1976d2',
@@ -1226,11 +1147,11 @@ const styles = StyleSheet.create({
   },
   detailsButtonText: {
     color: '#1976d2',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   detailsButtonTextMobile: {
-    fontSize: 13,
+    fontSize: 12,
   },
   bookNowButton: {
     backgroundColor: '#1976d2',
@@ -1251,9 +1172,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     minHeight: 36,
   },
-  bookNowButtonDisabled: {
-    backgroundColor: '#b0b0b0',
-  },
   bookNowButtonText: {
     color: 'white',
     fontSize: 14,
@@ -1262,13 +1180,18 @@ const styles = StyleSheet.create({
   bookNowButtonTextMobile: {
     fontSize: 13,
   },
-  favoriteButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
+  // Debug styles
+  debugOverlay: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 5,
+    borderRadius: 5,
   },
-  favoriteButtonMobile: {
-    padding: 6,
+  debugText: {
+    color: 'white',
+    fontSize: 10,
   },
 });
 

@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React from 'react';
 import {
   View,
@@ -5,21 +6,16 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  Alert as RNAlert,
 } from 'react-native';
 import {
   Portal,
-  Dialog,
-  Card,
   Text,
   Chip,
   IconButton,
   Divider,
-  List,
   PaperProvider,
-  Button,
-  Badge,
   Surface,
+  Card,
 } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -40,6 +36,7 @@ const ProviderAvailabilityDrawer: React.FC<ProviderAvailabilityDrawerProps> = ({
   if (!provider) return null;
 
   const formatTime = (timeString: string) => {
+    if (!timeString) return '08:00 AM';
     return moment(timeString, 'HH:mm').format('hh:mm A');
   };
 
@@ -51,17 +48,9 @@ const ProviderAvailabilityDrawer: React.FC<ProviderAvailabilityDrawerProps> = ({
     return 'Partially Available';
   };
 
-  const getAvailabilityColor = () => {
-    const availability = provider.monthlyAvailability;
-    if (!availability) return 'default';
-    
-    if (availability.fullyAvailable) return 'success';
-    return 'warning';
-  };
-
   const getBestMatchMessage = () => {
     if (provider.bestMatch) {
-      return "This provider is our best match for your requirements!";
+      return "This provider perfectly matches all your requirements and preferences.";
     } else {
       if (provider.monthlyAvailability?.fullyAvailable === false) {
         return "This provider has some schedule variations. Check availability details below.";
@@ -70,221 +59,171 @@ const ProviderAvailabilityDrawer: React.FC<ProviderAvailabilityDrawerProps> = ({
     }
   };
 
-  const getColor = (colorName: string) => {
-    const colors: Record<string, string> = {
-      success: '#4caf50',
-      warning: '#ff9800',
-      error: '#f44336',
-      primary: '#2196f3',
-      info: '#2196f3',
-      divider: '#e0e0e0',
-      background: '#ffffff',
-      textSecondary: '#757575',
-      warningLight: '#fff3e0',
-      warningDark: '#ff9800',
-      successLight: '#e8f5e9',
-      errorLight: '#ffebee',
-      grey50: '#fafafa',
-      grey200: '#eeeeee',
-    };
-    return colors[colorName] || '#000000';
-  };
-
   const renderHeader = () => (
     <View style={styles.header}>
       <View style={styles.headerContent}>
-        <Text variant="headlineSmall" style={styles.headerTitle}>
+        <Text variant="headlineMedium" style={styles.headerTitle}>
           Availability Details
         </Text>
-        <View style={styles.headerSubtitle}>
-          <Text variant="bodyLarge" style={styles.providerName}>
-            {provider.firstname} {provider.lastname}
+        <View style={styles.providerInfo}>
+          <Text variant="titleMedium" style={styles.providerName}>
+            {provider.firstName} {provider.lastName}
           </Text>
           {provider.bestMatch && (
-            <Chip
-              icon={() => <MaterialCommunityIcons name="fire" size={16} color="#fff" />}
-              style={[styles.chip, styles.bestMatchChip]}
-              textStyle={styles.chipText}
-            >
-              Best Match
-            </Chip>
+            <View style={styles.bestMatchBadge}>
+              <MaterialCommunityIcons name="star" size={16} color="#FFD700" />
+              <Text style={styles.bestMatchText}>Best Match</Text>
+            </View>
           )}
         </View>
       </View>
-      <IconButton
-        icon="close"
-        size={24}
-        onPress={onClose}
-        style={styles.closeButton}
-      />
+      <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+        <Icon name="close" size={28} color="#000" />
+      </TouchableOpacity>
     </View>
   );
 
   const renderBestMatchAlert = () => {
     if (provider.bestMatch) {
       return (
-        <Surface style={[styles.alert, styles.successAlert]}>
-          <View style={styles.alertContent}>
+        <View style={[styles.alert, styles.successAlert]}>
+          <View style={styles.alertIconContainer}>
             <MaterialCommunityIcons 
               name="fire" 
               size={24} 
-              color={getColor('success')}
+              color="#4caf50"
             />
-            <View style={styles.alertText}>
-              <Text variant="titleSmall" style={styles.alertTitle}>
-                Best Match Provider!
-              </Text>
-              <Text variant="bodyMedium">
-                This provider perfectly matches all your requirements and preferences.
-              </Text>
-            </View>
           </View>
-        </Surface>
+          <View style={styles.alertTextContainer}>
+            <Text style={styles.alertTitle}>
+              Best Match Provider!
+            </Text>
+            <Text style={styles.alertMessage}>
+              This provider perfectly matches all your requirements and preferences.
+            </Text>
+          </View>
+        </View>
       );
     } else {
       return (
-        <Surface style={[styles.alert, styles.infoAlert]}>
-          <View style={styles.alertContent}>
-            <Icon name="info" size={24} color={getColor('primary')} />
-            <View style={styles.alertText}>
-              <Text variant="titleSmall" style={styles.alertTitle}>
-                Good Match
-              </Text>
-              <Text variant="bodyMedium">
-                {getBestMatchMessage()}
-              </Text>
-            </View>
+        <View style={[styles.alert, styles.infoAlert]}>
+          <View style={styles.alertIconContainer}>
+            <Icon name="info" size={24} color="#2196f3" />
           </View>
-        </Surface>
+          <View style={styles.alertTextContainer}>
+            <Text style={styles.alertTitle}>
+              Good Match
+            </Text>
+            <Text style={styles.alertMessage}>
+              {getBestMatchMessage()}
+            </Text>
+          </View>
+        </View>
       );
     }
   };
 
-  const renderMonthlyAvailability = () => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardTitleRow}>
-            <Icon name="calendar-month" size={24} color={getColor('primary')} />
-            <Text variant="titleLarge" style={styles.cardTitle}>
-              Monthly Availability
-            </Text>
-          </View>
-          <Chip
-            style={[
-              styles.availabilityBadge,
-              provider.monthlyAvailability?.fullyAvailable 
-                ? styles.fullyAvailableBadge 
-                : styles.partiallyAvailableBadge
-            ]}
-            textStyle={styles.availabilityBadgeText}
-          >
-            {getAvailabilityStatus()}
-          </Chip>
-        </View>
-        
-        <Divider style={styles.divider} />
-
-        {/* Preferred Working Time */}
-        <View style={styles.section}>
-          <Text variant="labelMedium" style={styles.sectionLabel}>
-            Preferred Working Time
-          </Text>
-          <Surface style={styles.timeSlot}>
-            <View style={styles.timeSlotContent}>
-              <Icon name="access-time" size={24} color={getColor('primary')} />
-              <Text variant="titleMedium" style={styles.timeText}>
-                {formatTime(provider.monthlyAvailability?.preferredTime || '08:00')}
+  const renderMonthlyAvailability = () => {
+    const isFullyAvailable = provider.monthlyAvailability?.fullyAvailable === true;
+    
+    return (
+      <Card style={styles.mainCard}>
+        <Card.Content>
+          <View style={styles.sectionHeader}>
+            <Icon name="calendar-month" size={24} color="#333" />
+            <Text style={styles.sectionTitle}>Monthly Availability</Text>
+            <View style={[
+              styles.statusBadge,
+              isFullyAvailable ? styles.statusBadgeSuccess : styles.statusBadgeWarning
+            ]}>
+              <Text style={styles.statusBadgeText}>
+                {getAvailabilityStatus()}
               </Text>
-              <Chip 
-                mode="outlined"
-                style={styles.dailyChip}
-                textStyle={styles.dailyChipText}
-              >
-                Daily
-              </Chip>
             </View>
-          </Surface>
-        </View>
+          </View>
 
-        {/* Availability Stats */}
-        {provider.monthlyAvailability?.summary && (
-          <View style={styles.section}>
-            <Text variant="labelMedium" style={styles.sectionLabel}>
-              Availability Summary (Next 30 days)
-            </Text>
-            <Surface style={styles.statsCard}>
-              <View style={styles.statRow}>
-                <View style={styles.statLabel}>
-                  <Icon name="event-available" size={20} color={getColor('success')} />
-                  <Text variant="bodyMedium" style={styles.statText}>
-                    Days at preferred time
+          <View style={styles.infoSection}>
+            <Text style={styles.infoLabel}>Preferred Working Time</Text>
+            <View style={styles.timeInfo}>
+              <Icon name="access-time" size={20} color="#666" />
+              <Text style={styles.timeText}>
+                {formatTime(provider.monthlyAvailability?.preferredTime)}
+              </Text>
+              <View style={styles.dailyBadge}>
+                <Text style={styles.dailyBadgeText}>Daily</Text>
+              </View>
+            </View>
+          </View>
+
+          {provider.monthlyAvailability?.summary && (
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Availability Summary (Next 30 days)</Text>
+              
+              <View style={styles.summaryItem}>
+                <View style={styles.summaryLabel}>
+                  <Icon name="event-available" size={20} color="#4caf50" />
+                  <Text style={styles.summaryText}>Days at preferred time</Text>
+                </View>
+                <View style={styles.summaryValue}>
+                  <Text style={styles.daysCount}>
+                    {provider.monthlyAvailability.summary.daysAtPreferredTime} days
                   </Text>
                 </View>
-                <Chip
-                  mode="outlined"
-                  style={[styles.statChip, styles.successChip]}
-                  textStyle={styles.statChipText}
-                >
-                  {provider.monthlyAvailability.summary.daysAtPreferredTime} days
-                </Chip>
               </View>
 
               {provider.monthlyAvailability.summary.daysWithDifferentTime > 0 && (
-                <View style={styles.statRow}>
-                  <View style={styles.statLabel}>
-                    <Icon name="access-time" size={20} color={getColor('warning')} />
-                    <Text variant="bodyMedium" style={styles.statText}>
-                      Days with different time
+                <View style={styles.summaryItem}>
+                  <View style={styles.summaryLabel}>
+                    <Icon name="access-time" size={20} color="#ff9800" />
+                    <Text style={styles.summaryText}>Days with different time</Text>
+                  </View>
+                  <View style={styles.summaryValue}>
+                    <Text style={styles.daysCount}>
+                      {provider.monthlyAvailability.summary.daysWithDifferentTime} days
                     </Text>
                   </View>
-                  <Chip
-                    mode="outlined"
-                    style={[styles.statChip, styles.warningChip]}
-                    textStyle={styles.statChipText}
-                  >
-                    {provider.monthlyAvailability.summary.daysWithDifferentTime} days
-                  </Chip>
                 </View>
               )}
 
               {provider.monthlyAvailability.summary.unavailableDays > 0 && (
-                <View style={styles.statRow}>
-                  <View style={styles.statLabel}>
-                    <Icon name="event-busy" size={20} color={getColor('error')} />
-                    <Text variant="bodyMedium" style={styles.statText}>
-                      Unavailable days
+                <View style={styles.summaryItem}>
+                  <View style={styles.summaryLabel}>
+                    <Icon name="event-busy" size={20} color="#f44336" />
+                    <Text style={styles.summaryText}>Unavailable days</Text>
+                  </View>
+                  <View style={styles.summaryValue}>
+                    <Text style={styles.daysCount}>
+                      {provider.monthlyAvailability.summary.unavailableDays} days
                     </Text>
                   </View>
-                  <Chip
-                    mode="outlined"
-                    style={[styles.statChip, styles.errorChip]}
-                    textStyle={styles.statChipText}
-                  >
-                    {provider.monthlyAvailability.summary.unavailableDays} days
-                  </Chip>
                 </View>
               )}
 
-              <Divider style={styles.divider} />
+              <Divider style={styles.summaryDivider} />
 
-              <View style={styles.statRow}>
-                <Text variant="bodyMedium" style={styles.totalText}>
-                  Total available days
-                </Text>
-                <Chip
-                  style={[styles.statChip, styles.primaryChip]}
-                  textStyle={styles.primaryChipText}
-                >
-                  {provider.monthlyAvailability.summary.totalDays} days
-                </Chip>
+              <View style={styles.totalItem}>
+                <Text style={styles.totalLabel}>Total available days</Text>
+                <View style={styles.totalValue}>
+                  <Text style={styles.totalDays}>
+                    {provider.monthlyAvailability.summary.totalDays} days
+                  </Text>
+                </View>
               </View>
-            </Surface>
-          </View>
-        )}
-      </Card.Content>
-    </Card>
-  );
+            </View>
+          )}
+
+          {!provider.monthlyAvailability?.summary && (
+            <View style={styles.noDataSection}>
+              <Icon name="info" size={20} color="#666" />
+              <Text style={styles.noDataText}>
+                Detailed availability information is not available for this provider.
+              </Text>
+            </View>
+          )}
+        </Card.Content>
+      </Card>
+    );
+  };
 
   const renderExceptions = () => {
     if (!provider.monthlyAvailability?.exceptions || 
@@ -296,76 +235,49 @@ const ProviderAvailabilityDrawer: React.FC<ProviderAvailabilityDrawerProps> = ({
       <Card style={styles.card}>
         <Card.Content>
           <View style={styles.exceptionsHeader}>
-            <Icon name="warning" size={24} color={getColor('warning')} />
-            <Text variant="titleLarge" style={styles.cardTitle}>
-              Schedule Exceptions
-            </Text>
-            <Chip
-              mode="outlined"
-              style={[styles.chip, styles.warningChip]}
-              textStyle={styles.warningChip}
-            >
-              {provider.monthlyAvailability.exceptions.length} exception(s)
-            </Chip>
-          </View>
-
-          <List.Section>
-            {provider.monthlyAvailability.exceptions.map((exception, index) => (
-              <React.Fragment key={index}>
-                <Surface style={styles.exceptionItem}>
-                  <List.Item
-                    title={() => (
-                      <View style={styles.exceptionHeader}>
-                        <Text variant="titleMedium" style={styles.exceptionDate}>
-                          {moment(exception.date).format('ddd, MMM D, YYYY')}
-                        </Text>
-                        <Chip
-                          style={[styles.chip, styles.exceptionReasonChip]}
-                          textStyle={styles.exceptionReasonText}
-                        >
-                          {exception.reason.replace('_', ' ')}
-                        </Chip>
-                      </View>
-                    )}
-                    description={() => (
-                      <View style={styles.exceptionContent}>
-                        <Text variant="bodyMedium" style={styles.exceptionDescription}>
-                          {exception.reason === 'ON_DEMAND' 
-                            ? 'Available on demand at different time'
-                            : 'Not available at preferred time'}
-                        </Text>
-                        {exception.suggestedTime && (
-                          <View style={styles.suggestedTime}>
-                            <Icon name="access-time" size={16} color={getColor('textSecondary')} />
-                            <Text variant="bodyMedium" style={styles.suggestedTimeText}>
-                              Suggested time: {formatTime(exception.suggestedTime)}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-                    left={() => (
-                      <List.Icon 
-                        icon={() => <Icon name="info" size={24} color={getColor('warning')} />}
-                      />
-                    )}
-                  />
-                </Surface>
-                {index < provider.monthlyAvailability.exceptions.length - 1 && (
-                  <Divider style={styles.exceptionDivider} />
-                )}
-              </React.Fragment>
-            ))}
-          </List.Section>
-
-          <Surface style={[styles.alert, styles.infoAlert, styles.exceptionAlert]}>
-            <View style={styles.alertContent}>
-              <Text variant="bodyMedium">
-                These dates have different availability. You can still book for these dates,
-                but the timing might vary.
+            <Icon name="warning" size={24} color="#ff9800" />
+            <Text style={styles.sectionTitle}>Schedule Exceptions</Text>
+            <View style={styles.exceptionCountBadge}>
+              <Text style={styles.exceptionCountText}>
+                {provider.monthlyAvailability.exceptions.length} exception(s)
               </Text>
             </View>
-          </Surface>
+          </View>
+
+          {provider.monthlyAvailability.exceptions.map((exception, index) => (
+            <View key={index} style={styles.exceptionItem}>
+              <View style={styles.exceptionHeaderRow}>
+                <Text style={styles.exceptionDate}>
+                  {moment(exception.date).format('ddd, MMM D, YYYY')}
+                </Text>
+                <View style={styles.exceptionReasonBadge}>
+                  <Text style={styles.exceptionReasonText}>
+                    {exception.reason?.replace('_', ' ') || 'Exception'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.exceptionDescription}>
+                {exception.reason === 'ON_DEMAND' 
+                  ? 'Available on demand at different time'
+                  : 'Not available at preferred time'}
+              </Text>
+              {exception.suggestedTime && (
+                <View style={styles.suggestedTime}>
+                  <Icon name="access-time" size={16} color="#666" />
+                  <Text style={styles.suggestedTimeText}>
+                    Suggested time: {formatTime(exception.suggestedTime)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+
+          <View style={[styles.alert, styles.infoAlert, styles.exceptionAlert]}>
+            <Text style={styles.exceptionNote}>
+              These dates have different availability. You can still book for these dates,
+              but the timing might vary.
+            </Text>
+          </View>
         </Card.Content>
       </Card>
     );
@@ -374,38 +286,38 @@ const ProviderAvailabilityDrawer: React.FC<ProviderAvailabilityDrawerProps> = ({
   const renderNotices = () => (
     <View style={styles.notices}>
       {provider.monthlyAvailability?.fullyAvailable && (
-        <Surface style={[styles.alert, styles.successAlert]}>
-          <View style={styles.alertContent}>
-            <Icon name="check-circle" size={24} color={getColor('success')} />
-            <View style={styles.alertText}>
-              <Text variant="titleSmall" style={styles.alertTitle}>
-                Perfect Availability!
-              </Text>
-              <Text variant="bodyMedium">
-                This provider is fully available at their preferred time for the entire month.
-                No schedule conflicts or exceptions.
-              </Text>
-            </View>
+        <View style={[styles.alert, styles.successAlert, styles.noticeAlert]}>
+          <View style={styles.alertIconContainer}>
+            <Icon name="check-circle" size={24} color="#4caf50" />
           </View>
-        </Surface>
+          <View style={styles.alertTextContainer}>
+            <Text style={styles.alertTitle}>
+              Perfect Availability!
+            </Text>
+            <Text style={styles.alertMessage}>
+              This provider is fully available at their preferred time for the entire month.
+              No schedule conflicts or exceptions.
+            </Text>
+          </View>
+        </View>
       )}
 
       {!provider.bestMatch && provider.monthlyAvailability?.fullyAvailable === false && (
-        <Surface style={[styles.alert, styles.warningAlert]}>
-          <View style={styles.alertContent}>
-            <Icon name="info" size={24} color={getColor('warning')} />
-            <View style={styles.alertText}>
-              <Text variant="titleSmall" style={styles.alertTitle}>
-                Why this isn't a Best Match?
-              </Text>
-              <Text variant="bodyMedium">
-                This provider has some schedule variations during the month which prevents 
-                them from being marked as a "Best Match". However, they're still highly 
-                available and can accommodate your needs on most days.
-              </Text>
-            </View>
+        <View style={[styles.alert, styles.warningAlert, styles.noticeAlert]}>
+          <View style={styles.alertIconContainer}>
+            <Icon name="info" size={24} color="#ff9800" />
           </View>
-        </Surface>
+          <View style={styles.alertTextContainer}>
+            <Text style={styles.alertTitle}>
+              Why this isn't a Best Match?
+            </Text>
+            <Text style={styles.alertMessage}>
+              This provider has some schedule variations during the month which prevents 
+              them from being marked as a "Best Match". However, they're still highly 
+              available and can accommodate your needs on most days.
+            </Text>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -416,12 +328,18 @@ const ProviderAvailabilityDrawer: React.FC<ProviderAvailabilityDrawerProps> = ({
         visible={open}
         onRequestClose={onClose}
         animationType="slide"
-        presentationStyle="fullScreen"
+        presentationStyle="pageSheet"
+        style={styles.modal}
       >
         <PaperProvider>
           <View style={styles.container}>
             {renderHeader()}
-            <ScrollView style={styles.content}>
+            <Divider />
+            <ScrollView 
+              style={styles.content}
+              contentContainerStyle={styles.contentContainer}
+              showsVerticalScrollIndicator={false}
+            >
               {renderBestMatchAlert()}
               {renderMonthlyAvailability()}
               {renderExceptions()}
@@ -435,241 +353,334 @@ const ProviderAvailabilityDrawer: React.FC<ProviderAvailabilityDrawerProps> = ({
 };
 
 const styles = StyleSheet.create({
+  modal: {
+    margin: 0,
+  },
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: '#ffffff',
   },
   headerContent: {
     flex: 1,
   },
   headerTitle: {
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '700',
+    fontSize: 24,
+    marginBottom: 8,
+    color: '#000',
   },
-  headerSubtitle: {
+  providerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   providerName: {
-    color: '#757575',
+    fontWeight: '600',
+    fontSize: 16,
+    color: '#000',
     marginRight: 8,
   },
-  closeButton: {
-    marginLeft: 8,
+  bestMatchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF9C4',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  chip: {
-    marginRight: 4,
-  },
-  bestMatchChip: {
-    backgroundColor: '#ff9800',
-  },
-  chipText: {
-    color: '#ffffff',
+  bestMatchText: {
     fontWeight: '600',
     fontSize: 12,
+    color: '#FF8F00',
+    marginLeft: 4,
+  },
+  closeButton: {
+    padding: 4,
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     padding: 16,
   },
   alert: {
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
     padding: 16,
-  },
-  alertContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
-  alertText: {
+  alertIconContainer: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  alertTextContainer: {
     flex: 1,
-    marginLeft: 12,
   },
   alertTitle: {
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
     marginBottom: 4,
+    color: '#000',
+  },
+  alertMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#333',
   },
   successAlert: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: '#E8F5E9',
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
   },
   infoAlert: {
-    backgroundColor: '#e3f2fd',
+    backgroundColor: '#E3F2FD',
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
   },
   warningAlert: {
-    backgroundColor: '#fff3e0',
+    backgroundColor: '#FFF3E0',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+  },
+  mainCard: {
+    marginBottom: 16,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   card: {
     marginBottom: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  cardTitleRow: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  cardTitle: {
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  availabilityBadge: {
-    height: 32,
-  },
-  availabilityBadgeText: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  fullyAvailableBadge: {
-    backgroundColor: '#4caf50',
-  },
-  partiallyAvailableBadge: {
-    backgroundColor: '#ff9800',
-  },
-  divider: {
-    marginVertical: 16,
-  },
-  section: {
     marginBottom: 20,
   },
-  sectionLabel: {
-    color: '#757575',
-    marginBottom: 8,
-  },
-  timeSlot: {
-    borderRadius: 8,
-    backgroundColor: '#fafafa',
-    borderWidth: 1,
-    borderColor: '#eeeeee',
-    padding: 12,
-  },
-  timeSlotContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  timeText: {
-    fontWeight: '600',
+  sectionTitle: {
+    fontWeight: '700',
+    fontSize: 18,
+    color: '#000',
     marginLeft: 12,
     marginRight: 'auto',
   },
-  dailyChip: {
-    height: 24,
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  dailyChipText: {
+  statusBadgeSuccess: {
+    backgroundColor: '#4CAF50',
+  },
+  statusBadgeWarning: {
+    backgroundColor: '#FF9800',
+  },
+  statusBadgeText: {
+    color: '#fff',
+    fontWeight: '700',
     fontSize: 12,
   },
-  statsCard: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    padding: 16,
+  infoSection: {
+    marginBottom: 20,
   },
-  statRow: {
+  infoLabel: {
+    fontWeight: '600',
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  timeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  timeText: {
+    fontWeight: '700',
+    fontSize: 18,
+    color: '#000',
+    marginLeft: 12,
+    marginRight: 'auto',
+  },
+  dailyBadge: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  dailyBadgeText: {
+    color: '#2196F3',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  summaryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    paddingVertical: 8,
   },
-  statLabel: {
+  summaryLabel: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  statText: {
-    marginLeft: 8,
+  summaryText: {
+    fontSize: 15,
+    color: '#333',
+    marginLeft: 12,
   },
-  statChip: {
-    height: 28,
+  summaryValue: {
+    alignItems: 'flex-end',
   },
-  statChipText: {
-    fontSize: 12,
-  },
-  successChip: {
-    borderColor: '#4caf50',
-  },
-  warningChip: {
-    borderColor: '#ff9800',
-  },
-  errorChip: {
-    borderColor: '#f44336',
-  },
-  primaryChip: {
-    backgroundColor: '#2196f3',
-  },
-  primaryChipText: {
-    color: '#ffffff',
-    fontSize: 12,
-  },
-  totalText: {
+  daysCount: {
+    fontSize: 15,
     fontWeight: '600',
+    color: '#333',
+  },
+  summaryDivider: {
+    marginVertical: 16,
+    backgroundColor: '#E0E0E0',
+    height: 1,
+  },
+  totalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+  },
+  totalValue: {
+    alignItems: 'flex-end',
+  },
+  totalDays: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2196F3',
+  },
+  noDataSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAFAFA',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  noDataText: {
+    marginLeft: 12,
+    color: '#666',
+    fontSize: 14,
+    flex: 1,
   },
   exceptionsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
   },
-  exceptionItem: {
-    borderRadius: 8,
-    backgroundColor: '#fff3e0',
-    marginBottom: 8,
-    padding: 4,
+  exceptionCountBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF9800',
+    backgroundColor: '#FFF8E1',
   },
-  exceptionHeader: {
+  exceptionCountText: {
+    color: '#FF9800',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  exceptionItem: {
+    backgroundColor: '#FFF8E1',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+  },
+  exceptionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
+    flexWrap: 'wrap',
   },
   exceptionDate: {
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 16,
+    color: '#333',
     flex: 1,
+    marginRight: 8,
   },
-  exceptionReasonChip: {
-    backgroundColor: '#ff9800',
-    marginLeft: 8,
+  exceptionReasonBadge: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   exceptionReasonText: {
-    color: '#ffffff',
+    color: '#fff',
     fontSize: 12,
-  },
-  exceptionContent: {
-    marginTop: 4,
+    fontWeight: '600',
   },
   exceptionDescription: {
-    color: '#757575',
+    fontSize: 14,
+    color: '#666',
     marginBottom: 8,
   },
   suggestedTime: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 4,
   },
   suggestedTimeText: {
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  exceptionDivider: {
-    marginVertical: 8,
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
   },
   exceptionAlert: {
     marginTop: 16,
   },
+  exceptionNote: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#333',
+  },
   notices: {
-    marginTop: 16,
+    marginTop: 8,
+  },
+  noticeAlert: {
+    marginBottom: 16,
   },
 });
 

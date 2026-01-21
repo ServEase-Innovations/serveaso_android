@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -39,6 +39,8 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   const [selectedProviderType, setSelectedProviderType] = useState('');
   const [searchData, setSearchData] = useState<any>();
   const [serviceProviderData, setServiceProviderData] = useState<any[]>([]);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [hasPerformedSearch, setHasPerformedSearch] = useState(false);
   
   const { getBookingType, getPricingData, getFilteredPricing } = usePricingFilterService();
   const bookingType = getBookingType();
@@ -62,14 +64,17 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     console.log('📅 Booking type:', bookingType);
     console.log('📍 Location:', location);
     
-    performSearch();
+    // Only perform search if we have both booking type and location
+    if (bookingType && location && !hasPerformedSearch) {
+      performSearch();
+    }
   }, [selectedProviderType, location, bookingType]);
 
   useEffect(() => {
     console.log('Selected ...', selected);
     setSelectedProviderType(selected || '');
 
-    if (selected) {
+    if (selected && !hasPerformedSearch) {
       fetchServiceProvidersByRole(selected);
     }
   }, [selected]);
@@ -122,7 +127,8 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     toggleDrawer(false);
   };
 
-  const handleSelectedProvider = (provider: any) => {
+  // FIXED: Use useCallback to prevent unnecessary re-renders
+  const handleSelectedProvider = useCallback((provider: any) => {
     console.log('👤 Handle selected provider:', {
       providerId: provider.serviceproviderId || provider.id,
       name: `${provider.firstname} ${provider.lastname}`,
@@ -133,8 +139,9 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     if (selectedProvider) {
       selectedProvider(provider);
     }
-    sendDataToParent(CONFIRMATION);
-  };
+    
+    // No navigation here - only store data
+  }, [selectedProvider]);
 
   const handleSearch = (formData: { serviceType: string; startTime: string; endTime: string }) => {
     console.log('🔍 Search data received:', formData);
@@ -186,6 +193,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     try {
       console.log('\n🚀 =========== STARTING NEW SEARCH ===========');
       setLoading(true);
+      setHasPerformedSearch(true);
 
       console.log('📋 Booking Type:', bookingType);
       console.log('📍 Location object:', location);
@@ -220,6 +228,8 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       if (latitude === 0 && longitude === 0) {
         console.warn('⚠️ No valid coordinates found');
         Alert.alert('Location Required', 'Please enable location services to find providers near you');
+        setServiceProviderData([]);
+        setLoading(false);
         return;
       }
 
@@ -280,6 +290,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       setServiceProviderData([]);
     } finally {
       setLoading(false);
+      setIsInitialLoad(false);
       console.log('🏁 Search completed');
     }
   };
@@ -335,7 +346,8 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     }
   };
 
-  const handleProviderSelection = (provider: any) => {
+  // FIXED: Use useCallback to prevent unnecessary re-renders
+  const handleProviderSelection = useCallback((provider: any) => {
     console.log('\n🎯 =========== PROVIDER SELECTED ===========');
     console.log('Provider selected from ProviderDetails:', {
       id: provider.serviceproviderId || provider.id,
@@ -361,8 +373,23 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       selectedProvider(provider);
     }
     
-    sendDataToParent(CONFIRMATION);
-  };
+    // No navigation here - only store data
+    // Navigation will happen from service dialog after confirmation
+  }, [bookingType, selectedProvider]);
+
+  // FIXED: Use useCallback for ProviderDetails component to prevent re-renders
+  const renderProviderDetails = useCallback((provider: any, index: number) => {
+    return (
+      <View key={`provider-${index}-${provider.serviceproviderId || provider.id}`} style={styles.providerContainer}>
+        <ProviderDetails 
+          {...provider} 
+          selectedProvider={handleProviderSelection}
+          sendDataToParent={sendDataToParent}
+          housekeepingRole={provider.housekeepingRole || bookingType?.housekeepingRole}
+        />
+      </View>
+    );
+  }, [handleProviderSelection, sendDataToParent, bookingType]);
 
   // Log whenever serviceProviderData changes
   useEffect(() => {
@@ -381,7 +408,9 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   console.log('📊 Current state:', {
     serviceProviderDataLength: serviceProviderData?.length || 0,
     loading,
-    selectedProviderType
+    selectedProviderType,
+    hasPerformedSearch,
+    isInitialLoad
   });
 
   const renderContent = () => {
@@ -393,7 +422,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     });
     console.log('⏳ Loading state:', loading);
 
-    if (loading) {
+    if (loading && isInitialLoad) {
       console.log('🔄 Rendering loading state');
       return (
         <View style={styles.centeredContainer}>
@@ -412,19 +441,10 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
           <Text style={styles.resultsCount}>
             Found {serviceProviderData.length} provider{serviceProviderData.length !== 1 ? 's' : ''} near you
           </Text>
-          {serviceProviderData.map((provider, index) => (
-            <View key={`provider-${index}-${provider.serviceproviderId || provider.id}`} style={styles.providerContainer}>
-              <ProviderDetails 
-                {...provider} 
-                selectedProvider={handleProviderSelection}
-                sendDataToParent={sendDataToParent}
-                housekeepingRole={provider.housekeepingRole || bookingType?.housekeepingRole}
-              />
-            </View>
-          ))}
+          {serviceProviderData.map((provider, index) => renderProviderDetails(provider, index))}
         </>
       );
-    } else {
+    } else if (!loading && hasPerformedSearch) {
       console.log('❌ Rendering no data state');
       return (
         <View style={styles.centeredContainer}>
@@ -450,6 +470,15 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
           >
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
+        </View>
+      );
+    } else {
+      // Initial state - no search performed yet
+      return (
+        <View style={styles.centeredContainer}>
+          <Text style={styles.initialStateText}>
+            Select booking details to find providers
+          </Text>
         </View>
       );
     }
@@ -586,6 +615,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: 'white',
     textAlign: 'center',
+  },
+  initialStateText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
 
