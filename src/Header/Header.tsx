@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     height: 70,
-    paddingHorizontal: 16,
+    paddingHorizontal: 13,
     elevation: 3,
     ...Platform.select({
       ios: {
@@ -831,6 +831,7 @@ const styles = StyleSheet.create({
   },
   locationContainer: {
     flex: 2,
+   
     marginHorizontal: 10,
     maxWidth: width * 0.35,
     height: 36,
@@ -842,6 +843,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-end",
     maxWidth: 150,
+
   },
   iconButton: {
     justifyContent: "center",
