@@ -3,7 +3,7 @@
 // types.ts
 export interface ProviderDetailsType {
     serviceproviderId: string;
-    firstName: string;
+    firstname: string;
     middleName?: string;
     lastName: string;
     gender: string;
@@ -56,11 +56,11 @@ export interface MonthlyAvailabilityDTO {
 
 /** Service Provider DTO (Frontend) */
 export interface ServiceProviderDTO {
-  serviceproviderId: string;
+  serviceproviderid: string;
 
   // Basic info
-  firstName: string;
-  lastName: string;
+  firstname: string;
+  lastname: string;
   gender: "MALE" | "FEMALE" | "OTHER";
   experience: number; // years
   rating: number;

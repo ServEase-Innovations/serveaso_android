@@ -242,17 +242,32 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     setIsFavorite(!isFavorite);
   };
 
-  // Get provider ID - handle both lowercase and uppercase variations
+  // Get provider ID - FIXED: Handle property name variations correctly
   const getProviderId = () => {
-    // Check both property name variations
-    const id = props.serviceproviderid || props.serviceproviderId || props.id;
+    // Try to get the provider ID from different property names
+    const id = props.serviceproviderId || props.serviceproviderid;
     console.log("Provider ID check:", {
-      lowercase: props.serviceproviderid,
-      uppercase: props.serviceproviderId,
-      id: props.id,
+      serviceproviderId: props.serviceproviderId,
+      serviceproviderid: props.serviceproviderid,
+      
       selected: id
     });
     return id ? String(id) : undefined;
+  };
+
+  // Get first name - FIXED: Handle property name variations
+  const getFirstName = () => {
+    return props.firstName || props.firstname || '';
+  };
+
+  // Get last name - FIXED: Handle property name variations
+  const getLastName = () => {
+    return props.lastName || props.lastname || '';
+  };
+
+  // Get housekeeping role - FIXED: Handle property name variations
+  const getHousekeepingRole = () => {
+    return props.housekeepingRole || props.housekeepingrole || "UNKNOWN";
   };
 
   // Handle Book Now - FIXED VERSION
@@ -266,8 +281,7 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
       return;
     }
 
-    // FIXED: Check for both lowercase and uppercase property names
-    const housekeepingRole = props.housekeepingrole || props.housekeepingRole;
+    const housekeepingRole = getHousekeepingRole();
     
     let booking: BookingType;
 
@@ -346,8 +360,8 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
 
   // Get initials for avatar
   const getInitials = () => {
-    const firstName = props.firstName || props.firstName || '';
-    const lastName = props.lastName || props.lastName || '';
+    const firstName = getFirstName();
+    const lastName = getLastName();
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
@@ -379,59 +393,43 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
     return props.experience || 1;
   };
 
-  // Get housekeeping role - handle both lowercase and uppercase property names
-  const getHousekeepingRole = () => {
-    return props.housekeepingrole || props.housekeepingRole || "UNKNOWN";
-  };
-
   // Render service dialog - FIXED VERSION
   const renderServiceDialog = () => {
     const providerId = getProviderId();
     const housekeepingRole = getHousekeepingRole();
+    const firstName = getFirstName();
+    const lastName = getLastName();
     
     console.log("Rendering service dialog, open:", open);
     console.log("Provider role:", housekeepingRole);
     console.log("Provider ID:", providerId);
-    console.log("All props keys:", Object.keys(props));
+    console.log("First Name:", firstName);
+    console.log("Last Name:", lastName);
     
-    // FIXED: Use correct property names from your ServiceProviderDTO
-    const providerDetailsData: EnhancedProviderDetails = {
-      // Support both property name conventions for ID
+    // FIXED: Create providerDetailsData exactly like in your React web version
+    const providerDetailsData: any = {
+      ...props,
       serviceproviderid: providerId,
       serviceproviderId: providerId,
-      
-      // Basic info
-      firstName: props.firstName || '',
-      lastName: props.lastName || '',
+      firstname: firstName,
+      firstName: firstName,
+      lastname: lastName,
+      lastName: lastName,
       housekeepingrole: housekeepingRole,
       housekeepingRole: housekeepingRole,
-      gender: props.gender,
-      dob: props.dob,
-      diet: props.diet,
-      languageknown: props.languageknown || [],
-      experience: props.experience?.toString() || "",
-      otherServices: props.otherServices || "",
-      availableTimeSlots: props.availableTimeSlots || [],
-      
-      // Time selections
       selectedMorningTime: morningSelection,
       selectedEveningTime: eveningSelection,
-      matchedMorningSelection: matchedMorningSelection,
-      matchedEveningSelection: matchedEveningSelection,
-      startTime: startTime,
-      endTime: endTime,
-      
-      // Additional properties
-      rating: props.rating,
-      distance_km: props.distance_km,
-      bestMatch: props.bestMatch,
-      monthlyAvailability: props.monthlyAvailability,
-      age: props.age,
-      locality: props.locality
+      matchedMorningSelection,
+      matchedEveningSelection,
+      startTime,
+      endTime
     };
 
-    console.log("Dialog data prepared:", providerDetailsData);
-    console.log("Role for switch statement:", housekeepingRole);
+    console.log("Dialog data prepared:", {
+      id: providerDetailsData.serviceproviderId,
+      name: `${providerDetailsData.firstName} ${providerDetailsData.lastName}`,
+      role: providerDetailsData.housekeepingRole
+    });
 
     // FIXED: Use the variable that handles both property name variations
     switch (housekeepingRole) {
@@ -473,15 +471,14 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
         );
       default:
         console.log("No dialog for role:", housekeepingRole);
-        console.log("Available props:", Object.keys(props));
         return null;
     }
   };
 
   const age = getAge();
   const genderSymbol = getGenderSymbol(props.gender);
-  const firstName = props.firstName || '';
-  const lastName = props.lastName || '';
+  const firstName = getFirstName();
+  const lastName = getLastName();
   const fullName = `${firstName} ${lastName}`.trim();
   const housekeepingRole = getHousekeepingRole();
   const providerId = getProviderId();
@@ -773,15 +770,12 @@ const ProviderDetails: React.FC<ProviderDetailsProps> = (props) => {
       {/* Render the dialog */}
       {renderServiceDialog()}
       
-      {/* Debug overlay */}
+      {/* Debug overlay - helpful for development */}
       {/* {__DEV__ && (
         <View style={styles.debugOverlay}>
-          <Text style={styles.debugText}>Dialog Open: {open.toString()}</Text>
+          <Text style={styles.debugText}>Name: {fullName}</Text>
           <Text style={styles.debugText}>Provider ID: {providerId}</Text>
           <Text style={styles.debugText}>Role: {housekeepingRole}</Text>
-          <Text style={styles.debugText}>ID lower: {props.serviceproviderid}</Text>
-          <Text style={styles.debugText}>ID upper: {props.serviceproviderId}</Text>
-          <Text style={styles.debugText}>All props: {JSON.stringify(Object.keys(props))}</Text>
         </View>
       )} */}
     </View>
@@ -1181,18 +1175,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   // Debug styles
-  debugOverlay: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 5,
-    borderRadius: 5,
-  },
-  debugText: {
-    color: 'white',
-    fontSize: 10,
-  },
+  // debugOverlay: {
+  //   position: 'absolute',
+  //   bottom: 10,
+  //   right: 10,
+  //   backgroundColor: 'rgba(0,0,0,0.7)',
+  //   padding: 5,
+  //   borderRadius: 5,
+  // },
+  // debugText: {
+  //   color: 'white',
+  //   fontSize: 10,
+  // },
 });
 
 export default ProviderDetails;

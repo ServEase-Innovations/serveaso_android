@@ -1,23 +1,27 @@
-import React, { useEffect, useState, useCallback } from 'react';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable */
+
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Image,
-  ActivityIndicator,
   TouchableOpacity,
+  Image,
+  Platform,
+  ActivityIndicator,
+  SafeAreaView,
   Alert,
   Dimensions,
   RefreshControl,
-} from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
-import axiosInstance from '../services/axiosInstance';
-import ProviderDetails from './ProviderDetails';
-import { add } from '../features/detailsDataSlice';
-import { CONFIRMATION } from '../Constants/pagesConstants';
+} from "react-native";
+import providerInstance from "../services/providerInstance";
+import { CONFIRMATION } from "../Constants/pagesConstants";
+import ProviderDetails from "../DetailsView/ProviderDetails";
+import { useDispatch, useSelector } from "react-redux";
 import { usePricingFilterService } from '../utils/PricingFilter';
+import { ServiceProviderDTO } from "../types/ProviderDetailsType";
 
 interface DetailsViewProps {
   sendDataToParent: (data: string) => void;
@@ -36,14 +40,17 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedProviderType, setSelectedProviderType] = useState('');
+  const [selectedProviderType, setSelectedProviderType] = useState("");
   const [searchData, setSearchData] = useState<any>();
-  const [serviceProviderData, setServiceProviderData] = useState<any[]>([]);
+  const [serviceProviderData, setServiceProviderData] = useState<ServiceProviderDTO[]>([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasPerformedSearch, setHasPerformedSearch] = useState(false);
   
   const { getBookingType, getPricingData, getFilteredPricing } = usePricingFilterService();
   const bookingType = getBookingType();
+  
+  console.log("Details:", bookingType);
+  
   const dispatch = useDispatch();
 
   const location = useSelector((state: any) => {
@@ -52,7 +59,7 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   });
 
   const handleCheckoutData = (data: any) => {
-    console.log('Received checkout data:', data);
+    console.log("Received checkout data:", data);
 
     if (checkoutItem) {
       checkoutItem(data);
@@ -75,42 +82,13 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     setSelectedProviderType(selected || '');
 
     if (selected && !hasPerformedSearch) {
-      fetchServiceProvidersByRole(selected);
+      // You might want to fetch by role here if needed
+      // fetchServiceProvidersByRole(selected);
     }
   }, [selected]);
 
-  const fetchServiceProvidersByRole = async (role: string) => {
-    try {
-      setLoading(true);
-      console.log(`🔍 Fetching service providers by role: ${role.toUpperCase()}`);
-      
-      const response = await axiosInstance.get(
-        'api/serviceproviders/role?role=' + role.toUpperCase()
-      );
-      
-      console.log(`✅ Fetched ${response?.data?.length || 0} service providers by role`);
-      console.log('📋 Service providers data structure:', {
-        isArray: Array.isArray(response?.data),
-        length: response?.data?.length,
-        firstItem: response?.data?.[0]
-      });
-      
-      setServiceProvidersData(response?.data);
-      dispatch(add(response?.data));
-    } catch (err: any) {
-      console.error('❌ Error fetching service providers by role:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status
-      });
-      Alert.alert('Error', 'Failed to fetch service providers');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleBackClick = () => {
-    sendDataToParent('');
+    sendDataToParent("");
   };
 
   const toggleDrawer = (open: boolean) => {
@@ -118,16 +96,10 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   };
 
   const handleSearchResults = (data: any[]) => {
-    console.log('📥 Handle search results:', {
-      dataLength: data?.length,
-      dataStructure: Array.isArray(data) ? 'Array' : typeof data,
-      firstItem: data?.[0]
-    });
     setSearchResults(data);
     toggleDrawer(false);
   };
 
-  // FIXED: Use useCallback to prevent unnecessary re-renders
   const handleSelectedProvider = useCallback((provider: any) => {
     console.log('👤 Handle selected provider:', {
       providerId: provider.serviceproviderId || provider.id,
@@ -140,17 +112,17 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       selectedProvider(provider);
     }
     
-    // No navigation here - only store data
-  }, [selectedProvider]);
+    sendDataToParent(CONFIRMATION);
+  }, [selectedProvider, sendDataToParent]);
 
   const handleSearch = (formData: { serviceType: string; startTime: string; endTime: string }) => {
-    console.log('🔍 Search data received:', formData);
+    console.log("Search data received in MainComponent:", formData);
     setSearchData(formData);
   };
 
   const formatDateOnly = (dateString?: string) => {
-    if (!dateString) return '';
-    return dateString.split('T')[0];
+    if (!dateString) return "";
+    return dateString.split("T")[0];
   };
 
   const logProviderDetails = (providers: any[], source: string) => {
@@ -166,24 +138,6 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       console.log('   Experience:', provider.experience, 'years');
       console.log('   Distance:', provider.distance_km, 'km');
       console.log('   Locality:', provider.locality);
-      console.log('   Gender:', provider.gender);
-      console.log('   Diet:', provider.diet);
-      console.log('   Languages:', provider.languageknown);
-      console.log('   Available Time Slots:', provider.availableTimeSlots);
-      console.log('   Monthly Availability:', provider.monthlyAvailability);
-      console.log('   Other Services:', provider.otherServices);
-      console.log('   Best Match:', provider.bestMatch);
-      
-      // Log all available properties
-      const extraProps = Object.keys(provider).filter(key => 
-        !['serviceproviderId', 'id', 'firstname', 'lastname', 'housekeepingrole', 'rating', 
-          'experience', 'distance_km', 'locality', 'gender', 'diet', 'languageknown', 
-          'availableTimeSlots', 'monthlyAvailability', 'otherServices', 'bestMatch'].includes(key)
-      );
-      
-      if (extraProps.length > 0) {
-        console.log('   Additional Properties:', extraProps);
-      }
     });
     
     console.log(`=========== END PROVIDER DETAILS FROM ${source} ===========\n`);
@@ -234,29 +188,23 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       }
 
       try {
-        const queryParams = new URLSearchParams({
+        const response = await providerInstance.post('/api/service-providers/nearby-monthly', {
+          lat: latitude.toString(),
+          lng: longitude.toString(),
+          radius: 10,
           startDate: startDate,
           endDate: endDate,
-          timeslot: timeslot,
-          housekeepingRole: housekeepingRole,
-          latitude: latitude.toString(),
-          longitude: longitude.toString(),
+          preferredStartTime: bookingType?.timeRange ? bookingType.timeRange.split('-')[0] : "16:37",
+          role: housekeepingRole,
+          serviceDurationMinutes: 60
         });
-
-        console.log('🌐 API Request:', `/api/serviceproviders/search?${queryParams.toString()}`);
-
-        const response = await axiosInstance.get(
-          `/api/serviceproviders/search?${queryParams.toString()}`
-        );
 
         console.log('✅ API Response received');
         console.log('📦 Raw response data:', response.data);
+console.log('🧾 FULL AXIOS RESPONSE:', response);
+console.log('📦 RESPONSE.DATA:', JSON.stringify(response.data, null, 2));
 
-        if (response.data && Array.isArray(response.data)) {
-          console.log(`🎉 Found ${response.data.length} providers directly in array`);
-          logProviderDetails(response.data, 'DIRECT ARRAY RESPONSE');
-          setServiceProviderData(response.data);
-        } else if (response.data && response.data.providers) {
+        if (response.data && response.data.providers) {
           const providers = response.data.providers;
           if (Array.isArray(providers) && providers.length > 0) {
             console.log(`🎉 Found ${providers.length} providers in providers object`);
@@ -266,6 +214,10 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
             console.log('❌ No providers found in providers array');
             setServiceProviderData([]);
           }
+        } else if (response.data && Array.isArray(response.data)) {
+          console.log(`🎉 Found ${response.data.length} providers directly in array`);
+          logProviderDetails(response.data, 'DIRECT ARRAY RESPONSE');
+          setServiceProviderData(response.data);
         } else {
           console.log('❌ Unexpected response format');
           console.log('Response structure:', {
@@ -278,8 +230,8 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       } catch (apiError: any) {
         console.error('❌ API Error:', apiError.message);
         console.log('💡 Error details:', apiError.response?.data);
-        
-        await performAlternativeSearch(startDate, endDate, housekeepingRole, latitude, longitude);
+        Alert.alert('Error', 'Failed to search for providers');
+        setServiceProviderData([]);
       }
     } catch (error: any) {
       console.error('❌ Search failed:', {
@@ -295,57 +247,6 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
     }
   };
 
-  const performAlternativeSearch = async (
-    startDate: string, 
-    endDate: string, 
-    housekeepingRole: string, 
-    latitude: number, 
-    longitude: number
-  ) => {
-    try {
-      console.log('\n🔄 =========== TRYING ALTERNATIVE SEARCH ===========');
-      
-      const response = await axiosInstance.post('https://providers-08ug.onrender.com/api/service-providers/nearby-monthly', {
-        lat: latitude.toString(),
-        lng: longitude.toString(),
-        radius: 10,
-        startDate: startDate,
-        endDate: endDate,
-        preferredStartTime: bookingType?.timeRange ? bookingType.timeRange.split('-')[0] : "16:37",
-        role: housekeepingRole,
-        serviceDurationMinutes: 60
-      });
-
-      console.log('✅ Alternative API Response structure:', {
-        hasData: !!response.data,
-        hasProviders: !!response.data?.providers,
-        providersCount: response.data?.providers?.length || 0
-      });
-
-      if (response.data && response.data.providers) {
-        const providers = response.data.providers;
-        if (Array.isArray(providers) && providers.length > 0) {
-          console.log(`🎉 Found ${providers.length} providers via alternative search`);
-          logProviderDetails(providers, 'ALTERNATIVE SEARCH');
-          setServiceProviderData(providers);
-        } else {
-          console.log('❌ No providers found via alternative search');
-          setServiceProviderData([]);
-        }
-      } else {
-        console.log('❌ No providers data in alternative response');
-        console.log('Response data:', response.data);
-        setServiceProviderData([]);
-      }
-    } catch (error: any) {
-      console.error('❌ Alternative search failed:', {
-        message: error.message,
-        response: error.response?.data
-      });
-      setServiceProviderData([]);
-    }
-  };
-
   // FIXED: Use useCallback to prevent unnecessary re-renders
   const handleProviderSelection = useCallback((provider: any) => {
     console.log('\n🎯 =========== PROVIDER SELECTED ===========');
@@ -353,43 +254,16 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       id: provider.serviceproviderId || provider.id,
       name: `${provider.firstname} ${provider.lastname}`,
       role: provider.housekeepingrole,
-      morningSelection: provider.morningSelectionTime,
-      eveningSelection: provider.eveningSelectionTime,
       selectedMorningTime: provider.selectedMorningTime,
       selectedEveningTime: provider.selectedEveningTime,
-      fullData: provider
     });
-    
-    const bookingData = {
-      serviceproviderId: provider.serviceproviderId || provider.id,
-      eveningSelection: provider.eveningSelectionTime,
-      morningSelection: provider.morningSelectionTime,
-      ...bookingType
-    };
-    
-    console.log('📋 Booking data prepared:', bookingData);
     
     if (selectedProvider) {
       selectedProvider(provider);
     }
     
-    // No navigation here - only store data
-    // Navigation will happen from service dialog after confirmation
-  }, [bookingType, selectedProvider]);
-
-  // FIXED: Use useCallback for ProviderDetails component to prevent re-renders
-  const renderProviderDetails = useCallback((provider: any, index: number) => {
-    return (
-      <View key={`provider-${index}-${provider.serviceproviderId || provider.id}`} style={styles.providerContainer}>
-        <ProviderDetails 
-          {...provider} 
-          selectedProvider={handleProviderSelection}
-          sendDataToParent={sendDataToParent}
-          housekeepingRole={provider.housekeepingRole || bookingType?.housekeepingRole}
-        />
-      </View>
-    );
-  }, [handleProviderSelection, sendDataToParent, bookingType]);
+    sendDataToParent(CONFIRMATION);
+  }, [selectedProvider, sendDataToParent]);
 
   // Log whenever serviceProviderData changes
   useEffect(() => {
@@ -397,9 +271,9 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       console.log('\n📈 ServiceProviderData updated:', {
         count: serviceProviderData.length,
         providers: serviceProviderData.map(p => ({
-          id: p.serviceproviderId || p.id,
+          id: p.serviceproviderid,
           name: `${p.firstname} ${p.lastname}`,
-          role: p.housekeepingrole
+          role: p.housekeepingRole
         }))
       });
     }
@@ -414,68 +288,57 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   });
 
   const renderContent = () => {
-    console.log('🎨 Rendering content...');
-    console.log('📊 Service provider data:', {
-      length: serviceProviderData?.length || 0,
-      isArray: Array.isArray(serviceProviderData),
-      isEmpty: serviceProviderData?.length === 0
-    });
-    console.log('⏳ Loading state:', loading);
-
     if (loading && isInitialLoad) {
-      console.log('🔄 Rendering loading state');
       return (
-        <View style={styles.centeredContainer}>
-          <Image 
-            // source={require('./../../../assets/images/search.gif')} 
-            style={styles.loadingImage}
-          />
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#007bff" />
           <Text style={styles.loadingText}>Searching providers near you...</Text>
-          <ActivityIndicator size="large" color="#007bff" style={styles.activityIndicator} />
         </View>
       );
     } else if (Array.isArray(serviceProviderData) && serviceProviderData.length > 0) {
-      console.log('✅ Rendering providers list');
       return (
         <>
           <Text style={styles.resultsCount}>
             Found {serviceProviderData.length} provider{serviceProviderData.length !== 1 ? 's' : ''} near you
           </Text>
-          {serviceProviderData.map((provider, index) => renderProviderDetails(provider, index))}
+          {serviceProviderData.map((provider, index) => (
+            <View key={index} style={styles.providerContainer}>
+              <ProviderDetails 
+                {...provider} 
+                selectedProvider={handleProviderSelection}
+                sendDataToParent={sendDataToParent} 
+              />
+            </View>
+          ))}
         </>
       );
     } else if (!loading && hasPerformedSearch) {
-      console.log('❌ Rendering no data state');
       return (
-        <View style={styles.centeredContainer}>
-          <Image 
-            // source={require('../../assets/images/no-results.png')} 
-            style={styles.noDataImage}
-          />
-          <Text style={styles.noDataTitle}>Service Not Available in Your Area</Text>
-          <Text style={styles.noDataText}>
+        <View style={styles.centerContainer}>
+          <Text style={styles.title}>Service Not Available in Your Area</Text>
+          <Text style={styles.message}>
             Currently, we are unable to provide services in your location. 
             We hope to be available in your area soon.
           </Text>
           <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => sendDataToParent('')}
+            style={styles.button}
+            onPress={() => sendDataToParent("")}
           >
-            <Text style={styles.backButtonText}>Go Back</Text>
+            <Text style={styles.buttonText}>Go Back</Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={styles.retryButton}
+            style={[styles.button, { backgroundColor: '#6c757d', marginTop: 12 }]}
             onPress={performSearch}
           >
-            <Text style={styles.retryButtonText}>Try Again</Text>
+            <Text style={styles.buttonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
       );
     } else {
       // Initial state - no search performed yet
       return (
-        <View style={styles.centeredContainer}>
+        <View style={styles.centerContainer}>
           <Text style={styles.initialStateText}>
             Select booking details to find providers
           </Text>
@@ -485,12 +348,12 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
   };
 
   return (
-    <View style={styles.mainContainer}>
+    <SafeAreaView style={styles.safeArea}>
       <ScrollView 
-        style={styles.scrollView}
+        style={styles.container}
         contentContainerStyle={[
-          styles.scrollViewContent,
-          serviceProviderData.length === 0 && styles.emptyScrollViewContent
+          styles.contentContainer,
+          serviceProviderData.length === 0 && { justifyContent: 'center', flexGrow: 1 }
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -504,32 +367,63 @@ export const DetailsView: React.FC<DetailsViewProps> = ({
       >
         {renderContent()}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
-const { width, height } = Dimensions.get('window');
-
 const styles = StyleSheet.create({
-  mainContainer: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  scrollView: {
+  container: {
     flex: 1,
   },
-  scrollViewContent: {
+  contentContainer: {
     paddingVertical: 16,
-    paddingHorizontal: 8,
-    flexGrow: 1,
-  },
-  emptyScrollViewContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 16,
   },
   providerContainer: {
-    marginBottom: 12,
-    paddingHorizontal: 8,
+    marginBottom: 16,
+    paddingTop: 4,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    minHeight: 400,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#333',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  message: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  button: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#007bff',
+    borderRadius: 8,
+  },
+  buttonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'white',
   },
   resultsCount: {
     fontSize: 14,
@@ -545,76 +439,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    minHeight: height * 0.7,
-  },
-  loadingImage: {
-    width: 120,
-    height: 120,
-    marginBottom: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  activityIndicator: {
-    marginTop: 10,
-  },
-  noDataImage: {
-    width: 100,
-    height: 100,
-    marginBottom: 20,
-    opacity: 0.7,
-  },
-  noDataTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  noDataText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-    paddingHorizontal: 20,
-  },
-  backButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    backgroundColor: '#007bff',
-    borderRadius: 8,
-    marginBottom: 12,
-    minWidth: 140,
-  },
-  backButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'white',
-    textAlign: 'center',
-  },
-  retryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    backgroundColor: '#6c757d',
-    borderRadius: 8,
-    minWidth: 140,
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'white',
-    textAlign: 'center',
   },
   initialStateText: {
     fontSize: 16,
