@@ -87,6 +87,7 @@ const logBookingData = (data: any, source: string) => {
       console.log(`📌 end_date: ${item.end_date}`);
       console.log(`📌 start_time: ${item.start_time}`);
       console.log(`📌 end_time: ${item.end_time}`);
+      console.log(`📌 start_epoch: ${item.start_epoch}`);
       
       // Log vacation details
       if (item.vacation) {
@@ -129,6 +130,7 @@ const logMappedBooking = (booking: any, index: number) => {
   console.log(`📌 End Date: ${booking.endDate}`);
   console.log(`📌 Start Time: ${booking.start_time}`);
   console.log(`📌 End Time: ${booking.end_time}`);
+  console.log(`📌 Start Epoch: ${booking.start_epoch}`);
   console.log(`📌 Has Vacation: ${booking.hasVacation}`);
   if (booking.vacationDetails) {
     console.log(`🏖️ Vacation Details:`, booking.vacationDetails);
@@ -137,37 +139,6 @@ const logMappedBooking = (booking: any, index: number) => {
     console.log(`🔄 Modification Count: ${booking.modifications.length}`);
   }
   console.log(`🎯 ===== END MAPPED BOOKING =====\n`);
-};
-
-// Helper function to get first name from provider object
-const getProviderFirstName = (provider: any): string => {
-  if (!provider) return '';
-  console.log(`🔍 getProviderFirstName called with:`, provider);
-  const firstName = provider.firstName || provider.firstname || provider.FirstName || '';
-  console.log(`🔍 Found firstName: "${firstName}"`);
-  return firstName;
-};
-
-// Helper function to get last name from provider object
-const getProviderLastName = (provider: any): string => {
-  if (!provider) return '';
-  console.log(`🔍 getProviderLastName called with:`, provider);
-  const lastName = provider.lastName || provider.lastname || provider.LastName || '';
-  console.log(`🔍 Found lastName: "${lastName}"`);
-  return lastName;
-};
-
-// Helper function to get full provider name
-const getProviderFullName = (provider: any): string => {
-  if (!provider) {
-    console.log(`🔍 getProviderFullName: No provider object`);
-    return '';
-  }
-  const firstName = getProviderFirstName(provider);
-  const lastName = getProviderLastName(provider);
-  const fullName = `${firstName} ${lastName}`.trim();
-  console.log(`🔍 getProviderFullName result: "${fullName}"`);
-  return fullName;
 };
 
 // Implement Card component
@@ -277,7 +248,7 @@ interface Booking {
   address: string;
   customerName: string;
   serviceProviderName: string;
-  providerRating: number; // ADDED: Provider rating field
+  providerRating: number;
   taskStatus: string;
   bookingDate: string;
   engagements: string;
@@ -291,7 +262,18 @@ interface Booking {
   responsibilities: Responsibilities;
   customerHolidays?: CustomerHoliday[];
   hasVacation?: boolean;
-  assignmentStatus: string; // ADDED: Assignment status field
+  assignmentStatus: string;
+  start_epoch?: number;
+  vacation?: { // ADD THIS to match React version
+    start_date?: string;
+    end_date?: string;
+    leave_days?: number;
+    leave_start_date?: string;
+    leave_end_date?: string;
+    total_days?: number;
+    refund_amount?: number;
+    leave_type?: string;
+  };
   vacationDetails?: {
     leave_type?: string;
     total_days?: number;
@@ -409,26 +391,22 @@ const getServiceTitle = (type: string) => {
 };
 
 const hasVacation = (booking: Booking): boolean => {
-  return booking.hasVacation || false;
+  
+  return booking.hasVacation || 
+         (booking.vacationDetails && 
+          (booking.vacationDetails.total_days || booking.vacationDetails.leave_days) > 0) || 
+         false;
 };
 
-// NEW: Modification restriction functions from React code
-const isModificationTimeAllowed = (startDate: string, timeSlot: string): boolean => {
-  const now = dayjs();
-  const [time, period] = timeSlot.split(' ');
-  const [hoursStr, minutesStr] = time.split(':');
-  let hours = parseInt(hoursStr, 10);
-  const minutes = parseInt(minutesStr, 10);
+// UPDATED: Modification restriction functions to use start_epoch
+const isModificationTimeAllowed = (startEpoch: any): boolean => {
+  console.log("Start epoch ", startEpoch);
+  if (!startEpoch) return false;
   
-  if (period === 'PM' && hours !== 12) hours += 12;
-  if (period === 'AM' && hours === 12) hours = 0;
-  
-  const bookingDateTime = dayjs(startDate)
-    .set('hour', hours)
-    .set('minute', minutes)
-    .set('second', 0);
-  
-  return now.isBefore(bookingDateTime.subtract(30, 'minute'));
+  const now = dayjs().unix(); // current time in seconds
+  const cutoff = startEpoch - 30 * 60; // 30 minutes before booking start
+
+  return now < cutoff;
 };
 
 const isBookingAlreadyModified = (booking: Booking | null): boolean => {
@@ -452,7 +430,7 @@ const isBookingAlreadyModified = (booking: Booking | null): boolean => {
 const isModificationDisabled = (booking: Booking | null): boolean => {
   if (!booking) return true;
   
-  return !isModificationTimeAllowed(booking.startDate, booking.timeSlot) || 
+  return !isModificationTimeAllowed(booking.start_epoch) || 
          isBookingAlreadyModified(booking);
 };
 
@@ -462,7 +440,7 @@ const getModificationTooltip = (booking: Booking | null): string => {
   if (isBookingAlreadyModified(booking)) {
     return "This booking has already been modified and cannot be modified again.";
   }
-  if (!isModificationTimeAllowed(booking.startDate, booking.timeSlot)) {
+  if (!isModificationTimeAllowed(booking.start_epoch)) {
     return "Modification is only allowed at least 30 minutes before the scheduled time.";
   }
   return "Modify this booking";
@@ -538,6 +516,7 @@ const Booking: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [modifiedBookings, setModifiedBookings] = useState<number[]>([]);
   const [bookingsWithVacation, setBookingsWithVacation] = useState<number[]>([]);
+  const [generatedOTPs, setGeneratedOTPs] = useState<Record<number, string>>({});
   
   // Dialog states
   const [openDialog, setOpenDialog] = useState(false);
@@ -557,6 +536,7 @@ const Booking: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [otpLoading, setOtpLoading] = useState<number | null>(null);
   
   // Other states
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
@@ -680,119 +660,198 @@ const Booking: React.FC = () => {
   };
 
   // UPDATED: Improved mapBookingData function with provider info and base_amount
-  const mapBookingData = (data: any[]) => {
-    console.log(`\n🗺️ ===== MAPPING BOOKING DATA =====`);
-    console.log(`📊 Input data length: ${data.length}`);
-    
-    const result = Array.isArray(data)
-      ? data.map((item, index) => {
-          console.log(`\n📦 Processing item ${index + 1}:`);
-          console.log(`📌 Raw item keys:`, Object.keys(item));
-          
-          const hasVacation = item?.vacation?.leave_days > 0;
-          const serviceType = item.service_type?.toLowerCase() || item.serviceType?.toLowerCase() || 'other';
-          const modifications = item.modifications || [];
-          const hasModifications = modifications.length > 0;
+  // UPDATED: Improved mapBookingData function with provider info and base_amount
+const mapBookingData = (data: any[]) => {
+  console.log(`\n🗺️ ===== MAPPING BOOKING DATA =====`);
+  console.log(`📊 Input data length: ${data.length}`);
+  
+  const result = Array.isArray(data)
+    ? data.map((item, index) => {
+        console.log(`\n📦 Processing item ${index + 1}:`);
+        console.log(`📌 Raw item keys:`, Object.keys(item));
+        
+        const hasVacation = item?.vacation?.leave_days > 0;
+        const serviceType = item.service_type?.toLowerCase() || item.serviceType?.toLowerCase() || 'other';
+        const modifications = item.modifications || [];
+        const hasModifications = modifications.length > 0;
 
-          // Get provider information from the provider object
-          let serviceProviderName = "Not Assigned";
-          let providerRating = 0;
+        // Get provider information from the provider object - MATCHING REACT CODE
+        let serviceProviderName = "Not Assigned";
+        let providerRating = 0;
+        
+        console.log(`🔍 Looking for provider name...`);
+        
+        // DIRECT PROPERTY ACCESS - Like in React code (lowercase firstname/lastname)
+        if (item.provider) {
+          console.log(`✅ Found provider object:`, item.provider);
+          const firstName = item.provider.firstname || '';
+          const lastName = item.provider.lastname || '';
+          const fullName = `${firstName} ${lastName}`.trim();
           
-          console.log(`🔍 Looking for provider name...`);
-          
-          // Check multiple possible locations for provider info with correct property names
-          if (item.provider) {
-            console.log(`✅ Found provider object:`, item.provider);
-            const fullName = getProviderFullName(item.provider);
-            if (fullName) {
-              serviceProviderName = fullName;
-              providerRating = item.provider.rating || 0;
-              console.log(`✅ Using provider object name: "${serviceProviderName}"`);
-            }
-          } else if (item.service_provider) {
-            console.log(`✅ Found service_provider object:`, item.service_provider);
-            const fullName = getProviderFullName(item.service_provider);
-            if (fullName) {
-              serviceProviderName = fullName;
-              providerRating = item.service_provider.rating || 0;
-              console.log(`✅ Using service_provider object name: "${serviceProviderName}"`);
-            }
-          } else if (item.assignment_status === "UNASSIGNED") {
-            serviceProviderName = "Awaiting Assignment";
-            console.log(`✅ Using "Awaiting Assignment" (UNASSIGNED status)`);
-          } else if (item.serviceProviderName && item.serviceProviderName !== "undefined undefined") {
-            serviceProviderName = item.serviceProviderName;
-            console.log(`✅ Using serviceProviderName field: "${serviceProviderName}"`);
-          } else if (item.provider_name) {
-            serviceProviderName = item.provider_name;
-            console.log(`✅ Using provider_name field: "${serviceProviderName}"`);
+          if (fullName && fullName !== ' ') {
+            serviceProviderName = fullName;
+            providerRating = item.provider.rating || 0;
+            console.log(`✅ Using provider name: "${serviceProviderName}"`);
           } else {
-            console.log(`❌ No provider name found in any field`);
+            console.log(`❌ Provider name is empty in provider object`);
           }
-
-          // Use the current dates from API (which should reflect modifications)
-          const effectiveStartDate = item.start_date;
-          const effectiveEndDate = item.end_date;
-
-          // Get amount - check multiple possible fields
-          const amount = item.base_amount || item.monthlyAmount || item.total_amount || 0;
-
-          const mappedBooking = {
-            id: item.engagement_id,
-            customerId: item.customerId,
-            serviceProviderId: item.serviceproviderid || item.serviceProviderId,
-            name: item.customerName,
-            timeSlot: item.start_time,
-            date: effectiveStartDate,
-            startDate: effectiveStartDate,
-            endDate: effectiveEndDate,
-            start_time: item.start_time,
-            end_time: item.end_time,
-            bookingType: item.booking_type,
-            monthlyAmount: amount,
-            paymentMode: item.paymentMode,
-            address: item.address || 'No address specified',
-            customerName: item.customerName,
-            serviceProviderName: serviceProviderName,
-            providerRating: providerRating,
-            taskStatus: item.task_status,
-            engagements: item.engagements,
-            bookingDate: item.created_at,
-            service_type: serviceType,
-            serviceType: serviceType,
-            childAge: item.childAge,
-            experience: item.experience,
-            noOfPersons: item.noOfPersons,
-            mealType: item.mealType,
-            modifiedDate: hasModifications
-              ? modifications[modifications.length - 1]?.date || item.created_at
-              : item.created_at,
-            responsibilities: item.responsibilities,
-            customerHolidays: item.customerHolidays || [],
-            hasVacation: hasVacation,
-            assignmentStatus: item.assignment_status || "ASSIGNED",
-            vacationDetails: hasVacation && item.vacation?.leave_days > 0 
-              ? {
-                  ...item.vacation,
-                  leave_start_date: item.vacation.start_date || item.vacation.leave_start_date,
-                  leave_end_date: item.vacation.end_date || item.vacation.leave_end_date,
-                }
-              : null,
-            modifications: modifications,
-            today_service: item.today_service
-          };
-
-          // Log the mapped booking
-          logMappedBooking(mappedBooking, index);
+        } 
+        // Check service_provider object (fallback)
+        else if (item.service_provider) {
+          console.log(`✅ Found service_provider object:`, item.service_provider);
+          const firstName = item.service_provider.firstname || '';
+          const lastName = item.service_provider.lastname || '';
+          const fullName = `${firstName} ${lastName}`.trim();
           
-          return mappedBooking;
-        })
-      : [];
-    
-    console.log(`\n🗺️ ===== MAPPING COMPLETE =====`);
-    console.log(`📊 Mapped ${result.length} bookings`);
-    
-    return result;
+          if (fullName && fullName !== ' ') {
+            serviceProviderName = fullName;
+            providerRating = item.service_provider.rating || 0;
+            console.log(`✅ Using service_provider name: "${serviceProviderName}"`);
+          }
+        }
+        // Check if assignment status is UNASSIGNED
+        else if (item.assignment_status === "UNASSIGNED") {
+          serviceProviderName = "Awaiting Assignment";
+          console.log(`✅ Using "Awaiting Assignment" (UNASSIGNED status)`);
+        } 
+        // Check other possible fields (fallbacks)
+        else if (item.serviceProviderName && item.serviceProviderName !== "undefined undefined") {
+          serviceProviderName = item.serviceProviderName;
+          console.log(`✅ Using serviceProviderName field: "${serviceProviderName}"`);
+        } else if (item.provider_name) {
+          serviceProviderName = item.provider_name;
+          console.log(`✅ Using provider_name field: "${serviceProviderName}"`);
+        } else {
+          console.log(`❌ No provider name found in any field`);
+        }
+
+        // Use the current dates from API (which should reflect modifications)
+        const effectiveStartDate = item.start_date;
+        const effectiveEndDate = item.end_date;
+
+        // Get amount - check multiple possible fields
+        const amount = item.base_amount || item.monthlyAmount || item.total_amount || 0;
+
+        // Get start_epoch for modification checks
+        const startEpoch = item.start_epoch || 0;
+
+        const mappedBooking = {
+          id: item.engagement_id,
+          customerId: item.customerId,
+          serviceProviderId: item.serviceproviderid || item.serviceProviderId,
+          name: item.customerName,
+          timeSlot: item.start_time,
+          date: effectiveStartDate,
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
+          start_time: item.start_time,
+          end_time: item.end_time,
+          bookingType: item.booking_type,
+          monthlyAmount: amount,
+          paymentMode: item.paymentMode,
+          address: item.address || 'No address specified',
+          customerName: item.customerName,
+          serviceProviderName: serviceProviderName,
+          providerRating: providerRating,
+          taskStatus: item.task_status,
+          engagements: item.engagements,
+          bookingDate: item.created_at,
+          service_type: serviceType,
+          serviceType: serviceType,
+          childAge: item.childAge,
+          experience: item.experience,
+          noOfPersons: item.noOfPersons,
+          mealType: item.mealType,
+          modifiedDate: hasModifications
+            ? modifications[modifications.length - 1]?.date || item.created_at
+            : item.created_at,
+          responsibilities: item.responsibilities,
+          customerHolidays: item.customerHolidays || [],
+          hasVacation: hasVacation,
+          assignmentStatus: item.assignment_status || "ASSIGNED",
+          start_epoch: startEpoch,
+          // ADD VACATION PROPERTIES HERE:
+          vacation: item.vacation || null,
+          vacationDetails: hasVacation && item.vacation?.leave_days > 0 
+            ? {
+                ...item.vacation,
+                leave_start_date: item.vacation.start_date || item.vacation.leave_start_date,
+                leave_end_date: item.vacation.end_date || item.vacation.leave_end_date,
+                total_days: item.vacation.leave_days || item.vacation.total_days,
+              }
+            : null,
+          modifications: modifications,
+          today_service: item.today_service
+        };
+
+        // Log the mapped booking
+        logMappedBooking(mappedBooking, index);
+        
+        return mappedBooking;
+      })
+    : [];
+  
+  console.log(`\n🗺️ ===== MAPPING COMPLETE =====`);
+  console.log(`📊 Mapped ${result.length} bookings`);
+  
+  return result;
+};
+
+  // OTP Generation Function
+  const handleGenerateOTP = async (booking: Booking) => {
+    if (!booking.today_service?.service_day_id) {
+      console.error('Service day ID not found for OTP generation');
+      Alert.alert('Error', 'Service day ID not found for OTP generation');
+      return;
+    }
+
+    try {
+      setOtpLoading(booking.id);
+      
+      const response = await PaymentInstance.post(
+       `/api/engagement-service/service-days/${booking.today_service.service_day_id}/otp`
+      );
+
+      if (response.status === 200 || response.status === 201) {
+        const otp = response.data.otp || response.data.data?.otp || '123456';
+        
+        setGeneratedOTPs(prev => ({
+          ...prev,
+          [booking.id]: otp
+        }));
+
+        // Update the booking state
+        setCurrentBookings(prev => prev.map(b => 
+          b.id === booking.id ? {
+            ...b,
+            today_service: b.today_service ? {
+              ...b.today_service,
+              otp_active: true,
+              can_generate_otp: false
+            } : b.today_service
+          } : b
+        ));
+
+        setFutureBookings(prev => prev.map(b => 
+          b.id === booking.id ? {
+            ...b,
+            today_service: b.today_service ? {
+              ...b.today_service,
+              otp_active: true,
+              can_generate_otp: false
+            } : b.today_service
+          } : b
+        ));
+
+        Alert.alert('Success', 'OTP generated successfully!');
+      }
+    } catch (error: any) {
+      console.error('Error generating OTP:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to generate OTP. Please try again.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setOtpLoading(null);
+    }
   };
 
   // FILTER & SORT FUNCTIONS
@@ -1096,20 +1155,26 @@ const Booking: React.FC = () => {
               {/* OTP Generation Button */}
               <View style={styles.otpButtonContainer}>
                 <Button
-                  style={[styles.otpButton, otp_active && styles.otpButtonDisabled]}
-                  onPress={() => {
-                    console.log(`🔑 Generating OTP for booking ${booking.id}`);
-                    /* Handle OTP generation */
-                  }}
-                  disabled={otp_active}
+                  style={[styles.otpButton, otpLoading === booking.id && styles.disabledButton]}
+                  onPress={() => handleGenerateOTP(booking)}
+                  disabled={otpLoading === booking.id || !booking.today_service?.can_generate_otp}
                 >
-                  <Icon name="check-circle" size={16} color="#fff" />
-                  <Text style={styles.otpButtonText}>
-                    {otp_active ? "OTP Generated" : "Generate & Share OTP"}
-                  </Text>
+                  {otpLoading === booking.id ? (
+                    <>
+                      <ActivityIndicator size="small" color="#fff" />
+                      <Text style={styles.otpButtonText}>Generating...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="check-circle" size={16} color="#fff" />
+                      <Text style={styles.otpButtonText}>
+                        {booking.today_service.otp_active ? "OTP Generated" : "Generate & Share OTP"}
+                      </Text>
+                    </>
+                  )}
                 </Button>
                 
-                {otp_active && (
+                {booking.today_service.otp_active && (
                   <Badge style={styles.otpActiveBadge}>
                     <Text style={styles.otpActiveBadgeText}>OTP Active</Text>
                   </Badge>
@@ -1117,17 +1182,14 @@ const Booking: React.FC = () => {
               </View>
               
               {/* OTP Display Section (if OTP is generated) */}
-              {otp_active && (
+              {booking.today_service.otp_active && generatedOTPs[booking.id] && (
                 <View style={styles.otpDisplayContainer}>
                   <Text style={styles.otpDisplayLabel}>Share this OTP with your provider:</Text>
                   <View style={styles.otpDisplay}>
-                    <Text style={styles.otpCode}>123456</Text>
+                    <Text style={styles.otpCode}>{generatedOTPs[booking.id]}</Text>
                     <Button
                       style={styles.copyOtpButton}
                       onPress={() => {
-                        console.log(`📋 Copying OTP for booking ${booking.id}`);
-                        // Copy OTP to clipboard
-                        // navigator.clipboard.writeText("123456");
                         Alert.alert("Success", "OTP copied to clipboard!");
                       }}
                     >
@@ -1400,6 +1462,7 @@ const Booking: React.FC = () => {
     console.log(`   - Assignment Status: ${item.assignmentStatus}`);
     console.log(`   - Task Status: ${item.taskStatus}`);
     console.log(`   - Has Modifications: ${hasModifications}`);
+    console.log(`   - Start Epoch: ${item.start_epoch}`);
     
     return (
       <Card style={styles.bookingCard}>
