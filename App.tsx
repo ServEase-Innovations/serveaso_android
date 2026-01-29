@@ -43,6 +43,7 @@ import MobileNumberDialog from "./src/UserProfile/MobileNumberDialog";
 import axiosInstance from "./src/services/axiosInstance";
 import WalletDialog from "./src/UserProfile/WalletDialog";
 import NotificationsDialog from "./src/Notifications/NotificationsPage";
+import ServiceProviderRegistration from "./src/Registration/ServiceProviderRegistration";
 
 interface Engagement {
   engagement_id: number;
@@ -429,6 +430,7 @@ const MainApp = () => {
             closeDropdowns={closeDropdowns}
           />
         </View>
+       
 
         {/* Notification Button for Service Providers */}
         {appUser && appUser.role?.toUpperCase() === "SERVICE_PROVIDER" && (
